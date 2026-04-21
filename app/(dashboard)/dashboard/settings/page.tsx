@@ -28,7 +28,7 @@ export default function SettingsPage() {
         const { data: store, error } = await supabase
           .from('stores')
           .select('id, name, slug')
-          .eq('user_id', session.user.id)
+          .eq('owner_id', session.user.id)
           .single();
 
         if (store) {
@@ -70,7 +70,7 @@ export default function SettingsPage() {
       // Upsert: Update if it exists (storeId), Insert if it doesn't
       const { data, error } = await supabase.from('stores').upsert({
         id: storeId || undefined, 
-        user_id: userId,
+        owner_id: userId,
         name: formData.storeName.trim(),
         slug: formData.storeSlug,
       }).select().single();
