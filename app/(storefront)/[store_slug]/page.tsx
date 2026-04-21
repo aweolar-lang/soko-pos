@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { notFound } from "next/navigation";
-import { Store, MapPin, MessageCircle, ShoppingBag } from "lucide-react";
+import { Store, MapPin, MessageCircle, ShoppingBag, Package } from "lucide-react";
 import Link from "next/link";
 
 // Next.js 15 Server Component for maximum SEO speed
