@@ -1,21 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle2, Store, Receipt, Loader2 } from "lucide-react";
 
-export default function PaymentSuccessPage() {
+// 1. We move your core logic into a separate "Content" component
+function PaymentSuccessContent() {
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   
-  // Paystack appends a ?reference=xxx query parameter when it redirects back
   const reference = searchParams.get("reference");
 
   useEffect(() => {
     if (reference) {
-      // In a real-world app, you might want to call your own API here to verify the reference again, 
-      // but the webhook handles the actual database fulfillment. For the UI, we just show success.
       setStatus("success");
     } else {
       setStatus("error");
@@ -50,19 +48,14 @@ export default function PaymentSuccessPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4 py-12 selection:bg-emerald-200">
-      
-      {/* Brand Header */}
       <div className="mb-8 text-center">
         <Link href="https://localsoko.com" className="inline-flex items-center gap-2 text-emerald-600 font-black text-2xl tracking-tight">
           <Store className="h-8 w-8" />
-          SokoPOS
+          LocalSoko
         </Link>
       </div>
 
-      {/* Success Card */}
       <div className="bg-white p-8 sm:p-10 rounded-3xl shadow-xl shadow-slate-200/50 max-w-md w-full text-center border border-slate-100 relative overflow-hidden">
-        
-        {/* Background decorative blob */}
         <div className="absolute -top-24 -right-24 w-48 h-48 bg-emerald-50 rounded-full blur-3xl" />
         
         <div className="relative">
@@ -96,5 +89,19 @@ export default function PaymentSuccessPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// 2. We wrap it in a Suspense boundary in the main default export!
+export default function PaymentSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mb-4" />
+        <p className="text-slate-500 font-medium">Loading...</p>
+      </div>
+    }>
+      <PaymentSuccessContent />
+    </Suspense>
   );
 }
