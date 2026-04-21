@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { createBrowserClient } from '@supabase/ssr';
 import { Store, Mail, Lock, Loader2, LogIn } from "lucide-react";
 import { toast } from "sonner";
 
@@ -15,6 +15,12 @@ export default function LoginPage() {
     email: "",
     password: "",
   });
+  
+  // Create the SSR-compatible browser client
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +34,7 @@ export default function LoginPage() {
       
       if (error) throw error;
       
-      toast.success("Welcome back to SokoPOS!");
+      toast.success("Welcome back to LocalSoko!");
       router.push("/dashboard");
       router.refresh(); // Ensure the layout grabs the new auth state
 
