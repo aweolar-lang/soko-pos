@@ -2,22 +2,18 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useUser } from "@/hooks/useUser";
 import { Package, DollarSign, Image as ImageIcon, X, Hash, Loader2, ArrowLeft, AlignLeft, Tags } from "lucide-react"; 
 import { toast } from "sonner";
 import Link from "next/link";
-import { createBrowserClient } from '@supabase/ssr';
 
-export const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// 1. Import our shared bulletproof client!
+import { supabase } from "@/lib/supabase";
 
 const CATEGORIES = ["Electronics", "Fashion", "Food & Beverage", "Furniture", "Services", "Other"];
+const MAX_IMAGES = 5; // Updated to 5 images max!
 
 export default function AddProductPage() {
   const router = useRouter();
-  const { user } = useUser();
   const [storeId, setStoreId] = useState<string | null>(null);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -32,29 +28,37 @@ export default function AddProductPage() {
     stock_quantity: "1",
   });
 
-  // 1. Get the user's store ID so we know WHERE to save this product
+  // 2. The Bulletproof Fetch: Ask Supabase directly for the session
   useEffect(() => {
     async function fetchStore() {
-      if (!user) return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
       const { data } = await supabase
         .from('stores')
         .select('id')
-        .eq('owner_id', user.id)
+        .eq('owner_id', session.user.id)
         .single();
         
       if (data) setStoreId(data.id);
     }
     fetchStore();
-  }, [user]);
+  }, []);
 
-  // Image Upload Handlers
+  // Image Upload Handlers (Limited to 5)
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const selectedFiles = Array.from(e.target.files);
-      setImages(prev => [...prev, ...selectedFiles].slice(0, 4)); // Max 4 images
+      
+      if (images.length + selectedFiles.length > MAX_IMAGES) {
+        toast.error(`You can only upload a maximum of ${MAX_IMAGES} images.`);
+        return;
+      }
+
+      setImages(prev => [...prev, ...selectedFiles].slice(0, MAX_IMAGES));
       
       const newPreviews = selectedFiles.map(file => URL.createObjectURL(file));
-      setPreviewUrls(prev => [...prev, ...newPreviews].slice(0, 4));
+      setPreviewUrls(prev => [...prev, ...newPreviews].slice(0, MAX_IMAGES));
     }
   };
 
@@ -63,22 +67,41 @@ export default function AddProductPage() {
     setPreviewUrls(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Submit to Database
+  // Submit to Database & Storage
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!storeId) return toast.error("Store profile not found!");
     
     setIsSubmitting(true);
+    const toastId = toast.loading("Publishing product...");
 
     try {
-      // Create a URL-friendly slug (e.g., "MacBook Pro" -> "macbook-pro-8372")
       const slug = formData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Math.floor(Math.random() * 10000);
-
-      // (In a real app, you would upload the 'images' files to Supabase Storage here and get their URLs)
-      // For now, we will leave the images array empty to focus on the database architecture
       const imageUrls: string[] = []; 
 
-      // Save to Products Table
+      // 3. Upload images to Supabase Storage
+      if (images.length > 0) {
+        for (const file of images) {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${storeId}-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+          const filePath = `products/${fileName}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('product-images')
+            .upload(filePath, file);
+
+          if (uploadError) throw uploadError;
+
+          // Get the public URL to save in our database
+          const { data: publicUrlData } = supabase.storage
+            .from('product-images')
+            .getPublicUrl(filePath);
+
+          imageUrls.push(publicUrlData.publicUrl);
+        }
+      }
+
+      // 4. Save everything to the Products Table
       const { error } = await supabase.from('products').insert({
         store_id: storeId,
         title: formData.title,
@@ -87,16 +110,17 @@ export default function AddProductPage() {
         description: formData.description,
         category: formData.category,
         stock_quantity: Number(formData.stock_quantity),
-        images: imageUrls,
+        images: imageUrls, // Now contains the real URLs!
       });
 
       if (error) throw error;
 
-      toast.success("Product added successfully!");
-      router.push("/dashboard/inventory"); // Send them back to the table
+      toast.success("Product added successfully!", { id: toastId });
+      router.push("/dashboard/inventory"); 
 
     } catch (error: any) {
-      toast.error(error.message || "Failed to add product");
+      console.error(error);
+      toast.error(error.message || "Failed to add product", { id: toastId });
     } finally {
       setIsSubmitting(false);
     }
@@ -104,7 +128,6 @@ export default function AddProductPage() {
 
   return (
     <div className="max-w-3xl mx-auto py-6">
-      
       <Link href="/dashboard/inventory" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900 mb-6 transition-colors">
         <ArrowLeft className="h-4 w-4" /> Back to Inventory
       </Link>
@@ -117,31 +140,50 @@ export default function AddProductPage() {
 
         <form onSubmit={handleSubmit} className="p-6 space-y-8">
           
+          {/* Image Upload Section */}
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">Product Images (Max {MAX_IMAGES})</label>
+            <div className="flex gap-4 overflow-x-auto pb-2">
+              {previewUrls.map((url, index) => (
+                <div key={index} className="relative w-24 h-24 shrink-0 rounded-xl border border-slate-200 overflow-hidden group">
+                  <img src={url} alt="Preview" className="w-full h-full object-cover" />
+                  <button 
+                    type="button" 
+                    onClick={() => removeImage(index)}
+                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              
+              {images.length < MAX_IMAGES && (
+                <label className="w-24 h-24 shrink-0 flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl cursor-pointer hover:bg-slate-50 hover:border-emerald-500 transition-colors">
+                  <ImageIcon className="h-6 w-6 text-slate-400 mb-1" />
+                  <span className="text-[10px] font-medium text-slate-500">Add Image</span>
+                  <input type="file" accept="image/*" multiple onChange={handleImageChange} className="hidden" />
+                </label>
+              )}
+            </div>
+          </div>
+
+          <hr className="border-slate-100" />
+
           {/* Row 1: Title & Category */}
           <div className="grid md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-2">Product Title</label>
               <div className="relative">
                 <Package className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
-                <input 
-                  required type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData({...formData, title: e.target.value})}
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm"
-                  placeholder="e.g. iPhone 15 Pro"
-                />
+                <input required type="text" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" placeholder="e.g. iPhone 15 Pro" />
               </div>
             </div>
 
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-2">Category</label>
               <div className="relative">
-                <Tags className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
-                <select 
-                  value={formData.category}
-                  onChange={(e) => setFormData({...formData, category: e.target.value})}
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm appearance-none bg-white"
-                >
+                <Tags className="absolute left-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
+                <select value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm appearance-none bg-slate-50 focus:bg-white">
                   {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                 </select>
               </div>
@@ -154,13 +196,7 @@ export default function AddProductPage() {
               <label className="block text-sm font-bold text-slate-700 mb-2">Selling Price (Ksh)</label>
               <div className="relative">
                 <DollarSign className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
-                <input 
-                  required type="number" min="0"
-                  value={formData.price}
-                  onChange={(e) => setFormData({...formData, price: e.target.value})}
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm"
-                  placeholder="0"
-                />
+                <input required type="number" min="0" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-white" placeholder="0" />
               </div>
             </div>
             
@@ -168,13 +204,7 @@ export default function AddProductPage() {
               <label className="block text-sm font-bold text-slate-700 mb-2">Initial Stock Quantity</label>
               <div className="relative">
                 <Hash className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
-                <input 
-                  required type="number" min="1"
-                  value={formData.stock_quantity}
-                  onChange={(e) => setFormData({...formData, stock_quantity: e.target.value})}
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm"
-                  placeholder="10"
-                />
+                <input required type="number" min="1" value={formData.stock_quantity} onChange={(e) => setFormData({...formData, stock_quantity: e.target.value})} className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-white" placeholder="10" />
               </div>
             </div>
           </div>
@@ -184,23 +214,14 @@ export default function AddProductPage() {
             <label className="block text-sm font-bold text-slate-700 mb-2">Product Description</label>
             <div className="relative">
               <AlignLeft className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
-              <textarea 
-                required rows={4}
-                value={formData.description}
-                onChange={(e) => setFormData({...formData, description: e.target.value})}
-                className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm resize-none"
-                placeholder="Describe your product..."
-              />
+              <textarea required rows={4} value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm resize-none bg-slate-50 focus:bg-white" placeholder="Describe your product..." />
             </div>
           </div>
 
           {/* Submit Button */}
           <div className="pt-4 border-t border-slate-100">
-            <button 
-              type="submit" disabled={isSubmitting}
-              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl transition-all flex justify-center items-center gap-2"
-            >
-              {isSubmitting ? <><Loader2 className="animate-spin h-5 w-5" /> Saving Product...</> : "Publish Product"}
+            <button type="submit" disabled={isSubmitting} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl transition-all flex justify-center items-center gap-2">
+              {isSubmitting ? <><Loader2 className="animate-spin h-5 w-5" /> Publishing...</> : "Publish Product"}
             </button>
           </div>
 

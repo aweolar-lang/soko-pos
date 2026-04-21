@@ -2,16 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { Search, Plus, Minus, Trash2, CreditCard, Banknote, ShoppingBag } from "lucide-react";
-import { createBrowserClient } from '@supabase/ssr';
-import { useUser } from "@/hooks/useUser"; // Assuming you copied this over
+import { supabase } from "@/lib/supabase"; 
 import Image from "next/image";
 import { toast } from "sonner";
-
-export const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 
 // TypeScript Interfaces
 interface Product {
@@ -27,26 +20,28 @@ interface CartItem extends Product {
 }
 
 export default function PointOfSalePage() {
-  const { user } = useUser();
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [storeId, setStoreId] = useState<string | null>(null);
 
-  // 1. Fetch the store's products (Simplified for UI display)
   useEffect(() => {
     async function fetchInventory() {
-      if (!user) return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        setIsLoading(false);
+        return;
+      }
       
       const { data: store } = await supabase
         .from('stores')
         .select('id')
-        .eq('owner_id', user.id)
+        .eq('owner_id', session.user.id)
         .single();
 
       if (store) {
-        setStoreId(store.id); // <-- Save the store ID to state
+        setStoreId(store.id); 
         
         const { data: items } = await supabase
           .from('products')
@@ -58,8 +53,9 @@ export default function PointOfSalePage() {
       }
       setIsLoading(false);
     }
+    
     fetchInventory();
-  }, [user]);
+  }, []);
 
   // 2. Cart Logic
   const addToCart = (product: Product) => {
