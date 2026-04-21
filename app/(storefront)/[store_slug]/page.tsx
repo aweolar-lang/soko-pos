@@ -1,7 +1,10 @@
+"use client";
+
 import { supabase } from "@/lib/supabase";
 import { notFound } from "next/navigation";
 import { Store, MapPin, MessageCircle, ShoppingBag, Package } from "lucide-react";
 import Link from "next/link";
+import CheckoutButton from "./CheckoutButton";
 
 // Next.js 15 Server Component for maximum SEO speed
 export default async function PublicStorePage({ 
@@ -101,17 +104,7 @@ export default async function PublicStorePage({
                     <div className="mt-3 flex items-center justify-between mb-4">
                       <span className="text-lg font-black text-emerald-600">Ksh {product.price.toLocaleString()}</span>
                     </div>
-                    
-                    {/* The WhatsApp Order Button */}
-                    <a 
-                      href={buyLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-auto w-full bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95"
-                    >
-                      <MessageCircle className="h-4 w-4 text-[#25D366]" />
-                      Order via WhatsApp
-                    </a>
+                    <CheckoutButton productId={product.id} storeName={store.name} />
                   </div>
                 </div>
               );
