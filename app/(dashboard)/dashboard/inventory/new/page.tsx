@@ -2,11 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 import { useUser } from "@/hooks/useUser";
 import { Package, DollarSign, Image as ImageIcon, X, Hash, Loader2, ArrowLeft, AlignLeft, Tags } from "lucide-react"; 
 import { toast } from "sonner";
 import Link from "next/link";
+import { createBrowserClient } from '@supabase/ssr';
+
+export const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 const CATEGORIES = ["Electronics", "Fashion", "Food & Beverage", "Furniture", "Services", "Other"];
 

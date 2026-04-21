@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { Package, MapPin, Clock, Phone, Loader2, Calendar } from "lucide-react";
 import { toast } from "sonner";
+import { createBrowserClient } from '@supabase/ssr';
+
+export const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 // TypeScript interface based on our upgraded database schema
 interface Order {

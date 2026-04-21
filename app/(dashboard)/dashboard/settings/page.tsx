@@ -1,9 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
 import { Store, Link as LinkIcon, Loader2, Save, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+
+import { createBrowserClient } from '@supabase/ssr';
+
+export const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(false);

@@ -1,7 +1,7 @@
 // app/(dashboard)/dashboard/layout.tsx
 "use client";
 
-import { supabase } from "@/lib/supabase";
+import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from "next/navigation";
 
 import Link from "next/link";
@@ -29,6 +29,12 @@ const navLinks = [
   { name: "Billing", href: "/dashboard/billing", icon: CreditCard },
   { name: "Store Settings", href: "/dashboard/settings", icon: Settings },
 ];
+
+export const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

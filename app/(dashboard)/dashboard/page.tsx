@@ -2,10 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { Search, Plus, Minus, Trash2, CreditCard, Banknote, ShoppingBag } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { createBrowserClient } from '@supabase/ssr';
 import { useUser } from "@/hooks/useUser"; // Assuming you copied this over
 import Image from "next/image";
 import { toast } from "sonner";
+
+export const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
 
 // TypeScript Interfaces
 interface Product {

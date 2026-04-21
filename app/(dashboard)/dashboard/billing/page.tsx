@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { CheckCircle2, ShieldCheck, Zap, Crown, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { createBrowserClient } from '@supabase/ssr';
+
+export const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function BillingPage() {
   const [isLoading, setIsLoading] = useState(true);
