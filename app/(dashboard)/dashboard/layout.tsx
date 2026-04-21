@@ -1,6 +1,9 @@
 // app/(dashboard)/dashboard/layout.tsx
 "use client";
 
+import { supabase } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
@@ -12,7 +15,8 @@ import {
   Settings, 
   LogOut,
   Menu,
-  Bell
+  Bell,
+  CreditCard
 } from "lucide-react";
 import { useState } from "react";
 
@@ -22,12 +26,20 @@ const navLinks = [
   { name: "Inventory", href: "/dashboard/inventory", icon: Package },
   { name: "Orders", href: "/dashboard/orders", icon: Receipt },
   { name: "Wallet", href: "/dashboard/wallet", icon: Wallet },
+  { name: "Billing", href: "/dashboard/billing", icon: CreditCard },
   { name: "Store Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const router = useRouter();
+
+  const handleLogout = async () => {
+  await supabase.auth.signOut();
+  router.push("/");
+  };
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex font-sans text-slate-900">
@@ -67,7 +79,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Bottom Profile / Logout section */}
         <div className="p-4 border-t border-slate-100">
-          <button className="flex items-center gap-3 px-3 py-2.5 w-full rounded-xl text-sm font-semibold text-slate-600 hover:bg-red-50 hover:text-red-600 transition-all">
+          <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2.5 w-full rounded-xl text-sm font-semibold text-slate-600 hover:bg-red-50 hover:text-red-600 transition-all">
             <LogOut className="h-5 w-5 text-slate-400 group-hover:text-red-500" />
             Sign Out
           </button>

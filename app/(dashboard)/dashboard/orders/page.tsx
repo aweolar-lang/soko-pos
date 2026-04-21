@@ -1,195 +1,216 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { useUser } from "@/hooks/useUser";
-import { Receipt, Search, Clock, CheckCircle, CreditCard, Banknote, TrendingUp, PackageOpen } from "lucide-react";
+import { Package, MapPin, Clock, Phone, Loader2, Calendar } from "lucide-react";
+import { toast } from "sonner";
 
-// Types for our orders
+// TypeScript interface based on our upgraded database schema
 interface Order {
   id: string;
-  total_amount: number;
+  customer_name: string;
+  customer_phone: string;
+  amount_paid: number;
+  fulfillment_type: string;
+  delivery_address: string;
+  takeaway_time: string;
+  customer_notes: string;
   status: string;
-  payment_method: string;
-  is_pos_sale: boolean;
   created_at: string;
+  products: {
+    name: string;
+  } | null;
 }
 
+const STATUS_OPTIONS = [
+  { value: 'NEW', label: 'New Order', color: 'bg-blue-100 text-blue-700' },
+  { value: 'PREPARING', label: 'Preparing', color: 'bg-yellow-100 text-yellow-700' },
+  { value: 'READY_FOR_PICKUP', label: 'Ready for Pickup', color: 'bg-orange-100 text-orange-700' },
+  { value: 'OUT_FOR_DELIVERY', label: 'Out for Delivery', color: 'bg-purple-100 text-purple-700' },
+  { value: 'COMPLETED', label: 'Completed', color: 'bg-emerald-100 text-emerald-700' },
+  { value: 'CANCELLED', label: 'Cancelled', color: 'bg-red-100 text-red-700' },
+];
+
 export default function OrdersPage() {
-  const { user } = useUser();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-
-  // Quick Stats
-  const totalRevenue = orders.reduce((sum, order) => sum + Number(order.total_amount), 0);
-  const totalOrders = orders.length;
+  const [isUpdating, setIsUpdating] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchOrders() {
-      if (!user) return;
-      
-      // 1. Get the store
+    fetchOrders();
+  }, []);
+
+  const fetchOrders = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      // First get the store_id
       const { data: store } = await supabase
         .from('stores')
         .select('id')
-        .eq('owner_id', user.id)
+        .eq('owner_id', session.user.id)
         .single();
 
-      if (store) {
-        // 2. Get the orders
-        const { data: orderData } = await supabase
-          .from('orders')
-          .select('*')
-          .eq('store_id', store.id)
-          .order('created_at', { ascending: false });
-          
-        if (orderData) setOrders(orderData);
+      if (!store) {
+        setIsLoading(false);
+        return;
       }
-      setIsLoading(false);
-    }
-    fetchOrders();
-  }, [user]);
 
-  // UI Helpers
-  const getStatusBadge = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'completed':
-      case 'paid':
-        return <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-100 text-emerald-700"><CheckCircle className="h-3.5 w-3.5" /> Paid</span>;
-      case 'pending':
-        return <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-amber-100 text-amber-700"><Clock className="h-3.5 w-3.5" /> Pending</span>;
-      default:
-        return <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-slate-100 text-slate-700">{status}</span>;
+      // Fetch orders and join with the products table to get the product name
+      const { data: ordersData, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          products ( name )
+        `)
+        .eq('store_id', store.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setOrders(ordersData as Order[] || []);
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+      toast.error("Failed to load orders.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const filteredOrders = orders.filter(o => 
-    o.id.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleStatusChange = async (orderId: string, newStatus: string) => {
+    setIsUpdating(orderId);
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: newStatus })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      // Optimistically update the UI
+      setOrders(orders.map(order => 
+        order.id === orderId ? { ...order, status: newStatus } : order
+      ));
+      toast.success(`Order marked as ${newStatus.replace(/_/g, ' ')}`);
+    } catch (error) {
+      console.error("Error updating status:", error);
+      toast.error("Failed to update order status.");
+    } finally {
+      setIsUpdating(null);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900">Orders & Sales</h1>
-          <p className="text-slate-500 text-sm mt-1">Track your POS walk-ins and online storefront sales.</p>
-        </div>
+    <div className="max-w-5xl mx-auto space-y-6 pb-12">
+      <div>
+        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Orders</h1>
+        <p className="mt-2 text-sm text-slate-500">
+          Manage your incoming orders, deliveries, and pickups.
+        </p>
       </div>
 
-      {/* STATS CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="h-12 w-12 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
-            <TrendingUp className="h-6 w-6 text-emerald-600" />
-          </div>
-          <div>
-            <p className="text-sm font-bold text-slate-500">Total Revenue</p>
-            <p className="text-2xl font-black text-slate-900">Ksh {totalRevenue.toLocaleString()}</p>
-          </div>
+      {orders.length === 0 ? (
+        <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center shadow-sm">
+          <Package className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+          <h3 className="text-lg font-bold text-slate-900">No orders yet</h3>
+          <p className="text-slate-500 mt-1">When customers buy your products, they will appear here.</p>
         </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {orders.map((order) => {
+            const statusConfig = STATUS_OPTIONS.find(s => s.value === order.status) || STATUS_OPTIONS[0];
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="h-12 w-12 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
-            <Receipt className="h-6 w-6 text-blue-600" />
-          </div>
-          <div>
-            <p className="text-sm font-bold text-slate-500">Total Orders</p>
-            <p className="text-2xl font-black text-slate-900">{totalOrders}</p>
-          </div>
+            return (
+              <div key={order.id} className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col relative overflow-hidden">
+                
+                {/* Header: Date & Status */}
+                <div className="flex items-start justify-between mb-4 border-b border-slate-100 pb-4">
+                  <div>
+                    <div className="flex items-center gap-2 text-sm text-slate-500 font-medium mb-1">
+                      <Calendar className="h-4 w-4" />
+                      {new Date(order.created_at).toLocaleDateString()} at {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-900 line-clamp-1">
+                      {order.products?.name || "Deleted Product"}
+                    </h3>
+                  </div>
+                  
+                  {/* Status Dropdown */}
+                  <select
+                    value={order.status}
+                    onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                    disabled={isUpdating === order.id}
+                    className={`appearance-none cursor-pointer text-xs font-bold px-3 py-1.5 rounded-full outline-none transition-colors border-2 ${statusConfig.color.replace('bg-', 'border-').split(' ')[0]} ${statusConfig.color}`}
+                  >
+                    {STATUS_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value} className="bg-white text-slate-900">
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Customer Details */}
+                <div className="space-y-3 mb-6 flex-1">
+                  <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl">
+                    <span className="text-sm font-bold text-slate-700">{order.customer_name}</span>
+                    <span className="text-sm font-black text-emerald-600">Ksh {order.amount_paid}</span>
+                  </div>
+
+                  {order.customer_phone && order.customer_phone !== "N/A" && (
+                    <div className="flex items-center gap-3 text-sm text-slate-600">
+                      <Phone className="h-4 w-4 text-slate-400" />
+                      <a href={`tel:${order.customer_phone}`} className="hover:text-emerald-600 transition-colors">
+                        {order.customer_phone}
+                      </a>
+                    </div>
+                  )}
+
+                  {/* Dynamic Fulfillment UI */}
+                  {order.fulfillment_type === 'TAKEAWAY' ? (
+                    <div className="flex items-start gap-3 text-sm text-slate-600 bg-orange-50/50 p-3 rounded-xl border border-orange-100">
+                      <Clock className="h-4 w-4 text-orange-500 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold text-orange-800 block mb-0.5">Takeaway Pickup</span>
+                        {order.takeaway_time ? new Date(order.takeaway_time).toLocaleString() : "As soon as possible"}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-3 text-sm text-slate-600 bg-blue-50/50 p-3 rounded-xl border border-blue-100">
+                      <MapPin className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold text-blue-800 block mb-0.5">Delivery Location</span>
+                        {order.customer_notes && order.customer_notes !== "N/A" ? order.customer_notes : "No address provided."}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {order.fulfillment_type === 'TAKEAWAY' && order.customer_notes && order.customer_notes !== "N/A" && (
+                    <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <span className="font-bold text-slate-700 text-xs uppercase tracking-wider block mb-1">Notes</span>
+                      {order.customer_notes}
+                    </div>
+                  )}
+                </div>
+
+                {isUpdating === order.id && (
+                  <div className="absolute inset-0 bg-white/50 backdrop-blur-[2px] flex items-center justify-center rounded-3xl z-10">
+                    <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
-      </div>
-
-      {/* ORDERS TABLE */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        
-        {/* Search */}
-        <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-          <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by Order ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm"
-            />
-          </div>
-        </div>
-
-        {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm whitespace-nowrap">
-            <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-100">
-              <tr>
-                <th className="px-6 py-4">Order ID</th>
-                <th className="px-6 py-4">Date</th>
-                <th className="px-6 py-4">Source</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Amount</th>
-              </tr>
-            </thead>
-            
-            <tbody className="divide-y divide-slate-100">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-slate-400">Loading orders...</td>
-                </tr>
-              ) : filteredOrders.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center">
-                    <PackageOpen className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                    <p className="text-slate-500 font-medium">No sales yet</p>
-                    <p className="text-slate-400 text-sm mt-1">When customers buy from you, orders appear here.</p>
-                  </td>
-                </tr>
-              ) : (
-                filteredOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-slate-50/50 transition-colors">
-                    
-                    {/* Order ID */}
-                    <td className="px-6 py-4 font-mono text-slate-500 text-xs">
-                      #{order.id.split('-')[0].toUpperCase()}
-                    </td>
-
-                    {/* Date */}
-                    <td className="px-6 py-4 text-slate-600">
-                      {new Date(order.created_at).toLocaleDateString('en-KE', { 
-                        year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                      })}
-                    </td>
-
-                    {/* Source (POS vs Online) */}
-                    <td className="px-6 py-4">
-                      {order.is_pos_sale ? (
-                        <span className="flex items-center gap-1.5 text-slate-600 font-medium">
-                          <Banknote className="h-4 w-4 text-slate-400" /> Walk-in POS
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1.5 text-blue-600 font-medium">
-                          <CreditCard className="h-4 w-4 text-blue-400" /> Online Store
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Status */}
-                    <td className="px-6 py-4">
-                      {getStatusBadge(order.status)}
-                    </td>
-
-                    {/* Amount */}
-                    <td className="px-6 py-4 font-black text-emerald-600 text-right">
-                      Ksh {Number(order.total_amount).toLocaleString()}
-                    </td>
-
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

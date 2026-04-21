@@ -26,13 +26,13 @@ export default function PointOfSalePage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [storeId, setStoreId] = useState<string | null>(null);
 
   // 1. Fetch the store's products (Simplified for UI display)
   useEffect(() => {
     async function fetchInventory() {
       if (!user) return;
       
-      // First get the user's store
       const { data: store } = await supabase
         .from('stores')
         .select('id')
@@ -40,12 +40,13 @@ export default function PointOfSalePage() {
         .single();
 
       if (store) {
-        // Then get the products for that store
+        setStoreId(store.id); // <-- Save the store ID to state
+        
         const { data: items } = await supabase
           .from('products')
           .select('*')
           .eq('store_id', store.id)
-          .gt('stock_quantity', 0); // Only show items in stock
+          .gt('stock_quantity', 0); 
         
         if (items) setProducts(items);
       }
@@ -97,9 +98,41 @@ export default function PointOfSalePage() {
 
   const handleCheckout = async (method: 'Cash' | 'M-Pesa') => {
     if (cart.length === 0) return toast.error("Cart is empty");
-    toast.success(`Processing ${method} payment for Ksh ${total.toLocaleString()}`);
-    // Future step: Save order to Supabase database here!
-    setCart([]); // Clear cart after sale
+    if (!storeId) return toast.error("Store configuration missing");
+    
+    setIsLoading(true); // Re-use loading state for the button
+    const toastId = toast.loading(`Processing ${method} payment...`);
+
+    try {
+      // Create a unique reference for the POS transaction
+      const posReference = `POS-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+      // Insert the POS order directly into the orders table
+      const { error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          store_id: storeId,
+          paystack_reference: posReference,
+          customer_name: `In-Store Customer (${method})`,
+          customer_email: "pos@in-store.local", // Fallback for walk-ins
+          amount_paid: total,
+          fulfillment_type: 'IN_STORE',
+          status: 'COMPLETED', // POS orders are instantly completed!
+          product_id: cart[0].id // Tagging the primary product
+        });
+
+      if (orderError) throw orderError;
+
+      // Note: If you implement stock deduction in the future, it would go right here!
+
+      toast.success("Order logged successfully!", { id: toastId });
+      setCart([]); // Clear cart after successful sale
+    } catch (error: any) {
+      console.error("POS Checkout Error:", error);
+      toast.error("Failed to log order.", { id: toastId });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
