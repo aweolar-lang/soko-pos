@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import Link from "next/link"; // <-- Added Link import
 import { MapPin, Clock, ShoppingBag, Utensils, Star, MessageCircle } from "lucide-react";
 import OrderModal from "./OrderModal";
 
@@ -117,11 +118,14 @@ export default async function StorefrontPage({ params }: { params: { store_slug:
         {products && products.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {products.map((product) => {
-              const displayImage = product.images && product.images.length > 0 ? product.images[0] : null;
+              // Ensure we check for product images correctly based on how you store them
+              const displayImage = product.images && product.images.length > 0 ? product.images[0] : (product.image_url || null);
 
               return (
                 <div key={product.id} className="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col group">
-                  <div className="relative h-56 w-full bg-slate-50 overflow-hidden">
+                  
+                  {/* WRAPPED IMAGE IN LINK */}
+                  <Link href={`/${resolvedParams.store_slug}/${product.id}`} className="relative h-56 w-full bg-slate-50 overflow-hidden block">
                     {displayImage ? (
                       <img src={displayImage} alt={product.title} className="object-cover h-full w-full group-hover:scale-105 transition-transform duration-500" />
                     ) : (
@@ -132,10 +136,14 @@ export default async function StorefrontPage({ params }: { params: { store_slug:
                     <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-md text-slate-900 font-black px-4 py-1.5 rounded-full shadow-lg">
                       Ksh {product.price.toLocaleString()}
                     </div>
-                  </div>
+                  </Link>
 
                   <div className="p-5 flex-1 flex flex-col">
-                    <h3 className="text-lg font-bold text-slate-900 mb-2">{product.title}</h3>
+                    {/* WRAPPED TITLE IN LINK */}
+                    <Link href={`/${resolvedParams.store_slug}/${product.id}`}>
+                      <h3 className="text-lg font-bold text-slate-900 mb-2 hover:text-emerald-600 transition-colors">{product.title}</h3>
+                    </Link>
+                    
                     <p className="text-sm text-slate-500 line-clamp-2 mb-6 flex-1">
                       {product.description || "No description provided."}
                     </p>

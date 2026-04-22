@@ -2,8 +2,19 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase"; 
-import { Store, Link as LinkIcon, Loader2, Save, AlertCircle, MapPin, Building2, Map, ImagePlus, AlignLeft, Smartphone } from "lucide-react";
+import { Store, Link as LinkIcon, Loader2, Save, AlertCircle, MapPin, Building2, Map, ImagePlus, AlignLeft, Smartphone, Tags } from "lucide-react";
 import { toast } from "sonner";
+
+const STORE_CATEGORIES = [
+  "Food & Cafe", 
+  "Electronics", 
+  "Furniture", 
+  "Fashion", 
+  "Supermarket", 
+  "Beauty", 
+  "Services", 
+  "Other"
+];
 
 export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -14,19 +25,19 @@ export default function SettingsPage() {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   
-  // Track original paybill to know if we need to hit the Paystack API on save
   const [originalPaybill, setOriginalPaybill] = useState("");
 
   const [formData, setFormData] = useState({
     storeName: "",
     storeSlug: "",
     description: "", 
+    category: "", // <-- NEWLY INTEGRATED CATEGORY STATE
     county: "",
     town: "",
     area: "",
-    paybill_number: "", // Handles Till or Phone Number
+    paybill_number: "", 
     existingLogoUrl: "", 
-    paystack_subaccount_code: "", // Tracks their subaccount status
+    paystack_subaccount_code: "", 
   });
 
   useEffect(() => {
@@ -37,11 +48,14 @@ export default function SettingsPage() {
         
         setUserId(session.user.id);
 
-        const { data: store } = await supabase
-          .from('stores')
-          .select('id, name, slug, description, logo_url, county, town, area, paybill_number, paystack_subaccount_code')
-          .eq('owner_id', session.user.id)
+        const { data: store, error } = await supabase
+          .from("stores")
+          // Added category to the select query
+          .select("id, name, slug, description, category, county, town, area, paybill_number, logo_url, paystack_subaccount_code")
+          .eq("owner_id", session.user.id)
           .single();
+
+        if (error && error.code !== "PGRST116") throw error;
 
         if (store) {
           setStoreId(store.id);
@@ -50,6 +64,7 @@ export default function SettingsPage() {
             storeName: store.name || "",
             storeSlug: store.slug || "",
             description: store.description || "",
+            category: store.category || "", // <-- PREFILLS CATEGORY FROM DB
             county: store.county || "",
             town: store.town || "",
             area: store.area || "",
@@ -57,11 +72,10 @@ export default function SettingsPage() {
             existingLogoUrl: store.logo_url || "",
             paystack_subaccount_code: store.paystack_subaccount_code || "",
           });
-          
-          if (store.logo_url) setLogoPreview(store.logo_url);
         }
-      } catch (error) {
-        console.error("Error fetching store:", error);
+      } catch (error: any) {
+        console.error("Error fetching store:", error.message);
+        toast.error("Failed to load store profile.");
       } finally {
         setIsFetching(false);
       }
@@ -70,16 +84,7 @@ export default function SettingsPage() {
     fetchStoreDetails();
   }, []);
 
-  const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formattedSlug = e.target.value
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-/, '');
-    setFormData({ ...formData, storeSlug: formattedSlug });
-  };
-
-  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setLogoFile(file);
@@ -87,91 +92,94 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSaveStore = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userId) return;
+    if (!userId) return toast.error("User not authenticated.");
 
     setIsLoading(true);
-    const toastId = toast.loading("Saving store settings...");
+    const toastId = toast.loading("Saving store profile...");
 
     try {
       let finalLogoUrl = formData.existingLogoUrl;
-      let finalSubaccountCode = formData.paystack_subaccount_code;
 
-      // 1. Upload Logo if a new one was selected
+      // 1. Upload Logo if changed
       if (logoFile) {
         const fileExt = logoFile.name.split('.').pop();
         const fileName = `${userId}-${Date.now()}.${fileExt}`;
         const filePath = `logos/${fileName}`;
 
-        const { error: uploadError } = await supabase.storage.from('store-assets').upload(filePath, logoFile);
+        const { error: uploadError } = await supabase.storage
+          .from('store-assets')
+          .upload(filePath, logoFile, { upsert: true });
+
         if (uploadError) throw uploadError;
 
-        const { data: publicUrlData } = supabase.storage.from('store-assets').getPublicUrl(filePath);
+        const { data: publicUrlData } = supabase.storage
+          .from('store-assets')
+          .getPublicUrl(filePath);
+
         finalLogoUrl = publicUrlData.publicUrl;
       }
 
-      // 2. Generate Paystack Subaccount if M-Pesa number changed
+      // 2. Format Slug
+      const slugifiedName = formData.storeSlug
+        ? formData.storeSlug.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+        : formData.storeName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+      // 3. Save to Database (including the Category)
+      const updates = {
+        owner_id: userId,
+        name: formData.storeName,
+        slug: slugifiedName,
+        description: formData.description,
+        category: formData.category, // <-- SAVES CATEGORY TO DB
+        county: formData.county,
+        town: formData.town,
+        area: formData.area,
+        paybill_number: formData.paybill_number,
+        logo_url: finalLogoUrl,
+      };
+
+      if (storeId) {
+        const { error } = await supabase.from('stores').update(updates).eq('id', storeId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('stores').insert([updates]);
+        if (error) throw error;
+      }
+
+      // 4. Handle Paystack Setup ONLY if Paybill changed
       if (formData.paybill_number && formData.paybill_number !== originalPaybill) {
-        toast.loading("Verifying M-Pesa details with Paystack...", { id: toastId });
+        toast.loading("Setting up payment details...", { id: toastId });
         
-        const paystackRes = await fetch("/api/seller/payout-setup", {
+        const payRes = await fetch("/api/seller/payout-setup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             mpesaNumber: formData.paybill_number,
-            storeName: formData.storeName,
-          })
+            storeName: formData.storeName
+          }),
         });
-
-        const paystackData = await paystackRes.json();
         
-        if (!paystackRes.ok) {
-          throw new Error(paystackData.error || "Failed to link M-Pesa account.");
+        const payData = await payRes.json();
+        
+        if (!payRes.ok) {
+          throw new Error(payData.error || "Failed to verify M-Pesa details");
         }
         
-        finalSubaccountCode = paystackData.subaccount_code;
-        setOriginalPaybill(formData.paybill_number); // Update tracked original
+        setOriginalPaybill(formData.paybill_number);
+        setFormData(prev => ({...prev, paystack_subaccount_code: payData.subaccount_code}));
       }
 
-      // 3. Save everything to the database
-      const { data, error } = await supabase.from('stores').upsert({
-        id: storeId || undefined, 
-        owner_id: userId,
-        name: formData.storeName.trim(),
-        slug: formData.storeSlug,
-        description: formData.description.trim(),
-        logo_url: finalLogoUrl,
-        county: formData.county.trim(),
-        town: formData.town.trim(),
-        area: formData.area.trim(),
-        paybill_number: formData.paybill_number.trim(),
-        paystack_subaccount_code: finalSubaccountCode,
-      }).select().single();
+      toast.success("Store profile saved successfully!", { id: toastId });
 
-      if (error) {
-        if (error.code === '23505') throw new Error("That store link is already taken. Please choose another one.");
-        throw error;
-      }
-
-      setStoreId(data.id);
-      setFormData(prev => ({ 
-        ...prev, 
-        existingLogoUrl: finalLogoUrl,
-        paystack_subaccount_code: finalSubaccountCode
-      }));
-      setLogoFile(null); 
-      
-      toast.success(storeId ? "Store profile updated!" : "Store created successfully!", { id: toastId });
-      
     } catch (error: any) {
-      toast.error(error.message || "Failed to save store details.", { id: toastId });
+      console.error(error);
+      toast.error(error.message || "An error occurred while saving.", { id: toastId });
     } finally {
       setIsLoading(false);
     }
   };
-
-  const isFormValid = formData.storeName.trim() !== "" && formData.storeSlug.trim() !== "";
 
   if (isFetching) {
     return (
@@ -181,163 +189,166 @@ export default function SettingsPage() {
     );
   }
 
+  const isFormValid = formData.storeName && formData.county && formData.paybill_number && formData.category;
+
   return (
-    <div className="max-w-3xl mx-auto space-y-8 py-6">
+    <div className="max-w-4xl mx-auto space-y-6 pb-12">
       <div>
-        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Store Profile</h1>
+        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Store Settings</h1>
         <p className="mt-2 text-sm text-slate-500">
-          Manage your brand identity, public link, and physical location.
+          Manage your storefront details, location, and payment routing.
         </p>
       </div>
 
-      <div className="bg-white shadow-sm border border-slate-200 rounded-2xl overflow-hidden">
-        <div className="p-6 sm:p-8 space-y-8">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        <form onSubmit={handleSave} className="p-6 sm:p-8 space-y-8">
           
-          {!storeId && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-emerald-600 mt-0.5 shrink-0" />
-              <div>
-                <h3 className="text-sm font-bold text-emerald-800">Welcome to LocalSoko!</h3>
-                <p className="mt-1 text-sm text-emerald-600">
-                  Before you can add products, set up your store's profile.
-                </p>
+          {/* Logo Upload */}
+          <div className="flex flex-col sm:flex-row gap-6 items-start">
+            <div className="relative h-24 w-24 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden shrink-0 group hover:border-emerald-500 transition-colors">
+              {(logoPreview || formData.existingLogoUrl) ? (
+                <img src={logoPreview || formData.existingLogoUrl} alt="Logo" className="h-full w-full object-cover" />
+              ) : (
+                <Store className="h-8 w-8 text-slate-300" />
+              )}
+              <div className="absolute inset-0 bg-slate-900/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                <ImagePlus className="h-6 w-6 text-white" />
               </div>
+              <input type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer" />
             </div>
-          )}
-
-          <form onSubmit={handleSaveStore} className="space-y-8">
-            
-            {/* Logo Upload Section */}
-            <div className="flex items-center gap-6">
-              <div className="relative h-24 w-24 rounded-full border-4 border-slate-50 bg-slate-100 flex items-center justify-center overflow-hidden shadow-sm shrink-0 group">
-                {logoPreview ? (
-                  <img src={logoPreview} alt="Store Logo" className="h-full w-full object-cover" />
-                ) : (
-                  <Store className="h-8 w-8 text-slate-300" />
-                )}
-                <label className="absolute inset-0 bg-black/50 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
-                  <ImagePlus className="h-5 w-5 mb-1" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider">Upload</span>
-                  <input type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
-                </label>
-              </div>
-              <div>
-                <h3 className="font-bold text-slate-900">Store Logo</h3>
-                <p className="text-sm text-slate-500 mt-1 max-w-sm">
-                  Upload a square image. This will appear on your public storefront and in the marketplace search.
-                </p>
-              </div>
-            </div>
-
-            <hr className="border-slate-100" />
-            
-            {/* Store Name & Slug */}
-            <div className="grid sm:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Store Name</label>
-                <div className="relative">
-                  <Store className="absolute left-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
-                  <input 
-                    type="text" required value={formData.storeName} 
-                    onChange={(e) => setFormData({ ...formData, storeName: e.target.value })} 
-                    className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" 
-                    placeholder="e.g. Denis Tech Electronics" 
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Public Store Link</label>
-                <div className="flex rounded-xl shadow-sm border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-emerald-500 transition-all bg-slate-50 focus-within:bg-white">
-                  <span className="flex items-center pl-4 pr-1 text-slate-500 text-sm font-medium select-none">
-                    <LinkIcon className="h-4 w-4 mr-1.5 text-slate-400" />
-                    localsoko.com/
-                  </span>
-                  <input
-                    type="text" required value={formData.storeSlug} onChange={handleSlugChange}
-                    className="flex-1 py-2.5 pr-4 pl-1 outline-none text-sm font-bold text-slate-900 bg-transparent min-w-[100px]"
-                    placeholder="denis-tech"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Store Description */}
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">Short Description</label>
+              <h3 className="font-bold text-slate-900">Store Logo</h3>
+              <p className="text-sm text-slate-500 mt-1 mb-2 max-w-sm">
+                Upload your brand's logo. This will be displayed on your public storefront and marketplace listings.
+              </p>
+            </div>
+          </div>
+
+          <hr className="border-slate-100" />
+
+          {/* Row 1: Store Name & Category */}
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">Store Name</label>
               <div className="relative">
-                <AlignLeft className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
-                <textarea 
-                  rows={3} value={formData.description} 
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })} 
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm resize-none bg-slate-50 focus:bg-white" 
-                  placeholder="Tell customers what you sell..." 
+                <Store className="absolute left-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
+                <input 
+                  type="text" required value={formData.storeName} 
+                  onChange={(e) => setFormData({ ...formData, storeName: e.target.value })} 
+                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" 
+                  placeholder="e.g. The Coffee House" 
                 />
               </div>
             </div>
 
-            <hr className="border-slate-100" />
-
-            {/* Location Section */}
+            {/* INTEGRATED CATEGORY DROPDOWN HERE */}
             <div>
-              <h3 className="text-lg font-bold text-slate-900 mb-4">Physical Location</h3>
-              <div className="grid md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">County</label>
-                  <div className="relative">
-                    <Map className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                    <input 
-                      type="text" required value={formData.county} onChange={(e) => setFormData({ ...formData, county: e.target.value })}
-                      className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" placeholder="e.g. Nairobi"
-                    />
-                  </div>
-                </div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">Store Category</label>
+              <div className="relative">
+                <Tags className="absolute left-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
+                <select 
+                  required
+                  value={formData.category} 
+                  onChange={(e) => setFormData({...formData, category: e.target.value})}
+                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white appearance-none"
+                >
+                  <option value="" disabled>Select a category...</option>
+                  {STORE_CATEGORIES.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Town / City</label>
-                  <div className="relative">
-                    <Building2 className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                    <input 
-                      type="text" required value={formData.town} onChange={(e) => setFormData({ ...formData, town: e.target.value })}
-                      className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" placeholder="e.g. Westlands"
-                    />
-                  </div>
-                </div>
+          {/* Row 2: Slug & Description */}
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">Store URL (Slug)</label>
+              <div className="relative">
+                <LinkIcon className="absolute left-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
+                <input 
+                  type="text" value={formData.storeSlug} 
+                  onChange={(e) => setFormData({ ...formData, storeSlug: e.target.value })} 
+                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" 
+                  placeholder="e.g. the-coffee-house" 
+                />
+              </div>
+              <p className="text-xs text-slate-500 mt-2 ml-1">
+                Your store will be live at: <span className="font-bold text-slate-700">localsoko.com/{formData.storeSlug || "..."}</span>
+              </p>
+            </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Specific Area</label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                    <input 
-                      type="text" required value={formData.area} onChange={(e) => setFormData({ ...formData, area: e.target.value })}
-                      className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" placeholder="e.g. Moi Avenue"
-                    />
-                  </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">Store Description</label>
+              <div className="relative">
+                <AlignLeft className="absolute left-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
+                <textarea 
+                  rows={3} value={formData.description} 
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })} 
+                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white resize-none" 
+                  placeholder="Tell buyers what you sell..." 
+                />
+              </div>
+            </div>
+          </div>
+
+          <hr className="border-slate-100" />
+
+          {/* Row 3: Location */}
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 mb-4">Location Details</h3>
+            <div className="grid md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">County</label>
+                <div className="relative">
+                  <Map className="absolute left-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
+                  <input 
+                    type="text" required value={formData.county} 
+                    onChange={(e) => setFormData({ ...formData, county: e.target.value })} 
+                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" 
+                    placeholder="e.g. Nairobi" 
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Town/City</label>
+                <div className="relative">
+                  <Building2 className="absolute left-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
+                  <input 
+                    type="text" required value={formData.town} 
+                    onChange={(e) => setFormData({ ...formData, town: e.target.value })} 
+                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" 
+                    placeholder="e.g. Westlands" 
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Specific Area</label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
+                  <input 
+                    type="text" required value={formData.area} 
+                    onChange={(e) => setFormData({ ...formData, area: e.target.value })} 
+                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" 
+                    placeholder="e.g. Sarit Center" 
+                  />
                 </div>
               </div>
             </div>
+          </div>
 
-            <hr className="border-slate-100" />
-
-            {/* NEW: Automated Payout Section */}
-            <div className="bg-slate-50 -mx-6 sm:-mx-8 p-6 sm:p-8 border-y border-slate-100">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900">Payout Settings</h3>
-                  <p className="text-sm text-slate-500 mt-1 max-w-md">
-                    Enter the M-Pesa Phone Number or Till Number where your sales earnings should be automatically sent.
-                  </p>
-                </div>
-                {formData.paystack_subaccount_code && (
-                  <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                    Verified
-                  </span>
-                )}
-              </div>
-              
-              <div className="max-w-md">
-                <label className="block text-sm font-bold text-slate-700 mb-2">M-Pesa Number / Till</label>
+          {/* Row 4: Payout Details */}
+          <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+            <h3 className="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
+              <Smartphone className="h-5 w-5 text-emerald-600" />
+              M-Pesa Payout Settings
+            </h3>
+            <p className="text-sm text-slate-500 mb-6">Where should we automatically send your money when a customer pays?</p>
+            
+            <div className="grid md:grid-cols-2 gap-6 items-end">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">M-Pesa Number / Till Number</label>
                 <div className="relative">
                   <Smartphone className="absolute left-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
                   <input 
@@ -348,24 +359,31 @@ export default function SettingsPage() {
                   />
                 </div>
               </div>
+              
+              {formData.paystack_subaccount_code && (
+                <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-100 px-4 py-3 rounded-xl border border-emerald-200 font-medium">
+                  <AlertCircle className="h-5 w-5 shrink-0" />
+                  Payment Routing Active
+                </div>
+              )}
             </div>
+          </div>
 
-            {/* Submit Button */}
-            <div className="pt-2 flex justify-end">
-              <button 
-                type="submit" disabled={isLoading || !isFormValid} 
-                className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-8 rounded-xl shadow-md shadow-emerald-600/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading ? (
-                  <><Loader2 className="h-5 w-5 animate-spin" /><span>Saving...</span></>
-                ) : (
-                  <><span>{storeId ? "Save Profile" : "Create Store"}</span><Save className="h-5 w-5" /></>
-                )}
-              </button>
-            </div>
-          </form>
+          {/* Submit Button */}
+          <div className="pt-2 flex justify-end">
+            <button 
+              type="submit" disabled={isLoading || !isFormValid} 
+              className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-8 rounded-xl shadow-md shadow-emerald-600/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? (
+                <><Loader2 className="h-5 w-5 animate-spin" /><span>Saving...</span></>
+              ) : (
+                <><span>{storeId ? "Save Profile" : "Create Store"}</span><Save className="h-5 w-5" /></>
+              )}
+            </button>
+          </div>
 
-        </div>
+        </form>
       </div>
     </div>
   );
