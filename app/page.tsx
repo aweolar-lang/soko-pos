@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { Store, Sparkles, BookOpen, Smartphone, Sofa, Shirt, ShoppingBag, MapPin, Coffee, ChevronRight, XCircle, Grid, ShieldCheck, Star, Users, Clock, MapPin as MapPinIcon } from "lucide-react";
 import MarketplaceSearch from "@/components/MarketplaceSearch";
 
-export const revalidate = 0; 
+export const revalidate = 0;
 
 const CATEGORIES = [
   { name: "Food & Cafe", icon: Coffee, color: "text-orange-600", bg: "bg-orange-50", border: "border-orange-200" },
@@ -292,12 +292,11 @@ export default async function MarketplaceHome({
                           
                           <div className="h-6 w-px bg-slate-200"></div>
                           
-                          <button 
+                          <div 
                             className="flex items-center justify-center h-9 w-9 bg-emerald-50 hover:bg-emerald-600 text-emerald-600 hover:text-white rounded-2xl transition-all group-hover:scale-110"
-                            onClick={(e) => e.preventDefault()} // prevents link navigation on button click
                           >
                             <ChevronRight className="h-5 w-5" />
-                          </button>
+                          </div>
                         </div>
                       </div>
                     </div>
