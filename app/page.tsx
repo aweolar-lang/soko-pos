@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase"; 
-import { Store, MapPin, Coffee, Smartphone, Sofa, Shirt, HelpCircle, ShoppingBag, Star, ArrowRight, XCircle } from "lucide-react";
+import { Store, Sparkles,BookOpen,Dumbbell,Gamepad2,Pill,Car,Sprout,LayoutGrid, MapPin, Coffee, Smartphone, Sofa, Shirt, HelpCircle, ShoppingBag, Star, ArrowRight, XCircle } from "lucide-react";
 import MarketplaceSearch from "@/components/MarketplaceSearch"; // Import our new Client Component!
 
 export const revalidate = 0; 
@@ -11,14 +11,14 @@ const CATEGORIES = [
   { name: "Furniture", icon: Sofa, color: "text-amber-600", bg: "bg-amber-100" },
   { name: "Fashion", icon: Shirt, color: "text-pink-600", bg: "bg-pink-100" },
   { name: "Supermarket", icon: ShoppingBag, color: "text-emerald-600", bg: "bg-emerald-100" },
-  { name: "Beauty & Wellness", icon: Store, color: "text-purple-600", bg: "bg-purple-100" },
-  { name: "Books & Media", icon: Store, color: "text-yellow-600", bg: "bg-yellow-100" },
-  { name: "Sports & Outdoors", icon: Store, color: "text-green-600", bg: "bg-green-100" },
-  { name: "Toys & Games", icon: Store, color: "text-pink-600", bg: "bg-pink-100" },
-  { name: "Health & Pharmacy", icon: Store, color: "text-red-600", bg: "bg-red-100" },
-  { name: "Automotive", icon: Store, color: "text-gray-600", bg: "bg-gray-100" },
-  { name: "Home & Garden", icon: Store, color: "text-teal-600", bg: "bg-teal-100" },
-  { name: "All Categories", icon: Store, color: "text-slate-600", bg: "bg-slate-100" },
+  { name: "Beauty & Wellness", icon: Sparkles, color: "text-purple-600", bg: "bg-purple-100" },
+  { name: "Books & Media", icon: BookOpen, color: "text-yellow-600", bg: "bg-yellow-100" },
+  { name: "Sports & Outdoors", icon: Dumbbell, color: "text-green-600", bg: "bg-green-100" },
+  { name: "Toys & Games", icon: Gamepad2, color: "text-pink-600", bg: "bg-pink-100" },
+  { name: "Health & Pharmacy", icon: Pill, color: "text-red-600", bg: "bg-red-100" },
+  { name: "Automotive", icon: Car, color: "text-gray-600", bg: "bg-gray-100" },
+  { name: "Home & Garden", icon: Sprout, color: "text-teal-600", bg: "bg-teal-100" },
+  { name: "All Categories", icon: LayoutGrid, color: "text-slate-600", bg: "bg-slate-100" },
 ];
 
 interface StoreData {
