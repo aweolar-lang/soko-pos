@@ -4,18 +4,6 @@ import { Camera, Mail, Heart, X, Store, ArrowRight, ShieldCheck, Zap } from "luc
 export default function Footer() {
   return (
     <footer className="bg-white border-t border-slate-200 mt-auto">
-      {/* Pre-Footer CTA */}
-      <div className="border-b border-slate-100 bg-emerald-50/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div>
-            <h3 className="text-2xl font-black text-slate-900 mb-2">Own a local business?</h3>
-            <p className="text-slate-600 font-medium">Join hundreds of sellers growing their revenue on LocalSoko.</p>
-          </div>
-          <Link href="/auth/login" className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-8 py-4 rounded-full font-bold transition-all shadow-lg shadow-slate-900/10 active:scale-95">
-            Open Your Free Store <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-      </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-12">
