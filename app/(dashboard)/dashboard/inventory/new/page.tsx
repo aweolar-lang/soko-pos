@@ -106,10 +106,10 @@ export default function AddProductPage() {
         store_id: storeId,
         title: formData.title,
         slug: slug,
-        price: Number(formData.price),
+        price: parseFloat(formData.price),
+        stock_quantity: parseInt(formData.stock_quantity, 10),
         description: formData.description,
         category: formData.category,
-        stock_quantity: Number(formData.stock_quantity),
         images: imageUrls, // Now contains the real URLs!
       });
 

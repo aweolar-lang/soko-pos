@@ -4,15 +4,12 @@ import { cookies } from "next/headers";
 import { MapPin, Clock, ShoppingBag, Utensils, Star } from "lucide-react";
 import OrderModal from "./OrderModal";
 
-export const revalidate = 60; 
+// REMOVED: export const revalidate = 60; (Now the store updates instantly!)
 
-// FIXED: Changed storeSlug to store_slug to match the exact folder name!
 export default async function StorefrontPage({ params }: { params: { store_slug: string } }) {
-  // Await the params object (Required for Next.js 15)
   const resolvedParams = await params; 
   const cookieStore = await cookies();
 
-  // Initialize Supabase with the ANON key for public reading
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -25,18 +22,16 @@ export default async function StorefrontPage({ params }: { params: { store_slug:
     }
   );
 
-  // 1. Fetch the Store Details using the slug column
   const { data: store, error: storeError } = await supabase
     .from("stores")
     .select("id, name, description, logo_url, county, town, area, tier")
-    .eq("slug", resolvedParams.store_slug) // FIXED: Now querying the exact slug!
+    .eq("slug", resolvedParams.store_slug) 
     .single();
 
   if (storeError || !store) {
     notFound(); 
   }
 
-  // 2. Fetch the Store's Products
   const { data: products } = await supabase
     .from("products")
     .select("*")
@@ -48,7 +43,7 @@ export default async function StorefrontPage({ params }: { params: { store_slug:
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20 font-sans">
-      {/* Store Banner & Header */}
+      {/* Store Banner */}
       <div className="relative w-full bg-gradient-to-br from-emerald-900 via-slate-900 to-slate-900 pt-32 pb-16 overflow-hidden shadow-lg">
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 rounded-full bg-emerald-500/10 blur-3xl" />
         <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 rounded-full bg-blue-500/10 blur-3xl" />
@@ -109,20 +104,13 @@ export default async function StorefrontPage({ params }: { params: { store_slug:
         {products && products.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {products.map((product) => {
-              // FIXED: Extracting the image properly from the images array
               const displayImage = product.images && product.images.length > 0 ? product.images[0] : null;
 
               return (
                 <div key={product.id} className="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col group">
-                  
-                  {/* Product Image */}
                   <div className="relative h-56 w-full bg-slate-50 overflow-hidden">
                     {displayImage ? (
-                      <img 
-                        src={displayImage} 
-                        alt={product.title} 
-                        className="object-cover h-full w-full group-hover:scale-105 transition-transform duration-500"
-                      />
+                      <img src={displayImage} alt={product.title} className="object-cover h-full w-full group-hover:scale-105 transition-transform duration-500" />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center text-slate-300">
                         <ShoppingBag className="h-12 w-12" />
@@ -133,14 +121,11 @@ export default async function StorefrontPage({ params }: { params: { store_slug:
                     </div>
                   </div>
 
-                  {/* Product Details */}
                   <div className="p-5 flex-1 flex flex-col">
-                    <h3 className="text-lg font-bold text-slate-900 mb-2">{product.title}</h3> {/* FIXED: product.title */}
+                    <h3 className="text-lg font-bold text-slate-900 mb-2">{product.title}</h3>
                     <p className="text-sm text-slate-500 line-clamp-2 mb-6 flex-1">
                       {product.description || "No description provided."}
                     </p>
-                    
-                    {/* The Corrected Order Modal! */}
                     <OrderModal product={product} storeId={store.id} isHotel={isHotel} />
                   </div>
                 </div>

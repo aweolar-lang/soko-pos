@@ -4,25 +4,22 @@ import { supabase } from "@/lib/supabase";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { 
-      productId, 
-      buyerName, 
-      buyerEmail, 
-      buyerPhone, 
-      fulfillmentType, 
-      takeawayTime, 
-      customerNotes 
-    } = body;
+    const { productId, buyerName, buyerEmail, buyerPhone, fulfillmentType, takeawayTime, customerNotes } = body;
 
     if (!productId || !buyerName || !buyerEmail) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
     }
 
-    // 1. Fetch the product from the database to get the REAL price and store_id
-    // Security check: Never trust the frontend price!
+    // UPDATE: We now also select 'stores(paystack_subaccount_code)'
     const { data: product, error: productError } = await supabase
       .from("products")
-      .select("id, name, price, store_id")
+      .select(`
+        id, 
+        title, 
+        price, 
+        store_id,
+        stores ( paystack_subaccount_code )
+      `) 
       .eq("id", productId)
       .single();
 
@@ -30,54 +27,31 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Product not found." }, { status: 404 });
     }
 
-    // 2. Prepare Paystack Payload
-    const amountInSmallestUnit = Math.round(product.price * 100); // KES to cents
+    // Extract the subaccount code from the joined stores table
+    // @ts-ignore - Supabase join typing workaround
+    const subaccountCode = product.stores?.paystack_subaccount_code;
 
-    const paystackPayload = {
+    const paystackPayload: any = {
       email: buyerEmail,
-      amount: amountInSmallestUnit,
+      amount: Math.round(product.price * 100),
       currency: "KES",
-      // We will route them to a generic success page on your main domain after payment
-      callback_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://localsoko.com'}/order-success`, 
+      callback_url: "https://localsoko.com/order-success", 
+      // NEW: Add the subaccount code so Paystack splits the money automatically!
+      subaccount: subaccountCode || undefined, 
       metadata: {
-        // Hidden metadata our webhook will use to find the product and store
         product_id: product.id,
         store_id: product.store_id,
-        // Custom fields show up nicely on the Paystack dashboard AND our webhook extracts them!
         custom_fields: [
-          {
-            display_name: "Buyer Name",
-            variable_name: "buyer_name",
-            value: buyerName,
-          },
-          {
-            display_name: "Buyer Phone",
-            variable_name: "buyer_phone",
-            value: buyerPhone || "N/A",
-          },
-          {
-            display_name: "Fulfillment Type",
-            variable_name: "fulfillment_type",
-            value: fulfillmentType,
-          },
-          {
-            display_name: "Takeaway Time",
-            variable_name: "takeaway_time",
-            value: takeawayTime || "N/A",
-          },
-          {
-            display_name: "Customer Notes / Address",
-            variable_name: "customer_notes",
-            value: customerNotes || "N/A",
-          }
+          { display_name: "Buyer Name", variable_name: "buyer_name", value: buyerName },
+          { display_name: "Buyer Phone", variable_name: "buyer_phone", value: buyerPhone || "N/A" },
+          { display_name: "Fulfillment Type", variable_name: "fulfillment_type", value: fulfillmentType },
+          { display_name: "Takeaway Time", variable_name: "takeaway_time", value: takeawayTime || "N/A" },
+          { display_name: "Customer Notes", variable_name: "customer_notes", value: customerNotes || "N/A" }
         ],
       },
     };
 
-    // 3. Call Paystack API
-    if (!process.env.PAYSTACK_SECRET_KEY) {
-      throw new Error("Paystack secret key is missing.");
-    }
+    if (!process.env.PAYSTACK_SECRET_KEY) throw new Error("Paystack secret key missing.");
 
     const paystackResponse = await fetch("https://api.paystack.co/transaction/initialize", {
       method: "POST",
@@ -91,18 +65,13 @@ export async function POST(req: Request) {
     const paystackData = await paystackResponse.json();
 
     if (!paystackData.status) {
-      console.error("Paystack Error:", paystackData.message);
       return NextResponse.json({ error: "Payment gateway rejected the request." }, { status: 502 });
     }
 
-    // 4. Return the checkout URL to the frontend OrderModal
     return NextResponse.json({ checkoutUrl: paystackData.data.authorization_url });
 
   } catch (error: any) {
     console.error("Checkout API Error:", error);
-    return NextResponse.json(
-      { error: "An internal server error occurred during checkout." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "An internal server error occurred." }, { status: 500 });
   }
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase"; 
-import { Store, Link as LinkIcon, Loader2, Save, AlertCircle, MapPin, Building2, Map, ImagePlus, AlignLeft } from "lucide-react";
+import { Store, Link as LinkIcon, Loader2, Save, AlertCircle, MapPin, Building2, Map, ImagePlus, AlignLeft, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 
 export default function SettingsPage() {
@@ -11,18 +11,22 @@ export default function SettingsPage() {
   const [storeId, setStoreId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   
-  // New state for Logo uploads
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   
+  // Track original paybill to know if we need to hit the Paystack API on save
+  const [originalPaybill, setOriginalPaybill] = useState("");
+
   const [formData, setFormData] = useState({
     storeName: "",
     storeSlug: "",
-    description: "", // Added Description
+    description: "", 
     county: "",
     town: "",
     area: "",
-    existingLogoUrl: "", // Keep track of current logo
+    paybill_number: "", // Handles Till or Phone Number
+    existingLogoUrl: "", 
+    paystack_subaccount_code: "", // Tracks their subaccount status
   });
 
   useEffect(() => {
@@ -35,12 +39,13 @@ export default function SettingsPage() {
 
         const { data: store } = await supabase
           .from('stores')
-          .select('id, name, slug, description, logo_url, county, town, area')
+          .select('id, name, slug, description, logo_url, county, town, area, paybill_number, paystack_subaccount_code')
           .eq('owner_id', session.user.id)
           .single();
 
         if (store) {
           setStoreId(store.id);
+          setOriginalPaybill(store.paybill_number || "");
           setFormData({
             storeName: store.name || "",
             storeSlug: store.slug || "",
@@ -48,12 +53,12 @@ export default function SettingsPage() {
             county: store.county || "",
             town: store.town || "",
             area: store.area || "",
+            paybill_number: store.paybill_number || "",
             existingLogoUrl: store.logo_url || "",
+            paystack_subaccount_code: store.paystack_subaccount_code || "",
           });
           
-          if (store.logo_url) {
-            setLogoPreview(store.logo_url);
-          }
+          if (store.logo_url) setLogoPreview(store.logo_url);
         }
       } catch (error) {
         console.error("Error fetching store:", error);
@@ -91,6 +96,7 @@ export default function SettingsPage() {
 
     try {
       let finalLogoUrl = formData.existingLogoUrl;
+      let finalSubaccountCode = formData.paystack_subaccount_code;
 
       // 1. Upload Logo if a new one was selected
       if (logoFile) {
@@ -98,20 +104,37 @@ export default function SettingsPage() {
         const fileName = `${userId}-${Date.now()}.${fileExt}`;
         const filePath = `logos/${fileName}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('store-assets')
-          .upload(filePath, logoFile);
-
+        const { error: uploadError } = await supabase.storage.from('store-assets').upload(filePath, logoFile);
         if (uploadError) throw uploadError;
 
-        const { data: publicUrlData } = supabase.storage
-          .from('store-assets')
-          .getPublicUrl(filePath);
-
+        const { data: publicUrlData } = supabase.storage.from('store-assets').getPublicUrl(filePath);
         finalLogoUrl = publicUrlData.publicUrl;
       }
 
-      // 2. Save everything to the database
+      // 2. Generate Paystack Subaccount if M-Pesa number changed
+      if (formData.paybill_number && formData.paybill_number !== originalPaybill) {
+        toast.loading("Verifying M-Pesa details with Paystack...", { id: toastId });
+        
+        const paystackRes = await fetch("/api/seller/payout-setup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mpesaNumber: formData.paybill_number,
+            storeName: formData.storeName,
+          })
+        });
+
+        const paystackData = await paystackRes.json();
+        
+        if (!paystackRes.ok) {
+          throw new Error(paystackData.error || "Failed to link M-Pesa account.");
+        }
+        
+        finalSubaccountCode = paystackData.subaccount_code;
+        setOriginalPaybill(formData.paybill_number); // Update tracked original
+      }
+
+      // 3. Save everything to the database
       const { data, error } = await supabase.from('stores').upsert({
         id: storeId || undefined, 
         owner_id: userId,
@@ -122,6 +145,8 @@ export default function SettingsPage() {
         county: formData.county.trim(),
         town: formData.town.trim(),
         area: formData.area.trim(),
+        paybill_number: formData.paybill_number.trim(),
+        paystack_subaccount_code: finalSubaccountCode,
       }).select().single();
 
       if (error) {
@@ -130,8 +155,12 @@ export default function SettingsPage() {
       }
 
       setStoreId(data.id);
-      setFormData(prev => ({ ...prev, existingLogoUrl: finalLogoUrl })); // Update existing URL state
-      setLogoFile(null); // Clear the pending file
+      setFormData(prev => ({ 
+        ...prev, 
+        existingLogoUrl: finalLogoUrl,
+        paystack_subaccount_code: finalSubaccountCode
+      }));
+      setLogoFile(null); 
       
       toast.success(storeId ? "Store profile updated!" : "Store created successfully!", { id: toastId });
       
@@ -288,16 +317,49 @@ export default function SettingsPage() {
               </div>
             </div>
 
+            <hr className="border-slate-100" />
+
+            {/* NEW: Automated Payout Section */}
+            <div className="bg-slate-50 -mx-6 sm:-mx-8 p-6 sm:p-8 border-y border-slate-100">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Payout Settings</h3>
+                  <p className="text-sm text-slate-500 mt-1 max-w-md">
+                    Enter the M-Pesa Phone Number or Till Number where your sales earnings should be automatically sent.
+                  </p>
+                </div>
+                {formData.paystack_subaccount_code && (
+                  <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                    Verified
+                  </span>
+                )}
+              </div>
+              
+              <div className="max-w-md">
+                <label className="block text-sm font-bold text-slate-700 mb-2">M-Pesa Number / Till</label>
+                <div className="relative">
+                  <Smartphone className="absolute left-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
+                  <input 
+                    type="text" required value={formData.paybill_number} 
+                    onChange={(e) => setFormData({ ...formData, paybill_number: e.target.value })} 
+                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-white" 
+                    placeholder="e.g. 0712345678 or Till Number" 
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* Submit Button */}
-            <div className="pt-6 border-t border-slate-100 flex justify-end">
+            <div className="pt-2 flex justify-end">
               <button 
                 type="submit" disabled={isLoading || !isFormValid} 
-                className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-6 rounded-xl shadow-md shadow-emerald-600/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-8 rounded-xl shadow-md shadow-emerald-600/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
-                  <><Loader2 className="h-4 w-4 animate-spin" /><span>Saving...</span></>
+                  <><Loader2 className="h-5 w-5 animate-spin" /><span>Saving...</span></>
                 ) : (
-                  <><span>{storeId ? "Save Profile" : "Create Store"}</span><Save className="h-4 w-4" /></>
+                  <><span>{storeId ? "Save Profile" : "Create Store"}</span><Save className="h-5 w-5" /></>
                 )}
               </button>
             </div>

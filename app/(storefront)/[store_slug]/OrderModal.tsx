@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 interface Product {
   id: string;
-  title: string; // FIXED: Changed from name to title
+  title: string;
   price: number;
 }
 
@@ -20,7 +20,6 @@ export default function OrderModal({ product, storeId, isHotel }: OrderModalProp
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Form State
   const [formData, setFormData] = useState({
     buyerName: "",
     buyerEmail: "",
@@ -74,25 +73,25 @@ export default function OrderModal({ product, storeId, isHotel }: OrderModalProp
 
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+          {/* Added max-h-[90vh] so the entire modal box doesn't overflow the screen */}
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200 max-h-[90vh] flex flex-col">
             
-            {/* Header */}
-            <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
               <h3 className="font-bold text-slate-900">Complete Order</h3>
               <button onClick={() => setIsOpen(false)} className="p-2 bg-white rounded-full text-slate-400 hover:text-slate-900 shadow-sm transition-colors">
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="px-6 py-4 border-b border-slate-100 bg-emerald-50/50">
+            <div className="px-6 py-4 border-b border-slate-100 bg-emerald-50/50 shrink-0">
               <div className="flex justify-between items-center">
                 <span className="font-bold text-slate-900">{product.title}</span>
                 <span className="font-black text-emerald-600">Ksh {product.price.toLocaleString()}</span>
               </div>
             </div>
 
-            {/* Form */}
-            <form onSubmit={handleCheckout} className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+            {/* Adjusted from max-h-[60vh] to scroll better inside flex parent */}
+            <form onSubmit={handleCheckout} className="p-6 space-y-4 overflow-y-auto">
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Full Name</label>
                 <input 
@@ -169,7 +168,7 @@ export default function OrderModal({ product, storeId, isHotel }: OrderModalProp
                 />
               </div>
 
-              <div className="pt-4">
+              <div className="pt-4 shrink-0">
                 <button 
                   type="submit" 
                   disabled={isLoading}

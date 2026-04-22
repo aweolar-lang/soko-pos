@@ -5,20 +5,18 @@ import { Package, MapPin, Clock, Phone, Loader2, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase"; 
 
-// TypeScript interface based on our upgraded database schema
 interface Order {
   id: string;
   customer_name: string;
   customer_phone: string;
   amount_paid: number;
   fulfillment_type: string;
-  delivery_address: string;
   takeaway_time: string;
   customer_notes: string;
   status: string;
   created_at: string;
   products: {
-    name: string;
+    title: string; // FIXED: Changed from name to title
   } | null;
 }
 
@@ -45,7 +43,6 @@ export default function OrdersPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // First get the store_id
       const { data: store } = await supabase
         .from('stores')
         .select('id')
@@ -57,12 +54,12 @@ export default function OrdersPage() {
         return;
       }
 
-      // Fetch orders and join with the products table to get the product name
+      // FIXED: Fetching 'title' instead of 'name' from the products table
       const { data: ordersData, error } = await supabase
         .from('orders')
         .select(`
           *,
-          products ( name )
+          products ( title )
         `)
         .eq('store_id', store.id)
         .order('created_at', { ascending: false });
@@ -87,7 +84,6 @@ export default function OrdersPage() {
 
       if (error) throw error;
 
-      // Optimistically update the UI
       setOrders(orders.map(order => 
         order.id === orderId ? { ...order, status: newStatus } : order
       ));
@@ -131,19 +127,18 @@ export default function OrdersPage() {
             return (
               <div key={order.id} className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col relative overflow-hidden">
                 
-                {/* Header: Date & Status */}
                 <div className="flex items-start justify-between mb-4 border-b border-slate-100 pb-4">
                   <div>
                     <div className="flex items-center gap-2 text-sm text-slate-500 font-medium mb-1">
                       <Calendar className="h-4 w-4" />
                       {new Date(order.created_at).toLocaleDateString()} at {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>
+                    {/* FIXED: Rendering product.title instead of product.name */}
                     <h3 className="text-lg font-bold text-slate-900 line-clamp-1">
-                      {order.products?.name || "Deleted Product"}
+                      {order.products?.title || "Deleted Product"}
                     </h3>
                   </div>
                   
-                  {/* Status Dropdown */}
                   <select
                     value={order.status}
                     onChange={(e) => handleStatusChange(order.id, e.target.value)}
@@ -158,11 +153,10 @@ export default function OrdersPage() {
                   </select>
                 </div>
 
-                {/* Customer Details */}
                 <div className="space-y-3 mb-6 flex-1">
                   <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl">
                     <span className="text-sm font-bold text-slate-700">{order.customer_name}</span>
-                    <span className="text-sm font-black text-emerald-600">Ksh {order.amount_paid}</span>
+                    <span className="text-sm font-black text-emerald-600">Ksh {order.amount_paid.toLocaleString()}</span>
                   </div>
 
                   {order.customer_phone && order.customer_phone !== "N/A" && (
@@ -174,7 +168,6 @@ export default function OrdersPage() {
                     </div>
                   )}
 
-                  {/* Dynamic Fulfillment UI */}
                   {order.fulfillment_type === 'TAKEAWAY' ? (
                     <div className="flex items-start gap-3 text-sm text-slate-600 bg-orange-50/50 p-3 rounded-xl border border-orange-100">
                       <Clock className="h-4 w-4 text-orange-500 shrink-0 mt-0.5" />

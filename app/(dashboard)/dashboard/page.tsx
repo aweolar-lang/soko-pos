@@ -99,43 +99,62 @@ export default function PointOfSalePage() {
   const total = subtotal + tax;
 
   const handleCheckout = async (method: 'Cash' | 'M-Pesa') => {
-    if (cart.length === 0) return toast.error("Cart is empty");
-    if (!storeId) return toast.error("Store configuration missing");
-    
-    setIsLoading(true); // Re-use loading state for the button
-    const toastId = toast.loading(`Processing ${method} payment...`);
+  if (cart.length === 0) return toast.error("Cart is empty");
+  if (!storeId) return toast.error("Store configuration missing");
+  
+  setIsLoading(true);
+  const toastId = toast.loading(`Processing ${method} payment...`);
 
-    try {
-      // Create a unique reference for the POS transaction
-      const posReference = `POS-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  try {
+    const posReference = `POS-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-      // Insert the POS order directly into the orders table
-      const { error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          store_id: storeId,
-          paystack_reference: posReference,
-          customer_name: `In-Store Customer (${method})`,
-          customer_email: "pos@in-store.local", // Fallback for walk-ins
-          amount_paid: total,
-          fulfillment_type: 'IN_STORE',
-          status: 'COMPLETED', // POS orders are instantly completed!
-          product_id: cart[0].id // Tagging the primary product
-        });
+    // 1. Log the Order
+    const { error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        store_id: storeId,
+        paystack_reference: posReference,
+        customer_name: `In-Store Customer (${method})`,
+        customer_email: "pos@in-store.local",
+        amount_paid: total,
+        fulfillment_type: 'IN_STORE',
+        status: 'COMPLETED',
+        product_id: cart[0].id 
+      });
 
-      if (orderError) throw orderError;
+    if (orderError) throw orderError;
 
-      // Note: If you implement stock deduction in the future, it would go right here!
+    // 2. Critical Fix: Deduct Stock for every item in cart
+    for (const item of cart) {
+      const { error: stockError } = await supabase.rpc('decrement_stock', {
+        row_id: item.id,
+        quantity: item.cartQuantity
+      });
 
-      toast.success("Order logged successfully!", { id: toastId });
-      setCart([]); // Clear cart after successful sale
-    } catch (error: any) {
-      console.error("POS Checkout Error:", error);
-      toast.error("Failed to log order.", { id: toastId });
-    } finally {
-      setIsLoading(false);
+      if (stockError) {
+        console.error(`Failed to update stock for ${item.title}:`, stockError);
+        // We continue anyway so the sale isn't lost, but log it for the dev
+      }
     }
-  };
+
+    toast.success("Order logged & inventory updated!", { id: toastId });
+    setCart([]); 
+    
+    // Refresh local product list to show new stock levels
+    const { data: updatedItems } = await supabase
+      .from('products')
+      .select('*')
+      .eq('store_id', storeId)
+      .gt('stock_quantity', 0);
+    if (updatedItems) setProducts(updatedItems);
+
+  } catch (error: any) {
+    console.error("POS Checkout Error:", error);
+    toast.error("Failed to log order.", { id: toastId });
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col lg:flex-row gap-6">

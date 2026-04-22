@@ -5,7 +5,6 @@ import { CheckCircle2, ShieldCheck, Zap, Crown, Loader2, AlertTriangle } from "l
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase"; 
 
-
 export default function BillingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
@@ -57,7 +56,6 @@ export default function BillingPage() {
   const handleSubscribe = async (plan: string, amount: number) => {
     setIsProcessing(plan);
     try {
-      // In the next step, we will build this API route to handle platform subscriptions
       const response = await fetch('/api/billing/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -86,6 +84,7 @@ export default function BillingPage() {
   }
 
   const isLockedOut = storeStatus?.isTrialExpired && storeStatus?.isSubExpired;
+  const isPaidActive = !storeStatus?.isSubExpired && storeStatus?.tier !== 'FREE';
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-12">
@@ -97,6 +96,7 @@ export default function BillingPage() {
           Choose a plan to keep your storefront active and unlock premium features.
         </p>
 
+        {/* 1. Locked Out Banner */}
         {isLockedOut && (
           <div className="mt-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
@@ -109,13 +109,27 @@ export default function BillingPage() {
           </div>
         )}
 
-        {!isLockedOut && storeStatus?.tier === 'FREE' && (
+        {/* 2. Free Trial Active Banner */}
+        {!isLockedOut && !isPaidActive && storeStatus?.tier === 'FREE' && (
           <div className="mt-6 bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-3">
             <Zap className="h-5 w-5 text-emerald-600 mt-0.5 shrink-0" />
             <div>
               <h3 className="text-sm font-bold text-emerald-800">Trial Active</h3>
               <p className="mt-1 text-sm text-emerald-600">
                 You are currently on the free trial. It expires on {storeStatus.trialEnds?.toLocaleDateString()}.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* 3. NEW: Paid Subscription Active Banner */}
+        {isPaidActive && (
+          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+            <ShieldCheck className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
+            <div>
+              <h3 className="text-sm font-bold text-blue-800">Active {storeStatus?.tier} Subscription</h3>
+              <p className="mt-1 text-sm text-blue-600">
+                Thank you for subscribing! Your store is fully active until {storeStatus?.subEnds?.toLocaleDateString()}. You can renew early below.
               </p>
             </div>
           </div>
@@ -185,7 +199,7 @@ export default function BillingPage() {
               <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" /> Priority Support
             </li>
             <li className="flex items-center gap-3 text-sm text-slate-300 font-medium">
-              <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" /> "Verified" Badge
+              <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" /> "Verified" VIP Badge
             </li>
           </ul>
           <button 

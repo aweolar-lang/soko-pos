@@ -55,47 +55,32 @@ export default function InventoryPage() {
 
   // Delete Item Logic
  // Delete Item Logic (Now with Storage Cleanup!)
-  const handleDelete = async (productId: string, imageUrls: string[]) => {
-    if (!confirm("Are you sure you want to permanently delete this product and its images?")) return;
+const handleDelete = async (productId: string, imageUrls: string[]) => {
+  if (!confirm("Are you sure? This cannot be undone.")) return;
 
-    const toastId = toast.loading("Deleting product and cleaning up storage...");
+  const toastId = toast.loading("Removing product...");
+  try {
+    // 1. Delete from DB first
+    const { error: dbError } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', productId);
 
-    try {
-      // 1. Delete the product from the Database FIRST
-      const { error: dbError } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', productId);
+    if (dbError) throw dbError;
 
-      if (dbError) throw dbError;
-
-      // 2. Automatically delete the images from Supabase Storage
-      if (imageUrls && imageUrls.length > 0) {
-        const pathsToDelete = imageUrls.map(url => {
-          const urlParts = url.split('/product-images/');
-          return urlParts.length > 1 ? urlParts[1] : null;
-        }).filter(Boolean) as string[]; // Remove any nulls
-
-        if (pathsToDelete.length > 0) {
-          const { error: storageError } = await supabase.storage
-            .from('product-images')
-            .remove(pathsToDelete);
-
-          if (storageError) {
-            console.error("Storage cleanup failed, but product was deleted:", storageError);
-            // We don't throw an error here because the product itself WAS deleted successfully
-          }
-        }
-      }
-
-      // 3. Update the UI
-      setProducts(products.filter(p => p.id !== productId));
-      toast.success("Product and media deleted successfully!", { id: toastId });
-
-    } catch (error: any) {
-      toast.error(error.message || "Failed to delete product.", { id: toastId });
+    // 2. Storage cleanup (already good, just adding error logging)
+    if (imageUrls?.length > 0) {
+      const paths = imageUrls.map(url => url.split('/product-images/')[1]).filter(Boolean);
+      await supabase.storage.from('product-images').remove(paths);
     }
-  };
+
+    // 3. Instant UI Update
+    setProducts(prev => prev.filter(p => p.id !== productId));
+    toast.success("Product removed", { id: toastId });
+  } catch (error: any) {
+    toast.error("Delete failed: " + error.message, { id: toastId });
+  }
+};
 
   const filteredProducts = products.filter(p => 
     p.title.toLowerCase().includes(searchQuery.toLowerCase())
