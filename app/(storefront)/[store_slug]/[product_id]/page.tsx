@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { ArrowLeft, MapPin, ShoppingBag, ShieldCheck, Truck, ChevronRight } from "lucide-react";
 import OrderModal from "../OrderModal";
+import ProductGallery from "./ProductGallery";
 
 export default async function ProductDetailsPage({ 
   params 
@@ -66,43 +67,9 @@ export default async function ProductDetailsPage({
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col md:flex-row">
           
-          {/* Left Side: Swipeable Image Gallery */}
+          {/* Left Side: Image Gallery Component */}
           <div className="w-full md:w-1/2 bg-slate-100 relative border-b md:border-b-0 md:border-r border-slate-200 aspect-square md:aspect-auto">
-            {imagesList.length > 0 ? (
-              <>
-                {/* Scroll Container */}
-                <div className="flex overflow-x-auto snap-x snap-mandatory h-full w-full [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-                  {imagesList.map((img, index) => (
-                    <div key={index} className="min-w-full h-full snap-center relative">
-                      <img 
-                        src={img} 
-                        alt={`${product.title} - Image ${index + 1}`} 
-                        className="absolute inset-0 w-full h-full object-cover"
-                      />
-                    </div>
-                  ))}
-                </div>
-                
-                {/* Visual Indicator if there's more than 1 image */}
-                {imagesList.length > 1 && (
-                  <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 pointer-events-none">
-                    {imagesList.map((_, i) => (
-                      <div key={i} className="h-2 w-2 rounded-full bg-white/50 backdrop-blur-sm border border-black/10 shadow-sm" />
-                    ))}
-                  </div>
-                )}
-                {/* Swipe hint for mobile */}
-                {imagesList.length > 1 && (
-                  <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-md text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1 pointer-events-none">
-                    Swipe <ChevronRight className="h-3 w-3" />
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <ShoppingBag className="h-20 w-20 text-slate-300" />
-              </div>
-            )}
+            <ProductGallery images={imagesList} title={product.title} />
           </div>
 
           {/* Right Side: Product Details & Checkout */}
