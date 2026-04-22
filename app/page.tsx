@@ -31,11 +31,15 @@ interface StoreData {
 export default async function MarketplaceHome({
   searchParams,
 }: {
-  searchParams: { q?: string; category?: string; location?: string };
+  // 1. Tell TypeScript searchParams is a Promise
+  searchParams: Promise<{ q?: string; category?: string; location?: string }>; 
 }) {
-  const searchQuery = searchParams.q || "";
-  const categoryQuery = searchParams.category || "";
-  const locationQuery = searchParams.location || "";
+  // 2. Await the params before using them (Required in Next.js 15+)
+  const resolvedParams = await searchParams;
+
+  const searchQuery = resolvedParams.q || "";
+  const categoryQuery = resolvedParams.category || "";
+  const locationQuery = resolvedParams.location || "";
 
   const { data, error } = await supabase
     .rpc("search_stores", { 
