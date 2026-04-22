@@ -30,7 +30,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "M-Pesa number is required" }, { status: 400 });
     }
 
-    // --- NEW: AUTO-FORMATTER ---
+   // --- UPDATED: SMART AUTO-FORMATTER ---
     // Remove spaces, dashes, and plus signs
     let cleanNumber = mpesaNumber.replace(/[\s+-]/g, '');
     
@@ -39,10 +39,16 @@ export async function POST(req: Request) {
       cleanNumber = '0' + cleanNumber.substring(3);
     }
 
-    // Ensure it is exactly 10 digits
-    if (cleanNumber.length !== 10) {
+    // Smart Routing: Decide if it's a Phone Number or a Till Number
+    let paystackBankCode = "";
+
+    if (cleanNumber.length === 10) {
+      paystackBankCode = "MPESA"; // Standard Safaricom Mobile Money
+    } else if (cleanNumber.length >= 5 && cleanNumber.length <= 8) {
+      paystackBankCode = "MPTILL"; // Business Till Number
+    } else {
       return NextResponse.json({ 
-        error: "Please enter a valid 10-digit phone number (e.g., 0712345678). Till numbers may not be supported by default." 
+        error: "Please enter a valid 10-digit phone number or a 5-8 digit Till number." 
       }, { status: 400 });
     }
 
@@ -50,7 +56,7 @@ export async function POST(req: Request) {
       throw new Error("Missing Paystack Secret Key.");
     }
 
-    // Ping Paystack
+    // Ping Paystack to create the Subaccount
     const paystackRes = await fetch("https://api.paystack.co/subaccount", {
       method: "POST",
       headers: {
@@ -59,9 +65,9 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         business_name: storeName || "LocalSoko Vendor",
-        settlement_bank: "M-Pesa", // Paystack Kenya's official bank name for M-Pesa
+        settlement_bank: paystackBankCode, // EXACT code Paystack expects (MPESA or MPTILL)
         account_number: cleanNumber, 
-        percentage_charge: 5, 
+        percentage_charge: 1, 
         description: `Automated Subaccount for ${storeName}`
       }),
     });
