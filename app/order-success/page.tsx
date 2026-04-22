@@ -12,15 +12,11 @@ const supabaseAdmin = createClient(
 export default async function OrderSuccessPage({
   searchParams,
 }: {
-  // We type this to support both Next.js 14 and 15
   searchParams: Promise<{ reference?: string; trxref?: string }> | { reference?: string; trxref?: string };
 }) {
-  //  FIX: We must await searchParams in async Next.js components. 
-  // We also check for 'trxref' just in case Paystack uses that instead.
   const resolvedParams = await searchParams;
   const reference = resolvedParams?.reference || resolvedParams?.trxref;
 
-  //  Only attempt the Paystack API verification if we successfully grabbed the reference
   if (reference) {
     try {
       const verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
@@ -35,7 +31,8 @@ export default async function OrderSuccessPage({
       if (verifyData.status && verifyData.data.status === "success") {
         const metadata = verifyData.data.metadata;
 
-        if (metadata && metadata.product_id) {
+        // 🚨 ADDED CHECK FOR store_id!
+        if (metadata && metadata.product_id && metadata.store_id) {
           const { data: existingOrder } = await supabaseAdmin
             .from("orders")
             .select("id")
@@ -43,24 +40,58 @@ export default async function OrderSuccessPage({
             .single();
 
           if (!existingOrder) {
-            const getCustomField = (name: string) => 
-              metadata.custom_fields?.find((f: any) => f.variable_name === name)?.value;
+            const customFields = metadata.custom_fields || [];
+            const getField = (name: string) => customFields.find((f: any) => f.variable_name === name)?.value;
 
-            await supabaseAdmin.from("orders").insert({
-              buyer_name: getCustomField("buyer_name") || "N/A",
-              buyer_email: verifyData.data.customer.email,
-              buyer_phone: getCustomField("buyer_phone") || "N/A",
-              fulfillment_type: getCustomField("fulfillment_type") || "SHIPPING",
-              takeaway_time: getCustomField("takeaway_time"),
-              customer_notes: getCustomField("customer_notes"),
-              paystack_reference: reference,
-              status: "PAID",
-              product_id: metadata.product_id,
-              quantity: 1,
-              price_at_time: verifyData.data.amount / 100, 
-            });
-            
-            console.log(`✅ Order ${reference} successfully verified and saved via Success Page!`);
+            // Safely parse time just like we did in the webhook
+            const rawTakeawayTime = getField("takeaway_time");
+            let formattedTakeawayTime = null;
+            if (rawTakeawayTime && rawTakeawayTime !== "N/A") {
+              try {
+                if (rawTakeawayTime.length === 5 && rawTakeawayTime.includes(":")) {
+                  const todayDate = new Date().toISOString().split('T')[0];
+                  formattedTakeawayTime = new Date(`${todayDate}T${rawTakeawayTime}:00Z`).toISOString();
+                } else {
+                  formattedTakeawayTime = new Date(rawTakeawayTime).toISOString();
+                }
+              } catch (e) {
+                console.error("Time parsing failed");
+              }
+            }
+
+            // 1. INSERT ORDER (With the missing store_id!)
+            const { data: newOrder, error: orderError } = await supabaseAdmin
+              .from("orders")
+              .insert({
+                store_id: metadata.store_id, // <-- This was missing!
+                paystack_reference: reference,
+                customer_name: getField("buyer_name") || "Guest",
+                customer_email: verifyData.data.customer.email,
+                customer_phone: getField("buyer_phone") || null,
+                amount_paid: verifyData.data.amount / 100, 
+                fulfillment_type: getField("fulfillment_type") || "SHIPPING",
+                takeaway_time: formattedTakeawayTime,
+                status: 'NEW',
+                product_id: metadata.product_id 
+              })
+              .select()
+              .single();
+
+            if (orderError) console.error("🚨 Order Insert Error:", orderError);
+
+            // 2. INSERT ORDER ITEMS
+            if (!orderError && newOrder) {
+              const { error: itemsError } = await supabaseAdmin
+                .from("order_items")
+                .insert({
+                  order_id: newOrder.id,
+                  product_id: metadata.product_id,
+                  quantity: 1, 
+                  price_at_time: verifyData.data.amount / 100
+                });
+
+              if (itemsError) console.error("🚨 Items Insert Error:", itemsError);
+            }
           }
         }
       }
@@ -106,10 +137,6 @@ export default async function OrderSuccessPage({
               <Home className="h-5 w-5" />
               Back to Homepage
             </Link>
-            
-            <p className="text-xs text-slate-400 font-medium pt-2">
-              Powered by <span className="text-emerald-600 font-bold">LocalSoko</span>
-            </p>
           </div>
         </div>
       </div>
