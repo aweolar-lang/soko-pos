@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { Loader2, ShoppingCart, X, Clock, MapPin } from "lucide-react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
+import { Loader2, ShoppingCart, X, Clock, MapPin, ShoppingBag, Info } from "lucide-react";
 import { toast } from "sonner";
 
 interface Product {
   id: string;
   title: string;
   price: number;
+  description?: string;
+  images?: string[];
 }
 
 interface OrderModalProps {
@@ -19,7 +22,9 @@ interface OrderModalProps {
 export default function OrderModal({ product, storeId, isHotel }: OrderModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
+  // Form State
   const [formData, setFormData] = useState({
     buyerName: "",
     buyerEmail: "",
@@ -28,6 +33,11 @@ export default function OrderModal({ product, storeId, isHotel }: OrderModalProp
     takeawayTime: "",
     customerNotes: "",
   });
+
+  // Ensure portal only renders on the client side
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,131 +71,164 @@ export default function OrderModal({ product, storeId, isHotel }: OrderModalProp
     }
   };
 
+  const displayImage = product.images && product.images.length > 0 ? product.images[0] : null;
+
+  const ModalContent = (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col md:flex-row animate-in zoom-in-95 duration-200 relative">
+        
+        {/* Mobile Close Button */}
+        <button onClick={() => setIsOpen(false)} className="md:hidden absolute top-4 right-4 z-10 p-2 bg-white/80 backdrop-blur rounded-full text-slate-900 shadow-sm">
+          <X className="h-5 w-5" />
+        </button>
+
+        {/* LEFT COLUMN: Product Details */}
+        <div className="w-full md:w-1/2 bg-slate-50 flex flex-col overflow-y-auto border-r border-slate-100">
+          <div className="relative h-64 md:h-80 w-full shrink-0 bg-slate-100">
+            {displayImage ? (
+              <img src={displayImage} alt={product.title} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center text-slate-300">
+                <ShoppingBag className="h-16 w-16 mb-2" />
+                <span className="text-sm font-medium">No image available</span>
+              </div>
+            )}
+            <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-md text-slate-900 font-black px-4 py-2 rounded-full shadow-lg text-lg">
+              Ksh {product.price.toLocaleString()}
+            </div>
+          </div>
+          
+          <div className="p-6 sm:p-8">
+            <h2 className="text-2xl font-black text-slate-900 mb-4">{product.title}</h2>
+            <div className="flex items-start gap-3 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+              <Info className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+              <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-line">
+                {product.description || "No specific details provided for this item."}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: Checkout Form */}
+        <div className="w-full md:w-1/2 flex flex-col h-full max-h-[50vh] md:max-h-none">
+          <div className="hidden md:flex bg-white px-6 py-4 border-b border-slate-100 items-center justify-between shrink-0">
+            <h3 className="font-bold text-slate-900">Checkout</h3>
+            <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-900 transition-colors">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <form onSubmit={handleCheckout} className="p-6 space-y-5 overflow-y-auto flex-1">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Full Name</label>
+              <input 
+                type="text" required value={formData.buyerName} onChange={(e) => setFormData({...formData, buyerName: e.target.value})}
+                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white transition-all" 
+                placeholder="John Doe" 
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Email</label>
+                <input 
+                  type="email" required value={formData.buyerEmail} onChange={(e) => setFormData({...formData, buyerEmail: e.target.value})}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white transition-all" 
+                  placeholder="john@example.com" 
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Phone</label>
+                <input 
+                  type="tel" required value={formData.buyerPhone} onChange={(e) => setFormData({...formData, buyerPhone: e.target.value})}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white transition-all" 
+                  placeholder="07..." 
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">
+                {isHotel ? "Order Method" : "Delivery Method"}
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button 
+                  type="button" onClick={() => setFormData({...formData, fulfillmentType: isHotel ? 'TAKEAWAY' : 'PICKUP'})}
+                  className={`flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border transition-colors ${
+                    formData.fulfillmentType === 'TAKEAWAY' || formData.fulfillmentType === 'PICKUP' 
+                      ? 'border-emerald-600 bg-emerald-50 text-emerald-700' 
+                      : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  <Clock className="h-4 w-4" /> {isHotel ? "Takeaway" : "Pick Up"}
+                </button>
+                <button 
+                  type="button" onClick={() => setFormData({...formData, fulfillmentType: isHotel ? 'DELIVERY' : 'SHIPPING'})}
+                  className={`flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border transition-colors ${
+                    formData.fulfillmentType === 'DELIVERY' || formData.fulfillmentType === 'SHIPPING' 
+                      ? 'border-emerald-600 bg-emerald-50 text-emerald-700' 
+                      : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  <MapPin className="h-4 w-4" /> {isHotel ? "Delivery" : "Shipping"}
+                </button>
+              </div>
+            </div>
+
+            {formData.fulfillmentType === 'TAKEAWAY' && (
+              <div className="animate-in slide-in-from-top-2">
+                <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Pickup Time</label>
+                <input 
+                  type="time" required value={formData.takeawayTime} onChange={(e) => setFormData({...formData, takeawayTime: e.target.value})}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white transition-all" 
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">
+                {formData.fulfillmentType === 'DELIVERY' || formData.fulfillmentType === 'SHIPPING' ? "Full Delivery Address" : "Special Instructions"}
+              </label>
+              <textarea 
+                rows={2} required={formData.fulfillmentType === 'DELIVERY' || formData.fulfillmentType === 'SHIPPING'}
+                value={formData.customerNotes} onChange={(e) => setFormData({...formData, customerNotes: e.target.value})}
+                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white resize-none transition-all" 
+                placeholder={formData.fulfillmentType === 'TAKEAWAY' ? "e.g. No onions, extra sauce..." : "House number, street, landmarks..."} 
+              />
+            </div>
+
+            <div className="pt-4 shrink-0 mt-auto">
+              <button 
+                type="submit" 
+                disabled={isLoading}
+                className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 px-4 rounded-xl transition-all shadow-xl shadow-slate-900/20 active:scale-95 disabled:opacity-50"
+              >
+                {isLoading ? (
+                  <><Loader2 className="h-5 w-5 animate-spin" /><span>Processing Secure Payment...</span></>
+                ) : (
+                  <span>{isHotel ? "Complete Order" : "Proceed to Payment"}</span>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+
+      </div>
+    </div>
+  );
+
   return (
     <>
       <button 
         onClick={() => setIsOpen(true)}
-        className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-colors active:scale-95 shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2"
+        className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all active:scale-95 shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2"
       >
         <ShoppingCart className="h-5 w-5" />
-        Order Now
+        {isHotel ? "Order Food" : "Buy Now"}
       </button>
 
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          {/* Added max-h-[90vh] so the entire modal box doesn't overflow the screen */}
-          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200 max-h-[90vh] flex flex-col">
-            
-            <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
-              <h3 className="font-bold text-slate-900">Complete Order</h3>
-              <button onClick={() => setIsOpen(false)} className="p-2 bg-white rounded-full text-slate-400 hover:text-slate-900 shadow-sm transition-colors">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="px-6 py-4 border-b border-slate-100 bg-emerald-50/50 shrink-0">
-              <div className="flex justify-between items-center">
-                <span className="font-bold text-slate-900">{product.title}</span>
-                <span className="font-black text-emerald-600">Ksh {product.price.toLocaleString()}</span>
-              </div>
-            </div>
-
-            {/* Adjusted from max-h-[60vh] to scroll better inside flex parent */}
-            <form onSubmit={handleCheckout} className="p-6 space-y-4 overflow-y-auto">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Full Name</label>
-                <input 
-                  type="text" required value={formData.buyerName} onChange={(e) => setFormData({...formData, buyerName: e.target.value})}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white" 
-                  placeholder="John Doe" 
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Email</label>
-                  <input 
-                    type="email" required value={formData.buyerEmail} onChange={(e) => setFormData({...formData, buyerEmail: e.target.value})}
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white" 
-                    placeholder="john@example.com" 
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Phone</label>
-                  <input 
-                    type="tel" required value={formData.buyerPhone} onChange={(e) => setFormData({...formData, buyerPhone: e.target.value})}
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white" 
-                    placeholder="07..." 
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Order Method</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button 
-                    type="button" onClick={() => setFormData({...formData, fulfillmentType: isHotel ? 'TAKEAWAY' : 'PICKUP'})}
-                    className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold border transition-colors ${
-                      formData.fulfillmentType === 'TAKEAWAY' || formData.fulfillmentType === 'PICKUP' 
-                        ? 'border-emerald-600 bg-emerald-50 text-emerald-700' 
-                        : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
-                    }`}
-                  >
-                    <Clock className="h-4 w-4" /> {isHotel ? "Takeaway" : "Pick Up"}
-                  </button>
-                  <button 
-                    type="button" onClick={() => setFormData({...formData, fulfillmentType: isHotel ? 'DELIVERY' : 'SHIPPING'})}
-                    className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold border transition-colors ${
-                      formData.fulfillmentType === 'DELIVERY' || formData.fulfillmentType === 'SHIPPING' 
-                        ? 'border-emerald-600 bg-emerald-50 text-emerald-700' 
-                        : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
-                    }`}
-                  >
-                    <MapPin className="h-4 w-4" /> {isHotel ? "Delivery" : "Shipping"}
-                  </button>
-                </div>
-              </div>
-
-              {formData.fulfillmentType === 'TAKEAWAY' && (
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Pickup Time</label>
-                  <input 
-                    type="time" required value={formData.takeawayTime} onChange={(e) => setFormData({...formData, takeawayTime: e.target.value})}
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white" 
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">
-                  {formData.fulfillmentType === 'DELIVERY' || formData.fulfillmentType === 'SHIPPING' ? "Delivery Address & Notes" : "Special Instructions"}
-                </label>
-                <textarea 
-                  rows={2} required={formData.fulfillmentType === 'DELIVERY' || formData.fulfillmentType === 'SHIPPING'}
-                  value={formData.customerNotes} onChange={(e) => setFormData({...formData, customerNotes: e.target.value})}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white resize-none" 
-                  placeholder={formData.fulfillmentType === 'TAKEAWAY' ? "Any dietary requirements?" : "Enter full delivery address..."} 
-                />
-              </div>
-
-              <div className="pt-4 shrink-0">
-                <button 
-                  type="submit" 
-                  disabled={isLoading}
-                  className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50"
-                >
-                  {isLoading ? (
-                    <><Loader2 className="h-5 w-5 animate-spin" /><span>Processing...</span></>
-                  ) : (
-                    <span>Proceed to Payment</span>
-                  )}
-                </button>
-              </div>
-
-            </form>
-          </div>
-        </div>
-      )}
+      {/* REACT PORTAL: Teleports the modal out of the product card so it never flickers! */}
+      {mounted && isOpen && createPortal(ModalContent, document.body)}
     </>
   );
 }

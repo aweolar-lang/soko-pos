@@ -1,10 +1,8 @@
 import { notFound } from "next/navigation";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { MapPin, Clock, ShoppingBag, Utensils, Star } from "lucide-react";
+import { MapPin, Clock, ShoppingBag, Utensils, Star, MessageCircle } from "lucide-react";
 import OrderModal from "./OrderModal";
-
-// REMOVED: export const revalidate = 60; (Now the store updates instantly!)
 
 export default async function StorefrontPage({ params }: { params: { store_slug: string } }) {
   const resolvedParams = await params; 
@@ -38,7 +36,7 @@ export default async function StorefrontPage({ params }: { params: { store_slug:
     .eq("store_id", store.id)
     .order("created_at", { ascending: false });
 
-  const isHotel = store.description?.toLowerCase().includes("hotel") || store.description?.toLowerCase().includes("restaurant");
+  const isHotel = store.description?.toLowerCase().includes("hotel") || store.description?.toLowerCase().includes("restaurant") || store.description?.toLowerCase().includes("cafe");
   const locationText = [store.area, store.town, store.county].filter(Boolean).join(", ");
 
   return (
@@ -59,15 +57,30 @@ export default async function StorefrontPage({ params }: { params: { store_slug:
             </div>
           )}
           
-          <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight flex items-center gap-3">
-            {store.name}
-            {store.tier === 'VIP' && (
-              <span title="VIP Verified Store" className="flex items-center bg-yellow-400/20 p-1.5 rounded-full">
-                <Star className="h-6 w-6 text-yellow-400 fill-yellow-400" />
-              </span>
-            )}
-          </h1>
-          <p className="mt-4 text-lg text-emerald-50 max-w-2xl mx-auto font-medium leading-relaxed">
+          <div className="flex flex-col items-center gap-3">
+            <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight flex items-center gap-3">
+              {store.name}
+              {store.tier === 'VIP' && (
+                <span title="VIP Verified Store" className="flex items-center bg-yellow-400/20 p-1.5 rounded-full">
+                  <Star className="h-6 w-6 text-yellow-400 fill-yellow-400" />
+                </span>
+              )}
+            </h1>
+
+            {/* FUTURE FEATURE PLACEHOLDER: Reviews & Messages */}
+            <div className="flex items-center gap-3 mt-2">
+              <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full text-sm font-medium text-emerald-50">
+                <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                <span>4.8 (120 Reviews)</span>
+              </div>
+              <button className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 transition-colors px-4 py-1.5 rounded-full text-sm font-bold text-white shadow-lg">
+                <MessageCircle className="h-4 w-4" />
+                Message Seller
+              </button>
+            </div>
+          </div>
+
+          <p className="mt-6 text-lg text-emerald-50 max-w-2xl mx-auto font-medium leading-relaxed">
             {store.description || "Welcome to our official LocalSoko storefront."}
           </p>
         </div>
@@ -126,6 +139,8 @@ export default async function StorefrontPage({ params }: { params: { store_slug:
                     <p className="text-sm text-slate-500 line-clamp-2 mb-6 flex-1">
                       {product.description || "No description provided."}
                     </p>
+                    
+                    {/* The Full Product Object is now passed! */}
                     <OrderModal product={product} storeId={store.id} isHotel={isHotel} />
                   </div>
                 </div>
