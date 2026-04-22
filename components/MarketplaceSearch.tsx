@@ -34,7 +34,7 @@ export default function MarketplaceSearch({ initialQuery, initialLocation, initi
     }
 
     setIsLocating(true);
-    toast.loading("Detecting location...", { id: "location-toast" });
+    toast.loading("Pinpointing your neighborhood...", { id: "location-toast" });
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
@@ -47,7 +47,7 @@ export default function MarketplaceSearch({ initialQuery, initialLocation, initi
           
           if (detectedPlace) {
             setLocation(detectedPlace);
-            toast.success(`Location set to ${detectedPlace}`, { id: "location-toast" });
+            toast.success(`Found you in ${detectedPlace}!`, { id: "location-toast" });
           } else {
             toast.error("Could not determine exact location.", { id: "location-toast" });
           }
@@ -65,44 +65,50 @@ export default function MarketplaceSearch({ initialQuery, initialLocation, initi
   };
 
   return (
-    <form onSubmit={handleSearch} className="z-10 w-full max-w-4xl flex flex-col sm:flex-row bg-white border border-slate-300 shadow-sm transition-all focus-within:border-slate-900 focus-within:ring-1 focus-within:ring-slate-900">
+    <form onSubmit={handleSearch} className="z-10 w-full max-w-4xl mx-auto flex flex-col sm:flex-row bg-white rounded-3xl sm:rounded-full border border-slate-200/80 shadow-lg shadow-slate-200/50 transition-all hover:shadow-xl focus-within:ring-4 focus-within:ring-emerald-500/10 focus-within:border-emerald-500 overflow-hidden">
       
       {/* What to find */}
-      <div className="flex-1 flex items-center px-4 py-3.5 border-b sm:border-b-0 sm:border-r border-slate-200">
-        <Search className="h-4 w-4 text-slate-400 shrink-0" />
-        <input 
-          type="text" 
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search inventory, brands, or stores..." 
-          className="w-full pl-3 bg-transparent text-slate-900 placeholder:text-slate-400 outline-none text-sm font-medium"
-        />
+      <div className="flex-1 flex items-center px-6 py-4 border-b sm:border-b-0 sm:border-r border-slate-100 group">
+        <Search className="h-5 w-5 text-slate-400 group-focus-within:text-emerald-600 transition-colors shrink-0" />
+        <div className="flex flex-col w-full pl-3">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Looking for</span>
+          <input 
+            type="text" 
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Stores, products, or brands..." 
+            className="w-full bg-transparent text-slate-900 placeholder:text-slate-300 outline-none text-sm font-semibold"
+          />
+        </div>
       </div>
 
       {/* Where to find it */}
-      <div className="flex-1 flex items-center px-4 py-3.5 relative group bg-slate-50/50">
-        <MapPin className="h-4 w-4 text-slate-400 shrink-0" />
-        <input 
-          type="text" 
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-          placeholder="Location or Zip Code" 
-          className="w-full pl-3 pr-10 bg-transparent text-slate-900 placeholder:text-slate-400 outline-none text-sm font-medium"
-        />
+      <div className="flex-1 flex items-center px-6 py-4 relative group">
+        <MapPin className="h-5 w-5 text-slate-400 group-focus-within:text-emerald-600 transition-colors shrink-0" />
+        <div className="flex flex-col w-full pl-3 pr-10">
+           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Neighborhood</span>
+          <input 
+            type="text" 
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="Enter town or area" 
+            className="w-full bg-transparent text-slate-900 placeholder:text-slate-300 outline-none text-sm font-semibold"
+          />
+        </div>
         <button 
           type="button" 
           onClick={detectLocation}
           disabled={isLocating}
-          className="absolute right-3 p-1.5 text-slate-400 hover:text-slate-900 transition-colors"
-          title="Use GPS"
+          className="absolute right-4 p-2 bg-slate-50 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-all"
+          title="Use my current location"
         >
-          {isLocating ? <Loader2 className="h-4 w-4 animate-spin text-slate-900" /> : <Navigation className="h-4 w-4" />}
+          {isLocating ? <Loader2 className="h-4 w-4 animate-spin text-emerald-600" /> : <Navigation className="h-4 w-4" />}
         </button>
       </div>
 
       {/* Submit */}
-      <button type="submit" className="bg-slate-900 hover:bg-black text-white font-semibold py-3.5 sm:px-10 transition-colors text-sm w-full sm:w-auto">
-        Search
+      <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 px-8 transition-all text-sm w-full sm:w-auto flex items-center justify-center gap-2 m-1.5 sm:rounded-full rounded-2xl active:scale-95">
+        <Search className="h-4 w-4" /> Search
       </button>
     </form>
   );
