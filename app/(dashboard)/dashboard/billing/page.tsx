@@ -164,7 +164,7 @@ export default function BillingPage() {
             </li>
           </ul>
           <button 
-            onClick={() => handleSubscribe("1_MONTH", 5)}
+            onClick={() => handleSubscribe("1_MONTH", 350)}
             disabled={isProcessing !== null}
             className="w-full py-3.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold rounded-xl transition-colors disabled:opacity-50"
           >
