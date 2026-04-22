@@ -40,7 +40,7 @@ export async function POST(req: Request) {
 
       // ---- SCENARIO A: Platform Subscription Payment ----
       if (metadata && metadata.transaction_type === "platform_subscription") {
-        const userId = metadata.user_id;
+        const userId = metadata.owner_id; // The user whose subscription we need to update
         const plan = metadata.plan;
         
         // Calculate the new expiration date based on the plan
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
             subscription_ends_at: newSubEndsAt.toISOString(),
             tier: newTier,
           })
-          .eq("user_id", userId);
+          .eq("owner_id", userId);
 
         if (updateError) {
           console.error("Failed to update store subscription:", updateError);

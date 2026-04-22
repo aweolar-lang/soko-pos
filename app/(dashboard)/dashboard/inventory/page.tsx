@@ -54,19 +54,46 @@ export default function InventoryPage() {
   }, []);
 
   // Delete Item Logic
-  const handleDelete = async (productId: string) => {
-    if (!confirm("Are you sure you want to delete this item?")) return;
+ // Delete Item Logic (Now with Storage Cleanup!)
+  const handleDelete = async (productId: string, imageUrls: string[]) => {
+    if (!confirm("Are you sure you want to permanently delete this product and its images?")) return;
 
-    const { error } = await supabase
-      .from('products')
-      .delete()
-      .eq('id', productId);
+    const toastId = toast.loading("Deleting product and cleaning up storage...");
 
-    if (error) {
-      toast.error("Failed to delete product");
-    } else {
-      toast.success("Product deleted successfully");
+    try {
+      // 1. Delete the product from the Database FIRST
+      const { error: dbError } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productId);
+
+      if (dbError) throw dbError;
+
+      // 2. Automatically delete the images from Supabase Storage
+      if (imageUrls && imageUrls.length > 0) {
+        const pathsToDelete = imageUrls.map(url => {
+          const urlParts = url.split('/product-images/');
+          return urlParts.length > 1 ? urlParts[1] : null;
+        }).filter(Boolean) as string[]; // Remove any nulls
+
+        if (pathsToDelete.length > 0) {
+          const { error: storageError } = await supabase.storage
+            .from('product-images')
+            .remove(pathsToDelete);
+
+          if (storageError) {
+            console.error("Storage cleanup failed, but product was deleted:", storageError);
+            // We don't throw an error here because the product itself WAS deleted successfully
+          }
+        }
+      }
+
+      // 3. Update the UI
       setProducts(products.filter(p => p.id !== productId));
+      toast.success("Product and media deleted successfully!", { id: toastId });
+
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete product.", { id: toastId });
     }
   };
 
@@ -183,10 +210,11 @@ export default function InventoryPage() {
                           <Edit className="h-4 w-4" />
                         </button>
                         <button 
-                          onClick={() => handleDelete(product.id)}
-                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            onClick={() => handleDelete(product.id, product.images)} // <-- ADD product.images HERE!
+                            className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 rounded-lg transition-colors"
+                            title="Delete Product"
                         >
-                          <Trash2 className="h-4 w-4" />
+                       <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     </td>

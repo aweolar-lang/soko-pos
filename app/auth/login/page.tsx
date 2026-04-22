@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createBrowserClient } from '@supabase/ssr';
+import { supabase } from "@/lib/supabase"; 
 import { Store, Mail, Lock, Loader2, LogIn } from "lucide-react";
 import { toast } from "sonner";
 
@@ -17,10 +17,6 @@ export default function LoginPage() {
   });
   
   // Create the SSR-compatible browser client
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -75,7 +75,7 @@ export async function POST(req: Request) {
         ],
         // Hidden metadata our webhook will use to update the database silently
         transaction_type: "platform_subscription",
-        user_id: user.id,
+        owner_id: user.id,
         plan: plan,
       },
     };

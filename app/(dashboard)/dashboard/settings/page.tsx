@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-// 1. Using the shared client!
 import { supabase } from "@/lib/supabase"; 
-import { Store, Link as LinkIcon, Loader2, Save, AlertCircle, MapPin, Building2, Map } from "lucide-react";
+import { Store, Link as LinkIcon, Loader2, Save, AlertCircle, MapPin, Building2, Map, ImagePlus, AlignLeft } from "lucide-react";
 import { toast } from "sonner";
 
 export default function SettingsPage() {
@@ -12,12 +11,18 @@ export default function SettingsPage() {
   const [storeId, setStoreId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   
+  // New state for Logo uploads
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  
   const [formData, setFormData] = useState({
     storeName: "",
     storeSlug: "",
+    description: "", // Added Description
     county: "",
     town: "",
     area: "",
+    existingLogoUrl: "", // Keep track of current logo
   });
 
   useEffect(() => {
@@ -30,7 +35,7 @@ export default function SettingsPage() {
 
         const { data: store } = await supabase
           .from('stores')
-          .select('id, name, slug, county, town, area')
+          .select('id, name, slug, description, logo_url, county, town, area')
           .eq('owner_id', session.user.id)
           .single();
 
@@ -39,10 +44,16 @@ export default function SettingsPage() {
           setFormData({
             storeName: store.name || "",
             storeSlug: store.slug || "",
+            description: store.description || "",
             county: store.county || "",
             town: store.town || "",
             area: store.area || "",
+            existingLogoUrl: store.logo_url || "",
           });
+          
+          if (store.logo_url) {
+            setLogoPreview(store.logo_url);
+          }
         }
       } catch (error) {
         console.error("Error fetching store:", error);
@@ -55,14 +66,20 @@ export default function SettingsPage() {
   }, []);
 
   const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = e.target.value;
-    const formattedSlug = rawValue
+    const formattedSlug = e.target.value
       .toLowerCase()
       .replace(/[^a-z0-9-]/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-/, '');
-
     setFormData({ ...formData, storeSlug: formattedSlug });
+  };
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setLogoFile(file);
+      setLogoPreview(URL.createObjectURL(file));
+    }
   };
 
   const handleSaveStore = async (e: React.FormEvent) => {
@@ -70,30 +87,56 @@ export default function SettingsPage() {
     if (!userId) return;
 
     setIsLoading(true);
+    const toastId = toast.loading("Saving store settings...");
 
     try {
+      let finalLogoUrl = formData.existingLogoUrl;
+
+      // 1. Upload Logo if a new one was selected
+      if (logoFile) {
+        const fileExt = logoFile.name.split('.').pop();
+        const fileName = `${userId}-${Date.now()}.${fileExt}`;
+        const filePath = `logos/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('store-assets')
+          .upload(filePath, logoFile);
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from('store-assets')
+          .getPublicUrl(filePath);
+
+        finalLogoUrl = publicUrlData.publicUrl;
+      }
+
+      // 2. Save everything to the database
       const { data, error } = await supabase.from('stores').upsert({
         id: storeId || undefined, 
         owner_id: userId,
         name: formData.storeName.trim(),
         slug: formData.storeSlug,
+        description: formData.description.trim(),
+        logo_url: finalLogoUrl,
         county: formData.county.trim(),
         town: formData.town.trim(),
         area: formData.area.trim(),
       }).select().single();
 
       if (error) {
-        if (error.code === '23505') {
-          throw new Error("That store link is already taken. Please choose another one.");
-        }
+        if (error.code === '23505') throw new Error("That store link is already taken. Please choose another one.");
         throw error;
       }
 
       setStoreId(data.id);
-      toast.success(storeId ? "Store details updated!" : "Store created successfully!");
+      setFormData(prev => ({ ...prev, existingLogoUrl: finalLogoUrl })); // Update existing URL state
+      setLogoFile(null); // Clear the pending file
+      
+      toast.success(storeId ? "Store profile updated!" : "Store created successfully!", { id: toastId });
       
     } catch (error: any) {
-      toast.error(error.message || "Failed to save store details.");
+      toast.error(error.message || "Failed to save store details.", { id: toastId });
     } finally {
       setIsLoading(false);
     }
@@ -110,9 +153,9 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8">
+    <div className="max-w-3xl mx-auto space-y-8 py-6">
       <div>
-        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Store Settings</h1>
+        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Store Profile</h1>
         <p className="mt-2 text-sm text-slate-500">
           Manage your brand identity, public link, and physical location.
         </p>
@@ -127,47 +170,79 @@ export default function SettingsPage() {
               <div>
                 <h3 className="text-sm font-bold text-emerald-800">Welcome to LocalSoko!</h3>
                 <p className="mt-1 text-sm text-emerald-600">
-                  Before you can add products, set up your store's name, link, and location.
+                  Before you can add products, set up your store's profile.
                 </p>
               </div>
             </div>
           )}
 
-          <form onSubmit={handleSaveStore} className="space-y-6">
+          <form onSubmit={handleSaveStore} className="space-y-8">
             
-            {/* Store Name Input */}
-            <div>
-              <label htmlFor="storeName" className="block text-sm font-bold text-slate-700 mb-2">
-                Store Name
-              </label>
-              <div className="relative">
-                <Store className="absolute left-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
-                <input 
-                  id="storeName" type="text" required 
-                  value={formData.storeName} 
-                  onChange={(e) => setFormData({ ...formData, storeName: e.target.value })} 
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" 
-                  placeholder="e.g. Denis Tech Electronics" 
-                />
+            {/* Logo Upload Section */}
+            <div className="flex items-center gap-6">
+              <div className="relative h-24 w-24 rounded-full border-4 border-slate-50 bg-slate-100 flex items-center justify-center overflow-hidden shadow-sm shrink-0 group">
+                {logoPreview ? (
+                  <img src={logoPreview} alt="Store Logo" className="h-full w-full object-cover" />
+                ) : (
+                  <Store className="h-8 w-8 text-slate-300" />
+                )}
+                <label className="absolute inset-0 bg-black/50 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                  <ImagePlus className="h-5 w-5 mb-1" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">Upload</span>
+                  <input type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
+                </label>
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900">Store Logo</h3>
+                <p className="text-sm text-slate-500 mt-1 max-w-sm">
+                  Upload a square image. This will appear on your public storefront and in the marketplace search.
+                </p>
               </div>
             </div>
 
-            {/* Store Slug Input */}
+            <hr className="border-slate-100" />
+            
+            {/* Store Name & Slug */}
+            <div className="grid sm:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Store Name</label>
+                <div className="relative">
+                  <Store className="absolute left-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
+                  <input 
+                    type="text" required value={formData.storeName} 
+                    onChange={(e) => setFormData({ ...formData, storeName: e.target.value })} 
+                    className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" 
+                    placeholder="e.g. Denis Tech Electronics" 
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Public Store Link</label>
+                <div className="flex rounded-xl shadow-sm border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-emerald-500 transition-all bg-slate-50 focus-within:bg-white">
+                  <span className="flex items-center pl-4 pr-1 text-slate-500 text-sm font-medium select-none">
+                    <LinkIcon className="h-4 w-4 mr-1.5 text-slate-400" />
+                    localsoko.com/
+                  </span>
+                  <input
+                    type="text" required value={formData.storeSlug} onChange={handleSlugChange}
+                    className="flex-1 py-2.5 pr-4 pl-1 outline-none text-sm font-bold text-slate-900 bg-transparent min-w-[100px]"
+                    placeholder="denis-tech"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Store Description */}
             <div>
-              <label htmlFor="storeSlug" className="block text-sm font-bold text-slate-700 mb-2">
-                Public Store Link
-              </label>
-              <div className="flex rounded-xl shadow-sm border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-emerald-500 transition-all bg-slate-50 focus-within:bg-white">
-                <span className="flex items-center pl-4 pr-1 text-slate-500 sm:text-sm font-medium select-none">
-                  <LinkIcon className="h-4 w-4 mr-2 text-slate-400" />
-                  localsoko.com/
-                </span>
-                <input
-                  id="storeSlug" type="text" required
-                  value={formData.storeSlug}
-                  onChange={handleSlugChange}
-                  className="flex-1 py-2.5 pr-4 pl-1 outline-none text-sm font-bold text-slate-900 bg-transparent"
-                  placeholder="denis-tech"
+              <label className="block text-sm font-bold text-slate-700 mb-2">Short Description</label>
+              <div className="relative">
+                <AlignLeft className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+                <textarea 
+                  rows={3} value={formData.description} 
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })} 
+                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm resize-none bg-slate-50 focus:bg-white" 
+                  placeholder="Tell customers what you sell..." 
                 />
               </div>
             </div>
@@ -178,66 +253,51 @@ export default function SettingsPage() {
             <div>
               <h3 className="text-lg font-bold text-slate-900 mb-4">Physical Location</h3>
               <div className="grid md:grid-cols-3 gap-4">
-                
-                {/* County */}
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">County</label>
                   <div className="relative">
                     <Map className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                     <input 
-                      type="text" required
-                      value={formData.county}
-                      onChange={(e) => setFormData({ ...formData, county: e.target.value })}
-                      className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white"
-                      placeholder="e.g. Nairobi"
+                      type="text" required value={formData.county} onChange={(e) => setFormData({ ...formData, county: e.target.value })}
+                      className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" placeholder="e.g. Nairobi"
                     />
                   </div>
                 </div>
 
-                {/* Town */}
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Town / City</label>
                   <div className="relative">
                     <Building2 className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                     <input 
-                      type="text" required
-                      value={formData.town}
-                      onChange={(e) => setFormData({ ...formData, town: e.target.value })}
-                      className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white"
-                      placeholder="e.g. Westlands"
+                      type="text" required value={formData.town} onChange={(e) => setFormData({ ...formData, town: e.target.value })}
+                      className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" placeholder="e.g. Westlands"
                     />
                   </div>
                 </div>
 
-                {/* Specific Area */}
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Specific Area</label>
                   <div className="relative">
                     <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                     <input 
-                      type="text" required
-                      value={formData.area}
-                      onChange={(e) => setFormData({ ...formData, area: e.target.value })}
-                      className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white"
-                      placeholder="e.g. Moi Avenue"
+                      type="text" required value={formData.area} onChange={(e) => setFormData({ ...formData, area: e.target.value })}
+                      className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" placeholder="e.g. Moi Avenue"
                     />
                   </div>
                 </div>
-
               </div>
             </div>
 
             {/* Submit Button */}
             <div className="pt-6 border-t border-slate-100 flex justify-end">
               <button 
-                type="submit" 
-                disabled={isLoading || !isFormValid} 
-                className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 px-6 rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                type="submit" disabled={isLoading || !isFormValid} 
+                className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-6 rounded-xl shadow-md shadow-emerald-600/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
                   <><Loader2 className="h-4 w-4 animate-spin" /><span>Saving...</span></>
                 ) : (
-                  <><span>{storeId ? "Update Settings" : "Save Settings"}</span><Save className="h-4 w-4" /></>
+                  <><span>{storeId ? "Save Profile" : "Create Store"}</span><Save className="h-4 w-4" /></>
                 )}
               </button>
             </div>

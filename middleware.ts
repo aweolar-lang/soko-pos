@@ -55,7 +55,7 @@ export async function middleware(request: NextRequest) {
       const { data: store } = await supabase
         .from('stores')
         .select('trial_ends_at, subscription_ends_at')
-        .eq('user_id', session.user.id)
+        .eq('owner_id', session.user.id)
         .single();
 
       if (store) {
