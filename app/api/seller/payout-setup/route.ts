@@ -6,7 +6,6 @@ export async function POST(req: Request) {
   try {
     const cookieStore = await cookies();
     
-    // Initialize secure Supabase client
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -19,26 +18,39 @@ export async function POST(req: Request) {
       }
     );
 
-    // 1. Verify the seller is logged in
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 2. Extract data from the Settings page request
     const body = await req.json();
     const { mpesaNumber, storeName } = body;
 
     if (!mpesaNumber) {
-      return NextResponse.json({ error: "M-Pesa or Till number is required" }, { status: 400 });
+      return NextResponse.json({ error: "M-Pesa number is required" }, { status: 400 });
+    }
+
+    // --- NEW: AUTO-FORMATTER ---
+    // Remove spaces, dashes, and plus signs
+    let cleanNumber = mpesaNumber.replace(/[\s+-]/g, '');
+    
+    // If it starts with 254, convert to 0
+    if (cleanNumber.startsWith('254')) {
+      cleanNumber = '0' + cleanNumber.substring(3);
+    }
+
+    // Ensure it is exactly 10 digits
+    if (cleanNumber.length !== 10) {
+      return NextResponse.json({ 
+        error: "Please enter a valid 10-digit phone number (e.g., 0712345678). Till numbers may not be supported by default." 
+      }, { status: 400 });
     }
 
     if (!process.env.PAYSTACK_SECRET_KEY) {
-      throw new Error("Missing Paystack Secret Key in environment variables.");
+      throw new Error("Missing Paystack Secret Key.");
     }
 
-    // 3. Ping Paystack to create the Automated Subaccount
-    // Note: For Kenyan M-Pesa, the settlement_bank parameter is typically "M-Pesa" or "M-Pesa (Safaricom)"
+    // Ping Paystack
     const paystackRes = await fetch("https://api.paystack.co/subaccount", {
       method: "POST",
       headers: {
@@ -47,37 +59,33 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         business_name: storeName || "LocalSoko Vendor",
-        settlement_bank: "M-Pesa", 
-        account_number: mpesaNumber, 
-        percentage_charge: 1, // YOUR PLATFORM COMMISSION (e.g., 5%)
+        settlement_bank: "M-Pesa", // Paystack Kenya's official bank name for M-Pesa
+        account_number: cleanNumber, 
+        percentage_charge: 5, 
         description: `Automated Subaccount for ${storeName}`
       }),
     });
 
     const paystackData = await paystackRes.json();
 
-    // 4. Handle Paystack Rejections (e.g., invalid phone format)
+    // --- NEW: EXPOSE REAL ERROR ---
     if (!paystackData.status) {
-      console.error("Paystack Subaccount Error:", paystackData.message);
+      console.error("Paystack API Error:", paystackData.message);
+      // We now pass the EXACT error message from Paystack to your frontend
       return NextResponse.json({ 
-        error: "Paystack could not verify this number. Please check the format." 
+        error: `Paystack: ${paystackData.message}` 
       }, { status: 502 });
     }
 
     const subaccountCode = paystackData.data.subaccount_code;
 
-    // 5. Save the generated subaccount_code to the seller's store in Supabase
     const { error: dbError } = await supabase
       .from("stores")
       .update({ paystack_subaccount_code: subaccountCode })
       .eq("owner_id", session.user.id);
 
-    if (dbError) {
-      console.error("Supabase Database Error:", dbError);
-      throw dbError;
-    }
+    if (dbError) throw dbError;
 
-    // 6. Return the success signal to the frontend
     return NextResponse.json({ 
       success: true, 
       subaccount_code: subaccountCode 
