@@ -9,7 +9,7 @@ import ProductGallery from "./ProductGallery";
 export default async function ProductDetailsPage({ 
   params 
 }: { 
-  params: Promise<{ store_slug: string; product_id: string }> 
+  params: Promise<{ store_slug: string; product_slug: string }> 
 }) {
   const resolvedParams = await params;
   const cookieStore = await cookies();
@@ -37,7 +37,7 @@ export default async function ProductDetailsPage({
   const { data: product, error: productError } = await supabase
     .from("products")
     .select("*")
-    .eq("id", resolvedParams.product_id)
+    .eq("slug", resolvedParams.product_slug)
     .single();
 
   if (productError || !product) notFound();

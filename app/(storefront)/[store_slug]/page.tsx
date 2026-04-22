@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import Link from "next/link"; // <-- Added Link import
+import Link from "next/link";
 import { MapPin, Clock, ShoppingBag, Utensils, Star, MessageCircle } from "lucide-react";
 import OrderModal from "./OrderModal";
 
@@ -125,7 +125,7 @@ export default async function StorefrontPage({ params }: { params: { store_slug:
                 <div key={product.id} className="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col group">
                   
                   {/* WRAPPED IMAGE IN LINK */}
-                  <Link href={`/${resolvedParams.store_slug}/${product.id}`} className="relative h-56 w-full bg-slate-50 overflow-hidden block">
+                  <Link href={`/${resolvedParams.store_slug}/${product.slug}`} className="relative h-56 w-full bg-slate-50 overflow-hidden block">
                     {displayImage ? (
                       <img src={displayImage} alt={product.title} className="object-cover h-full w-full group-hover:scale-105 transition-transform duration-500" />
                     ) : (
@@ -140,7 +140,7 @@ export default async function StorefrontPage({ params }: { params: { store_slug:
 
                   <div className="p-5 flex-1 flex flex-col">
                     {/* WRAPPED TITLE IN LINK */}
-                    <Link href={`/${resolvedParams.store_slug}/${product.id}`}>
+                    <Link href={`/${resolvedParams.store_slug}/${product.slug}`}>
                       <h3 className="text-lg font-bold text-slate-900 mb-2 hover:text-emerald-600 transition-colors">{product.title}</h3>
                     </Link>
                     
