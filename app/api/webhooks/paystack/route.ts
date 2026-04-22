@@ -28,6 +28,9 @@ export async function POST(req: Request) {
 
     const event = JSON.parse(rawBody);
 
+    // ==========================================
+    // SCENARIO 1: CHARGE SUCCESS (Money In)
+    // ==========================================
     if (event.event === "charge.success") {
       const metadata = event.data.metadata;
 
@@ -77,6 +80,7 @@ export async function POST(req: Request) {
         }
 
         // Insert Order
+        // Insert Order
         const { data: newOrder, error: orderError } = await supabaseAdmin
           .from("orders")
           .insert({
@@ -89,14 +93,19 @@ export async function POST(req: Request) {
             fulfillment_type: fulfillmentType,
             takeaway_time: formattedTakeawayTime,
             status: 'NEW',
-            product_id: metadata.product_id 
+            product_id: metadata.product_id // <-- Ensure this column actually exists in your 'orders' table!
           })
           .select()
           .single();
 
+        // 🚨 ADD THIS LOUD ERROR LOG:
+        if (orderError) {
+          console.error("🚨 SUPABASE ORDER INSERT FAILED:", orderError);
+        }
+
         if (!orderError && newOrder) {
           // Insert Order Item
-          await supabaseAdmin
+          const { error: itemsError } = await supabaseAdmin
             .from("order_items")
             .insert({
               order_id: newOrder.id,
@@ -104,38 +113,44 @@ export async function POST(req: Request) {
               quantity: 1, 
               price_at_time: event.data.amount / 100
             });
-        }
-      }
-
-      else if (event.event === "transfer.success") {
-        const transferData = event.data;
-      
-        // Paystack sends the subaccount/recipient info. We find the store that owns it.
-        // Note: Depending on Paystack's exact transfer payload, the code might be inside 'recipient'
-        const subaccountCode = transferData.recipient?.subaccount || transferData.subaccount?.subaccount_code;
-
-        if (subaccountCode) {
-          // Find the store linked to this subaccount
-          const { data: store } = await supabaseAdmin
-            .from("stores")
-            .select("id")
-            .eq("paystack_subaccount_code", subaccountCode)
-            .single();
-
-          if (store) {
-            // Log the payout in the database!
-            await supabaseAdmin
-              .from("payouts")
-              .insert({
-                store_id: store.id,
-                amount_paid: transferData.amount / 100, // Convert from Kobo/Cents to Ksh
-                paystack_reference: transferData.reference,
-                status: "COMPLETED"
-              });
+            
+          // 🚨 ADD THIS LOUD ERROR LOG:
+          if (itemsError) {
+            console.error("🚨 SUPABASE ITEMS INSERT FAILED:", itemsError);
           }
         }
       }
+    } 
+    // ==========================================
+    // SCENARIO 2: TRANSFER SUCCESS (Money Out)
+    // ==========================================
+    else if (event.event === "transfer.success") {
+      const transferData = event.data;
+    
+      // Paystack sends the subaccount/recipient info. We find the store that owns it.
+      // Note: Depending on Paystack's exact transfer payload, the code might be inside 'recipient'
+      const subaccountCode = transferData.recipient?.subaccount || transferData.subaccount?.subaccount_code;
 
+      if (subaccountCode) {
+        // Find the store linked to this subaccount
+        const { data: store } = await supabaseAdmin
+          .from("stores")
+          .select("id")
+          .eq("paystack_subaccount_code", subaccountCode)
+          .single();
+
+        if (store) {
+          // Log the payout in the database!
+          await supabaseAdmin
+            .from("payouts")
+            .insert({
+              store_id: store.id,
+              amount_paid: transferData.amount / 100, // Convert from Kobo/Cents to Ksh
+              paystack_reference: transferData.reference,
+              status: "COMPLETED"
+            });
+        }
+      }
     }
 
     return NextResponse.json({ received: true }, { status: 200 });

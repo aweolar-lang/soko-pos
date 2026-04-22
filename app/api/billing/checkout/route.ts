@@ -3,7 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 const VALID_PLANS = {
-  "1_MONTH": 350,
+  "1_MONTH": 5,
   "6_MONTHS": 650,
   "1_YEAR": 1000,
 };

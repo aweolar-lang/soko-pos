@@ -30,13 +30,13 @@ export async function POST(req: Request) {
     // Extract the subaccount code from the joined stores table
     // @ts-ignore - Supabase join typing workaround
     const subaccountCode = product.stores?.paystack_subaccount_code;
+    const baseUrl = "https://localsoko.com";
 
     const paystackPayload: any = {
       email: buyerEmail,
       amount: Math.round(product.price * 100),
       currency: "KES",
-      callback_url: "https://localsoko.com/order-success", 
-      // NEW: Add the subaccount code so Paystack splits the money automatically!
+      callback_url: `${baseUrl}/order-success`,
       subaccount: subaccountCode || undefined, 
       metadata: {
         product_id: product.id,
