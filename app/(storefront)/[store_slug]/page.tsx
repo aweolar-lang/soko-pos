@@ -23,7 +23,7 @@ export default async function StorefrontPage({ params }: { params: { store_slug:
 
   const { data: store, error: storeError } = await supabase
     .from("stores")
-    .select("id, name, description, logo_url, county, town, area, tier")
+    .select("id, name, description, logo_url, county, town, area, tier, category" )
     .eq("slug", resolvedParams.store_slug) 
     .single();
 
@@ -37,7 +37,7 @@ export default async function StorefrontPage({ params }: { params: { store_slug:
     .eq("store_id", store.id)
     .order("created_at", { ascending: false });
 
-  const isHotel = store.description?.toLowerCase().includes("hotel") || store.description?.toLowerCase().includes("restaurant") || store.description?.toLowerCase().includes("cafe");
+  const isHotel = store.description?.toLowerCase().includes("hotel") || store.description?.toLowerCase().includes("restaurant") || store.description?.toLowerCase().includes("cafe") || store.name?.toLowerCase().includes("hotel") || store.name?.toLowerCase().includes("restaurant") || store.name?.toLowerCase().includes("cafe") || store.category?.toLowerCase().includes("hotel") || store.category?.toLowerCase().includes("restaurant") || store.category?.toLowerCase().includes("cafe");
   const locationText = [store.area, store.town, store.county].filter(Boolean).join(", ");
 
   return (

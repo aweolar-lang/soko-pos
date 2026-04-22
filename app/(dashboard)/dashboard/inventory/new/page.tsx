@@ -9,7 +9,7 @@ import Link from "next/link";
 // 1. Import our shared bulletproof client!
 import { supabase } from "@/lib/supabase";
 
-const CATEGORIES = ["Electronics", "Fashion", "Food & Beverage", "Furniture", "Services", "Other"];
+const CATEGORIES = ["Electronics", "Fashion", "Food & Beverage", "Furniture", "Services","Supermarket","Beauty","Other"];
 const MAX_IMAGES = 5; // Updated to 5 images max!
 
 export default function AddProductPage() {

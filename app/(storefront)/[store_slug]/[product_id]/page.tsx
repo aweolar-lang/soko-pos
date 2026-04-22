@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { ArrowLeft, MapPin, ShoppingBag, ShieldCheck, Truck } from "lucide-react";
+import { ArrowLeft, MapPin, ShoppingBag, ShieldCheck, Truck, ChevronRight } from "lucide-react";
 import OrderModal from "../OrderModal";
 
 export default async function ProductDetailsPage({ 
@@ -25,7 +25,6 @@ export default async function ProductDetailsPage({
     }
   );
 
-  // 1. Fetch the Store (to get store ID, tier, and check if it's a hotel)
   const { data: store, error: storeError } = await supabase
     .from("stores")
     .select("id, name, description, tier")
@@ -34,7 +33,6 @@ export default async function ProductDetailsPage({
 
   if (storeError || !store) notFound();
 
-  // 2. Fetch the specific Product
   const { data: product, error: productError } = await supabase
     .from("products")
     .select("*")
@@ -45,8 +43,13 @@ export default async function ProductDetailsPage({
 
   const isHotel = store.description?.toLowerCase().includes("hotel") || store.description?.toLowerCase().includes("restaurant");
 
+  // MAGIC FIX: Grab the array of images, or fallback to image_url, or return an empty array.
+  const imagesList: string[] = product.images && product.images.length > 0 
+    ? product.images 
+    : (product.image_url ? [product.image_url] : []);
+
   return (
-    <div className="min-h-screen bg-slate-50 pb-20">
+    <div className="min-h-screen bg-slate-50 pb-20 font-sans">
       {/* Top Navigation */}
       <div className="bg-white border-b border-slate-200 sticky top-0 z-20">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center">
@@ -63,16 +66,42 @@ export default async function ProductDetailsPage({
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col md:flex-row">
           
-          {/* Left Side: Product Image */}
-          <div className="w-full md:w-1/2 bg-slate-100 aspect-square md:aspect-auto relative flex items-center justify-center border-b md:border-b-0 md:border-r border-slate-200">
-            {product.image_url ? (
-              <img 
-                src={product.image_url} 
-                alt={product.title} 
-                className="absolute inset-0 w-full h-full object-cover"
-              />
+          {/* Left Side: Swipeable Image Gallery */}
+          <div className="w-full md:w-1/2 bg-slate-100 relative border-b md:border-b-0 md:border-r border-slate-200 aspect-square md:aspect-auto">
+            {imagesList.length > 0 ? (
+              <>
+                {/* Scroll Container */}
+                <div className="flex overflow-x-auto snap-x snap-mandatory h-full w-full [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+                  {imagesList.map((img, index) => (
+                    <div key={index} className="min-w-full h-full snap-center relative">
+                      <img 
+                        src={img} 
+                        alt={`${product.title} - Image ${index + 1}`} 
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Visual Indicator if there's more than 1 image */}
+                {imagesList.length > 1 && (
+                  <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 pointer-events-none">
+                    {imagesList.map((_, i) => (
+                      <div key={i} className="h-2 w-2 rounded-full bg-white/50 backdrop-blur-sm border border-black/10 shadow-sm" />
+                    ))}
+                  </div>
+                )}
+                {/* Swipe hint for mobile */}
+                {imagesList.length > 1 && (
+                  <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-md text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1 pointer-events-none">
+                    Swipe <ChevronRight className="h-3 w-3" />
+                  </div>
+                )}
+              </>
             ) : (
-              <ShoppingBag className="h-20 w-20 text-slate-300" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <ShoppingBag className="h-20 w-20 text-slate-300" />
+              </div>
             )}
           </div>
 
@@ -82,7 +111,7 @@ export default async function ProductDetailsPage({
               <ShieldCheck className="h-4 w-4" /> Secure Payment
             </div>
             
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight mt-2 mb-4">
+            <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight mt-2 mb-4">
               {product.title}
             </h1>
             
@@ -92,7 +121,7 @@ export default async function ProductDetailsPage({
 
             <div className="prose prose-slate mb-8 flex-1">
               <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-2">Description</h3>
-              <p className="text-slate-600 leading-relaxed">
+              <p className="text-slate-600 leading-relaxed whitespace-pre-line">
                 {product.description || "The seller has not provided a detailed description for this item."}
               </p>
             </div>
@@ -108,7 +137,6 @@ export default async function ProductDetailsPage({
               </div>
             </div>
 
-            {/* Reusing your exact OrderModal! */}
             <div className="mt-auto">
               <OrderModal product={product} storeId={store.id} isHotel={isHotel} />
             </div>
