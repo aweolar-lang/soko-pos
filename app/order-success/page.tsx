@@ -23,7 +23,7 @@ export default async function OrderSuccessPage({
   }
 
   try {
-    // 2. CHECK PAYSTACK
+    // 2. CHECK PAYSTACK (Verify the payment actually happened)
     const verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
       headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },
       cache: "no-store",
@@ -45,28 +45,17 @@ export default async function OrderSuccessPage({
       return <ErrorUI title="Missing Metadata" message="Paystack returned no metadata for this transaction." />;
     }
 
-    // Sometimes frontend developers put store_id inside custom_fields instead of the root metadata object
     const customFields = metadata.custom_fields || [];
     const getField = (name: string) => customFields.find((f: any) => f.variable_name === name)?.value;
     
     const productId = metadata.product_id || getField("product_id");
-    const storeId = metadata.store_id || getField("store_id");
     
-    // NEW: Safely extract is_digital from the metadata
+    // Check if it's a digital product
     const isDigital = metadata.is_digital === true || metadata.is_digital === "true";
 
-    if (!productId || !storeId) {
-      return (
-        <ErrorUI 
-          title="Missing Product or Store ID" 
-          message={`product_id: ${productId || "MISSING"}, store_id: ${storeId || "MISSING"}`} 
-        />
-      );
-    }
-
-    // NEW: If it's a digital product, securely fetch the file path and generate a Signed URL (valid for 24 hours)
+    // 4. GENERATE SECURE DOWNLOAD URL FOR THE UI (If Digital)
     let downloadUrl: string | null = null;
-    if (isDigital) {
+    if (isDigital && productId) {
       const { data: prodData } = await supabaseAdmin
         .from("products")
         .select("file_url")
@@ -74,7 +63,7 @@ export default async function OrderSuccessPage({
         .single();
 
       if (prodData && prodData.file_url) {
-        // Create a secure URL that expires in 86400 seconds (24 hours)
+        // Create a secure URL that expires in 24 hours just for this screen
         const { data: signedData } = await supabaseAdmin.storage
           .from("digital-products")
           .createSignedUrl(prodData.file_url, 86400);
@@ -85,88 +74,10 @@ export default async function OrderSuccessPage({
       }
     }
 
-    // 4. CHECK DATABASE - ALREADY EXISTS?
-    const { data: existingOrder, error: checkError } = await supabaseAdmin
-      .from("orders")
-      .select("id")
-      .eq("paystack_reference", reference)
-      .single();
+    // NOTICE: All Supabase INSERT logic has been removed here! 
+    // The Webhook handles database insertion securely in the background.
 
-    if (existingOrder) {
-      // It already saved successfully! We can show the normal success page here.
-      // NEW: Pass the downloadUrl so if they refresh the page, they still get the button!
-      return <SuccessUI reference={reference} downloadUrl={downloadUrl} />;
-    }
-
-    // 5. INSERT ORDER
-    const rawTakeawayTime = getField("takeaway_time");
-    let formattedTakeawayTime = null;
-    if (rawTakeawayTime && rawTakeawayTime !== "N/A") {
-      try {
-        if (rawTakeawayTime.length === 5 && rawTakeawayTime.includes(":")) {
-          const todayDate = new Date().toISOString().split('T')[0];
-          formattedTakeawayTime = new Date(`${todayDate}T${rawTakeawayTime}:00Z`).toISOString();
-        } else {
-          formattedTakeawayTime = new Date(rawTakeawayTime).toISOString();
-        }
-      } catch (e) {
-        // ignore time format error
-      }
-    }
-
-    const { data: newOrder, error: orderError } = await supabaseAdmin
-      .from("orders")
-      .insert({
-        store_id: storeId,
-        paystack_reference: reference,
-        customer_name: getField("buyer_name") || "Guest",
-        customer_email: verifyData.data.customer.email,
-        customer_phone: getField("buyer_phone") || null,
-        amount_paid: verifyData.data.amount / 100,
-        total_amount: verifyData.data.amount / 100,
-        fulfillment_type: getField("fulfillment_type") || "SHIPPING",
-        takeaway_time: formattedTakeawayTime,
-        status: 'NEW',
-        product_id: productId
-      })
-      .select()
-      .single();
-
-    if (orderError) {
-      return <ErrorUI title="Supabase Insert Error (Orders)" message={orderError.message} />;
-    }
-
-    // 6. INSERT ORDER ITEMS
-    if (newOrder) {
-      const { error: itemsError } = await supabaseAdmin
-        .from("order_items")
-        .insert({
-          order_id: newOrder.id,
-          product_id: productId,
-          quantity: 1,
-          price_at_time: verifyData.data.amount / 100
-        });
-
-      if (itemsError) {
-        return <ErrorUI title="Supabase Insert Error (Items)" message={itemsError.message} />;
-      }
-      
-      // CALL THE DATABASE BACKEND TO REDUCE STOCK
-      // NEW: Only reduce stock if it is a physical item
-      if (!isDigital) {
-        const { error: stockError } = await supabaseAdmin.rpc('decrement_stock', {
-          row_id: productId,
-          quantity: 1
-        });
-        
-        if (stockError) {
-           console.error("Database failed to reduce stock:", stockError);
-        }
-      }
-    }
-
-    // NEW: Passed the downloadUrl
-    return <SuccessUI reference={reference} downloadUrl={downloadUrl} />;
+    return <SuccessUI reference={reference} downloadUrl={downloadUrl} isDigital={isDigital} />;
 
   } catch (error: any) {
     return <ErrorUI title="Critical Code Crash" message={error.message || "Unknown error occurred"} />;
@@ -194,8 +105,7 @@ function ErrorUI({ title, message }: { title: string, message: string }) {
   );
 }
 
-// NEW: Accepted downloadUrl as a prop
-function SuccessUI({ reference, downloadUrl }: { reference: string, downloadUrl?: string | null }) {
+function SuccessUI({ reference, downloadUrl, isDigital }: { reference: string, downloadUrl?: string | null, isDigital?: boolean }) {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="bg-white max-w-md w-full rounded-3xl shadow-xl border border-slate-100 overflow-hidden text-center">
@@ -212,11 +122,23 @@ function SuccessUI({ reference, downloadUrl }: { reference: string, downloadUrl?
             </p>
           </div>
           
-          {/* NEW: Render the download button if a secure URL was generated */}
+          {/* DIGITAL DOWNLOAD BUTTON */}
           {downloadUrl && (
-            <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 px-4 rounded-xl shadow-md shadow-blue-600/20 transition-all active:scale-95">
-              <Download className="h-5 w-5" /> Download Your File
-            </a>
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-4 rounded-xl shadow-md shadow-blue-600/20 transition-all active:scale-95">
+                <Download className="h-5 w-5" /> Download Your File
+              </a>
+              <p className="text-xs text-slate-500 mt-3 font-medium">
+                A backup link has also been sent to your email.
+              </p>
+            </div>
+          )}
+
+          {/* PHYSICAL ITEM NOTICE */}
+          {!isDigital && (
+            <p className="text-sm text-slate-600 font-medium">
+              The seller has been notified and your order is now being processed.
+            </p>
           )}
 
           <Link href="/" className="w-full flex items-center justify-center gap-2 bg-slate-900 text-white font-bold py-3.5 px-4 rounded-xl">
