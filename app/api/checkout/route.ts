@@ -4,22 +4,31 @@ import { supabase } from "@/lib/supabase";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { productId, buyerName, buyerEmail, buyerPhone, fulfillmentType, takeawayTime, customerNotes } = body;
+    const {
+      productId,
+      buyerName,
+      buyerEmail,
+      buyerPhone,
+      fulfillmentType,
+      takeawayTime,
+      customerNotes,
+    } = body;
 
     if (!productId || !buyerName || !buyerEmail) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
     }
 
-    // UPDATE: We now also select 'stores(paystack_subaccount_code)'
+    // 1. Fetch the product, including the is_digital flag and the store's Paystack code
     const { data: product, error: productError } = await supabase
       .from("products")
       .select(`
         id, 
         title, 
         price, 
+        is_digital,
         store_id,
         stores ( paystack_subaccount_code )
-      `) 
+      `)
       .eq("id", productId)
       .single();
 
@@ -27,20 +36,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Product not found." }, { status: 404 });
     }
 
-    // Extract the subaccount code from the joined stores table
     // @ts-ignore - Supabase join typing workaround
     const subaccountCode = product.stores?.paystack_subaccount_code;
+
+    // Hardcoded base URL
     const baseUrl = "https://localsoko.com";
 
+    // 2. Build the Paystack Payload
     const paystackPayload: any = {
       email: buyerEmail,
       amount: Math.round(product.price * 100),
       currency: "KES",
       callback_url: `${baseUrl}/order-success`,
-      subaccount: subaccountCode || undefined, 
+      subaccount: subaccountCode || undefined,
       metadata: {
         product_id: product.id,
         store_id: product.store_id,
+        is_digital: product.is_digital,
         custom_fields: [
           { display_name: "Buyer Name", variable_name: "buyer_name", value: buyerName },
           { display_name: "Buyer Phone", variable_name: "buyer_phone", value: buyerPhone || "N/A" },
@@ -71,7 +83,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ checkoutUrl: paystackData.data.authorization_url });
 
   } catch (error: any) {
-    console.error("Checkout API Error:", error);
-    return NextResponse.json({ error: "An internal server error occurred." }, { status: 500 });
+    console.error("Checkout Error:", error);
+    return NextResponse.json(
+      { error: "An internal server error occurred." },
+      { status: 500 }
+    );
   }
 }

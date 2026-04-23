@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { ArrowLeft, MapPin, ShieldCheck, Truck, AlertCircle, Store } from "lucide-react";
+import { ArrowLeft, MapPin, ShieldCheck, Truck, AlertCircle, Store, FileDown } from "lucide-react";
 import OrderModal from "../OrderModal";
 import ProductGallery from "./ProductGallery";
 
@@ -26,14 +26,16 @@ export default async function ProductDetailsPage({
     }
   );
 
+  // Added offers_delivery to the select query
   const { data: store, error: storeError } = await supabase
     .from("stores")
-    .select("id, name, description, tier")
+    .select("id, name, description, tier, offers_delivery")
     .eq("slug", resolvedParams.store_slug)
     .single();
 
   if (storeError || !store) notFound();
 
+  // Selects all fields, which now naturally includes is_digital
   const { data: product, error: productError } = await supabase
     .from("products")
     .select("*")
@@ -49,8 +51,8 @@ export default async function ProductDetailsPage({
     ? product.images 
     : (product.image_url ? [product.image_url] : []);
 
-  // Out of Stock Check 
-  const isOutOfStock = product.stock_quantity <= 0;
+  // Out of Stock Check: Digital products are infinite, so they bypass this check
+  const isOutOfStock = !product.is_digital && product.stock_quantity <= 0;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-24 font-sans selection:bg-emerald-500/30">
@@ -59,7 +61,7 @@ export default async function ProductDetailsPage({
       <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-sm supports-[backdrop-filter]:bg-white/60">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <Link 
-            href={`/${resolvedParams.store_slug}`}
+            href={`/store/${resolvedParams.store_slug}`}
             className="flex items-center gap-2 text-slate-600 hover:text-emerald-600 font-bold transition-colors bg-slate-50 hover:bg-emerald-50 px-3 py-1.5 rounded-xl border border-slate-100"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -81,6 +83,14 @@ export default async function ProductDetailsPage({
           
           {/* Left Side: Image Gallery Component */}
           <div className={`w-full md:w-1/2 bg-slate-50 relative border-b md:border-b-0 md:border-r border-slate-100 aspect-square md:aspect-auto ${isOutOfStock ? 'grayscale-[0.4]' : ''}`}>
+             
+             {/* NEW: Digital Product Floating Badge */}
+             {product.is_digital && (
+               <div className="absolute top-4 left-4 z-20 bg-blue-600 text-white text-xs font-black px-3 py-1.5 rounded-lg shadow-md flex items-center gap-1.5 tracking-wider uppercase">
+                 <FileDown className="h-4 w-4" /> Digital Product
+               </div>
+             )}
+
              <ProductGallery images={imagesList} title={product.title} />
              
              {/* Large Floating Out of Stock Badge over image on mobile */}
@@ -126,12 +136,27 @@ export default async function ProductDetailsPage({
             </div>
 
             <div className="space-y-4 mb-8 pt-6 border-t border-slate-100">
+              
+              {/* NEW: Conditional Badges based on product type and store settings */}
+              {product.is_digital ? (
+                <div className="flex items-center gap-3 text-sm text-blue-700 font-medium bg-blue-50 p-3 rounded-xl border border-blue-100">
+                  <FileDown className="h-5 w-5 text-blue-600 shrink-0" />
+                  Instant Digital Download after payment
+                </div>
+              ) : store.offers_delivery ? (
+                <div className="flex items-center gap-3 text-sm text-slate-600 font-medium bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <Truck className="h-5 w-5 text-emerald-500 shrink-0" />
+                  {isHotel ? "Delivery or Takeaway available" : "Nationwide Shipping & Delivery available"}
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 text-sm text-slate-600 font-medium bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <MapPin className="h-5 w-5 text-emerald-500 shrink-0" />
+                  Pick up in-store only
+                </div>
+              )}
+
               <div className="flex items-center gap-3 text-sm text-slate-600 font-medium bg-slate-50 p-3 rounded-xl border border-slate-100">
-                <Truck className="h-5 w-5 text-emerald-500 shrink-0" />
-                {isHotel ? "Delivery or Takeaway available" : "Nationwide Shipping available"}
-              </div>
-              <div className="flex items-center gap-3 text-sm text-slate-600 font-medium bg-slate-50 p-3 rounded-xl border border-slate-100">
-                <MapPin className="h-5 w-5 text-emerald-500 shrink-0" />
+                <Store className="h-5 w-5 text-emerald-500 shrink-0" />
                 Sold by <span className="font-bold text-slate-900">{store.name}</span>
               </div>
             </div>

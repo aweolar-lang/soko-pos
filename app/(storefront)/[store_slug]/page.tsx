@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { MapPin, Clock, ShoppingBag, Utensils, Star, MessageCircle, Info, Search, BadgeCheck, Phone } from "lucide-react";
+import { MapPin, Clock, ShoppingBag, Utensils, Star, MessageCircle, Info, Search, BadgeCheck, Phone, Truck, FileDown } from "lucide-react";
 import OrderModal from "./OrderModal";
 
 export default async function StorefrontPage({ 
@@ -29,9 +29,10 @@ export default async function StorefrontPage({
     }
   );
 
+  // Added offers_delivery here
   const { data: store, error: storeError } = await supabase
     .from("stores")
-    .select("id, name, description, logo_url, county, town, area, tier, category, owner_id" )
+    .select("id, name, description, logo_url, county, town, area, tier, category, owner_id, offers_delivery" )
     .eq("slug", resolvedParams.store_slug) 
     .single();
 
@@ -64,8 +65,9 @@ export default async function StorefrontPage({
   const { data: rawProducts } = await productQuery.order("created_at", { ascending: false });
 
   const products = rawProducts?.sort((a, b) => {
-    const aInStock = a.stock_quantity > 0 ? 1 : 0;
-    const bInStock = b.stock_quantity > 0 ? 1 : 0;
+    // Digital items bypass stock check for sorting
+    const aInStock = (a.is_digital || a.stock_quantity > 0) ? 1 : 0;
+    const bInStock = (b.is_digital || b.stock_quantity > 0) ? 1 : 0;
     // 1 (in stock) comes before 0 (out of stock)
     return bInStock - aInStock; 
   }) || [];
@@ -158,6 +160,12 @@ export default async function StorefrontPage({
                 <Utensils className="h-3.5 w-3.5" /> Takeaway / Delivery
               </div>
             )}
+            {/* Added Delivery Badge for non-hotel stores */}
+            {store.offers_delivery && !isHotel && (
+              <div className="flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap">
+                <Truck className="h-3.5 w-3.5" /> Delivery Available
+              </div>
+            )}
           </div>
 
           {/* Search Bar */}
@@ -188,7 +196,9 @@ export default async function StorefrontPage({
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             {products.map((product) => {
               const displayImage = product.images && product.images.length > 0 ? product.images[0] : (product.image_url || null);
-              const isOutOfStock = product.stock_quantity <= 0;
+              
+              // Digital items are never out of stock
+              const isOutOfStock = !product.is_digital && product.stock_quantity <= 0;
 
               return (
                 <div key={product.id} className={`bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col group transition-all duration-300 ${isOutOfStock ? 'opacity-60 grayscale-[0.5]' : 'hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1'}`}>
@@ -208,13 +218,21 @@ export default async function StorefrontPage({
 
                     {/* Top Badges */}
                     <div className="absolute top-2 left-2 sm:top-3 sm:left-3 right-2 sm:right-3 flex justify-between items-start">
-                      {isOutOfStock ? (
-                        <span className="bg-red-500/95 backdrop-blur-sm text-white text-[9px] sm:text-[10px] font-black px-2 py-1 rounded-md shadow-sm uppercase tracking-wider">
-                          Sold Out
-                        </span>
-                      ) : (
-                        <div></div> 
-                      )}
+                      <div className="flex flex-col gap-1">
+                        {isOutOfStock && (
+                          <span className="bg-red-500/95 backdrop-blur-sm text-white text-[9px] sm:text-[10px] font-black px-2 py-1 rounded-md shadow-sm uppercase tracking-wider w-fit">
+                            Sold Out
+                          </span>
+                        )}
+                        {product.is_digital && (
+                          <span className="bg-blue-600/95 backdrop-blur-sm text-white text-[9px] sm:text-[10px] font-black px-2 py-1 rounded-md shadow-sm uppercase tracking-wider flex items-center gap-1 w-fit">
+                            <FileDown className="h-3 w-3" /> Digital
+                          </span>
+                        )}
+                        {!isOutOfStock && !product.is_digital && (
+                          <div></div>
+                        )}
+                      </div>
                       
                       {/* Price Pill */}
                       <span className="bg-white/95 backdrop-blur-md text-slate-900 text-xs sm:text-sm font-black px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl shadow-sm border border-white/20">

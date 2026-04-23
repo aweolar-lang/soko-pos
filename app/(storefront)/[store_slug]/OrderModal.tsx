@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, ShoppingCart, X, Clock, MapPin, ShoppingBag, Info } from "lucide-react";
+import { Loader2, ShoppingCart, X, Clock, MapPin, ShoppingBag, Info, FileDown } from "lucide-react";
 import { toast } from "sonner";
 
 interface Product {
@@ -11,6 +11,7 @@ interface Product {
   price: number;
   description?: string;
   images?: string[];
+  is_digital?: boolean; // <-- Added this
 }
 
 interface OrderModalProps {
@@ -29,7 +30,8 @@ export default function OrderModal({ product, storeId, isHotel }: OrderModalProp
     buyerName: "",
     buyerEmail: "",
     buyerPhone: "",
-    fulfillmentType: isHotel ? "DELIVERY" : "SHIPPING",
+    // If digital, force 'DIGITAL'. Otherwise, default to Delivery/Shipping
+    fulfillmentType: product.is_digital ? "DIGITAL" : (isHotel ? "DELIVERY" : "SHIPPING"),
     takeawayTime: "",
     customerNotes: "",
   });
@@ -101,7 +103,11 @@ export default function OrderModal({ product, storeId, isHotel }: OrderModalProp
           <div className="p-6 sm:p-8">
             <h2 className="text-2xl font-black text-slate-900 mb-4">{product.title}</h2>
             <div className="flex items-start gap-3 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-              <Info className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+              {product.is_digital ? (
+                <FileDown className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
+              ) : (
+                <Info className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+              )}
               <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-line">
                 {product.description || "No specific details provided for this item."}
               </p>
@@ -130,7 +136,7 @@ export default function OrderModal({ product, storeId, isHotel }: OrderModalProp
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Email</label>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Email (Required for Receipt)</label>
                 <input 
                   type="email" required value={formData.buyerEmail} onChange={(e) => setFormData({...formData, buyerEmail: e.target.value})}
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white transition-all" 
@@ -147,55 +153,68 @@ export default function OrderModal({ product, storeId, isHotel }: OrderModalProp
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">
-                {isHotel ? "Order Method" : "Delivery Method"}
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <button 
-                  type="button" onClick={() => setFormData({...formData, fulfillmentType: isHotel ? 'TAKEAWAY' : 'PICKUP'})}
-                  className={`flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border transition-colors ${
-                    formData.fulfillmentType === 'TAKEAWAY' || formData.fulfillmentType === 'PICKUP' 
-                      ? 'border-emerald-600 bg-emerald-50 text-emerald-700' 
-                      : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
-                  }`}
-                >
-                  <Clock className="h-4 w-4" /> {isHotel ? "Takeaway" : "Pick Up"}
-                </button>
-                <button 
-                  type="button" onClick={() => setFormData({...formData, fulfillmentType: isHotel ? 'DELIVERY' : 'SHIPPING'})}
-                  className={`flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border transition-colors ${
-                    formData.fulfillmentType === 'DELIVERY' || formData.fulfillmentType === 'SHIPPING' 
-                      ? 'border-emerald-600 bg-emerald-50 text-emerald-700' 
-                      : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
-                  }`}
-                >
-                  <MapPin className="h-4 w-4" /> {isHotel ? "Delivery" : "Shipping"}
-                </button>
+            {/* CONDITIONAL UI: Hide physical delivery fields if it's a digital product */}
+            {product.is_digital ? (
+              <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 flex items-start gap-3 mt-2">
+                <FileDown className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
+                <div>
+                  <h4 className="font-bold text-blue-900 text-sm">Instant Digital Delivery</h4>
+                  <p className="text-xs text-blue-800/80 mt-1 font-medium">After completing payment via Paystack, you will receive a secure link to download this product.</p>
+                </div>
               </div>
-            </div>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">
+                    {isHotel ? "Order Method" : "Delivery Method"}
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button 
+                      type="button" onClick={() => setFormData({...formData, fulfillmentType: isHotel ? 'TAKEAWAY' : 'PICKUP'})}
+                      className={`flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border transition-colors ${
+                        formData.fulfillmentType === 'TAKEAWAY' || formData.fulfillmentType === 'PICKUP' 
+                          ? 'border-emerald-600 bg-emerald-50 text-emerald-700' 
+                          : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Clock className="h-4 w-4" /> {isHotel ? "Takeaway" : "Pick Up"}
+                    </button>
+                    <button 
+                      type="button" onClick={() => setFormData({...formData, fulfillmentType: isHotel ? 'DELIVERY' : 'SHIPPING'})}
+                      className={`flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border transition-colors ${
+                        formData.fulfillmentType === 'DELIVERY' || formData.fulfillmentType === 'SHIPPING' 
+                          ? 'border-emerald-600 bg-emerald-50 text-emerald-700' 
+                          : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      <MapPin className="h-4 w-4" /> {isHotel ? "Delivery" : "Shipping"}
+                    </button>
+                  </div>
+                </div>
 
-            {formData.fulfillmentType === 'TAKEAWAY' && (
-              <div className="animate-in slide-in-from-top-2">
-                <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Pickup Time</label>
-                <input 
-                  type="time" required value={formData.takeawayTime} onChange={(e) => setFormData({...formData, takeawayTime: e.target.value})}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white transition-all" 
-                />
-              </div>
+                {formData.fulfillmentType === 'TAKEAWAY' && (
+                  <div className="animate-in slide-in-from-top-2">
+                    <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Pickup Time</label>
+                    <input 
+                      type="time" required value={formData.takeawayTime} onChange={(e) => setFormData({...formData, takeawayTime: e.target.value})}
+                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white transition-all" 
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">
+                    {formData.fulfillmentType === 'DELIVERY' || formData.fulfillmentType === 'SHIPPING' ? "Full Delivery Address" : "Special Instructions"}
+                  </label>
+                  <textarea 
+                    rows={2} required={formData.fulfillmentType === 'DELIVERY' || formData.fulfillmentType === 'SHIPPING'}
+                    value={formData.customerNotes} onChange={(e) => setFormData({...formData, customerNotes: e.target.value})}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white resize-none transition-all" 
+                    placeholder={formData.fulfillmentType === 'TAKEAWAY' ? "e.g. No onions, extra sauce..." : "House number, street, landmarks..."} 
+                  />
+                </div>
+              </>
             )}
-
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">
-                {formData.fulfillmentType === 'DELIVERY' || formData.fulfillmentType === 'SHIPPING' ? "Full Delivery Address" : "Special Instructions"}
-              </label>
-              <textarea 
-                rows={2} required={formData.fulfillmentType === 'DELIVERY' || formData.fulfillmentType === 'SHIPPING'}
-                value={formData.customerNotes} onChange={(e) => setFormData({...formData, customerNotes: e.target.value})}
-                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white resize-none transition-all" 
-                placeholder={formData.fulfillmentType === 'TAKEAWAY' ? "e.g. No onions, extra sauce..." : "House number, street, landmarks..."} 
-              />
-            </div>
 
             <div className="pt-4 shrink-0 mt-auto">
               <button 
@@ -206,7 +225,7 @@ export default function OrderModal({ product, storeId, isHotel }: OrderModalProp
                 {isLoading ? (
                   <><Loader2 className="h-5 w-5 animate-spin" /><span>Processing Secure Payment...</span></>
                 ) : (
-                  <span>{isHotel ? "Complete Order" : "Proceed to Payment"}</span>
+                  <span>{product.is_digital ? "Buy & Download" : (isHotel ? "Complete Order" : "Proceed to Payment")}</span>
                 )}
               </button>
             </div>
@@ -221,13 +240,14 @@ export default function OrderModal({ product, storeId, isHotel }: OrderModalProp
     <>
       <button 
         onClick={() => setIsOpen(true)}
-        className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all active:scale-95 shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2"
+        className={`w-full py-3 rounded-xl text-white font-bold transition-all active:scale-95 shadow-md flex items-center justify-center gap-2 ${
+          product.is_digital ? 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/20' : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20'
+        }`}
       >
-        <ShoppingCart className="h-5 w-5" />
-        {isHotel ? "Order Food" : "Buy Now"}
+        {product.is_digital ? <FileDown className="h-5 w-5" /> : <ShoppingCart className="h-5 w-5" />}
+        {product.is_digital ? "Buy & Download" : (isHotel ? "Order Food" : "Buy Now")}
       </button>
 
-      {/* REACT PORTAL: Teleports the modal out of the product card so it never flickers! */}
       {mounted && isOpen && createPortal(ModalContent, document.body)}
     </>
   );

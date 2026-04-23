@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase"; 
-import { Store, Link as LinkIcon, Loader2, Save, AlertCircle, MapPin, Building2, Map, ImagePlus, AlignLeft, Smartphone, Tags } from "lucide-react";
+import { Store, Link as LinkIcon, Loader2, Save, AlertCircle, MapPin, Building2, Map, ImagePlus, AlignLeft, Smartphone, Tags, Truck } from "lucide-react";
 import { toast } from "sonner";
 
 const STORE_CATEGORIES = [
@@ -12,7 +12,8 @@ const STORE_CATEGORIES = [
   "Fashion", 
   "Supermarket", 
   "Beauty", 
-  "Services", 
+  "Services",
+  "Digital Products", // <-- Added this to help categorize digital stores
   "Other"
 ];
 
@@ -38,6 +39,7 @@ export default function SettingsPage() {
     paybill_number: "", 
     existingLogoUrl: "", 
     paystack_subaccount_code: "", 
+    offers_delivery: false, // <-- NEW STATE FOR DELIVERY
   });
 
   useEffect(() => {
@@ -50,7 +52,7 @@ export default function SettingsPage() {
 
         const { data: store, error } = await supabase
           .from("stores")
-          .select("id, name, slug, description, category, county, town, area, paybill_number, logo_url, paystack_subaccount_code")
+          .select("id, name, slug, description, category, county, town, area, paybill_number, logo_url, paystack_subaccount_code, offers_delivery")
           .eq("owner_id", user.id)
           .single();
 
@@ -70,6 +72,7 @@ export default function SettingsPage() {
             paybill_number: store.paybill_number || "",
             existingLogoUrl: store.logo_url || "",
             paystack_subaccount_code: store.paystack_subaccount_code || "",
+            offers_delivery: store.offers_delivery || false, // <-- FETCH DELIVERY
           });
         }
       } catch (error: any) {
@@ -134,6 +137,7 @@ export default function SettingsPage() {
         area: formData.area,
         paybill_number: formData.paybill_number,
         logo_url: finalLogoUrl,
+        offers_delivery: formData.offers_delivery, // <-- SAVE DELIVERY
       };
 
       if (storeId) {
@@ -191,14 +195,14 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Store Settings</h1>
         <p className="mt-1.5 sm:mt-2 text-sm text-slate-500">
-          Manage your storefront details, location, and payment routing.
+          Manage your storefront details, location, and fulfillment options.
         </p>
       </div>
 
       <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
         <form onSubmit={handleSave} className="p-5 sm:p-8 space-y-6 sm:space-y-8">
           
-          {/* Logo Upload - Adaptive Centering on Mobile */}
+          {/* Logo Upload */}
           <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-center sm:items-start text-center sm:text-left">
             <div className="relative h-24 w-24 sm:h-28 sm:w-28 rounded-3xl bg-slate-50 border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden shrink-0 group hover:border-emerald-500 transition-colors">
               {(logoPreview || formData.existingLogoUrl) ? (
@@ -227,7 +231,6 @@ export default function SettingsPage() {
               <label className="block text-sm font-bold text-slate-700 mb-2">Store Name</label>
               <div className="relative">
                 <Store className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
-                {/* Notice the text-base sm:text-sm trick applied to inputs! */}
                 <input 
                   type="text" required value={formData.storeName} 
                   onChange={(e) => setFormData({ ...formData, storeName: e.target.value })} 
@@ -269,9 +272,6 @@ export default function SettingsPage() {
                   placeholder="e.g. the-coffee-house" 
                 />
               </div>
-              <p className="text-xs text-slate-500 mt-2 ml-1">
-                Live at: <span className="font-bold text-slate-700">localsoko.com/{formData.storeSlug || "..."}</span>
-              </p>
             </div>
 
             <div>
@@ -290,7 +290,7 @@ export default function SettingsPage() {
 
           <hr className="border-slate-100" />
 
-          {/* Row 3: Location - Responsive Grid (1 col -> 2 col -> 3 col) */}
+          {/* Row 3: Location */}
           <div>
             <h3 className="text-lg font-bold text-slate-900 mb-4 sm:mb-5">Location Details</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
@@ -333,6 +333,28 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          {/* NEW ROW: Delivery Toggle */}
+          <div className="bg-blue-50/50 p-5 sm:p-6 rounded-3xl border border-blue-100">
+            <h3 className="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
+              <Truck className="h-5 w-5 text-blue-600" />
+              Delivery Options
+            </h3>
+            <p className="text-sm text-slate-500 mb-5">Do you offer delivery or shipping to your customers?</p>
+            
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div className="relative">
+                <input 
+                  type="checkbox" 
+                  checked={formData.offers_delivery}
+                  onChange={(e) => setFormData({...formData, offers_delivery: e.target.checked})}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              </div>
+              <span className="font-bold text-slate-800 text-sm">Yes, we offer delivery services</span>
+            </label>
+          </div>
+
           {/* Row 4: Payout Details */}
           <div className="bg-slate-50 p-5 sm:p-6 rounded-3xl border border-slate-200">
             <h3 className="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
@@ -358,13 +380,12 @@ export default function SettingsPage() {
               {formData.paystack_subaccount_code && (
                 <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-100 px-4 py-3 sm:py-3.5 rounded-xl border border-emerald-200 font-bold w-full md:w-auto justify-center md:justify-start">
                   <AlertCircle className="h-5 w-5 shrink-0" />
-                  Payment Routing Active
+                  Routing Active
                 </div>
               )}
             </div>
           </div>
 
-          {/* Submit Button - Sticky-like on mobile by adding padding bottom to container and full width button */}
           <div className="pt-4 border-t border-slate-100 flex justify-end">
             <button 
               type="submit" disabled={isLoading || !isFormValid} 

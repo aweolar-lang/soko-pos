@@ -2,15 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Package, DollarSign, Image as ImageIcon, X, Hash, Loader2, ArrowLeft, AlignLeft, Tags } from "lucide-react"; 
+import { Package, DollarSign, Image as ImageIcon, X, Hash, Loader2, ArrowLeft, AlignLeft, Tags, FileDown, UploadCloud } from "lucide-react"; 
 import { toast } from "sonner";
 import Link from "next/link";
-
-// 1. Import our shared bulletproof client!
 import { supabase } from "@/lib/supabase";
 
-const CATEGORIES = ["Electronics", "Fashion", "Food & Beverage", "Furniture", "Services","Supermarket","Beauty","Other"];
-const MAX_IMAGES = 5; // Updated to 5 images max!
+const CATEGORIES = ["Electronics", "Fashion", "Food & Beverage", "Furniture", "Services", "Supermarket", "Beauty", "Digital Products", "Other"];
+const MAX_IMAGES = 5;
 
 export default function AddProductPage() {
   const router = useRouter();
@@ -20,6 +18,10 @@ export default function AddProductPage() {
   const [images, setImages] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   
+  // NEW: Digital Product State
+  const [isDigital, setIsDigital] = useState(false);
+  const [digitalFile, setDigitalFile] = useState<File | null>(null);
+  
   const [formData, setFormData] = useState({
     title: "",
     price: "",
@@ -28,7 +30,6 @@ export default function AddProductPage() {
     stock_quantity: "1",
   });
 
-  // 2. The Bulletproof Fetch: Ask Supabase directly for the session
   useEffect(() => {
     async function fetchStore() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -45,20 +46,22 @@ export default function AddProductPage() {
     fetchStore();
   }, []);
 
-  // Image Upload Handlers (Limited to 5)
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const selectedFiles = Array.from(e.target.files);
-      
       if (images.length + selectedFiles.length > MAX_IMAGES) {
         toast.error(`You can only upload a maximum of ${MAX_IMAGES} images.`);
         return;
       }
-
       setImages(prev => [...prev, ...selectedFiles].slice(0, MAX_IMAGES));
-      
       const newPreviews = selectedFiles.map(file => URL.createObjectURL(file));
       setPreviewUrls(prev => [...prev, ...newPreviews].slice(0, MAX_IMAGES));
+    }
+  };
+
+  const handleDigitalFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setDigitalFile(e.target.files[0]);
     }
   };
 
@@ -67,50 +70,67 @@ export default function AddProductPage() {
     setPreviewUrls(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Submit to Database & Storage
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!storeId) return toast.error("Store profile not found!");
     
+    // Validation
+    if (isDigital && !digitalFile) return toast.error("Please upload the digital file (PDF, ZIP, etc).");
+    if (!isDigital && !formData.stock_quantity) return toast.error("Please provide a stock quantity for physical items.");
+
     setIsSubmitting(true);
     const toastId = toast.loading("Publishing product...");
 
     try {
       const slug = formData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Math.floor(Math.random() * 10000);
       const imageUrls: string[] = []; 
+      let uploadedFileUrl = null;
 
-      // 3. Upload images to Supabase Storage
+      // 1. Upload Images
       if (images.length > 0) {
         for (const file of images) {
           const fileExt = file.name.split('.').pop();
           const fileName = `${storeId}-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
           const filePath = `products/${fileName}`;
 
-          const { error: uploadError } = await supabase.storage
-            .from('product-images')
-            .upload(filePath, file);
-
+          const { error: uploadError } = await supabase.storage.from('product-images').upload(filePath, file);
           if (uploadError) throw uploadError;
 
-          // Get the public URL to save in our database
-          const { data: publicUrlData } = supabase.storage
-            .from('product-images')
-            .getPublicUrl(filePath);
-
+          const { data: publicUrlData } = supabase.storage.from('product-images').getPublicUrl(filePath);
           imageUrls.push(publicUrlData.publicUrl);
         }
       }
 
-      // 4. Save everything to the Products Table
+      // 2. NEW: Upload Digital File (if applicable)
+      // 2. NEW: Upload Digital File (Secure Private Upload)
+      if (isDigital && digitalFile) {
+        toast.loading("Uploading digital asset...", { id: toastId });
+        const fileExt = digitalFile.name.split('.').pop();
+        const fileName = `${storeId}-${Date.now()}-asset.${fileExt}`;
+        const filePath = `downloads/${fileName}`;
+
+        const { error: fileUploadError } = await supabase.storage
+          .from('digital-products') 
+          .upload(filePath, digitalFile);
+
+        if (fileUploadError) throw fileUploadError;
+
+        // INSTEAD of a public URL, we just save the secure file path!
+        uploadedFileUrl = filePath; 
+      }
+
+      // 3. Save to Database
       const { error } = await supabase.from('products').insert({
         store_id: storeId,
         title: formData.title,
         slug: slug,
         price: parseFloat(formData.price),
-        stock_quantity: parseInt(formData.stock_quantity, 10),
+        stock_quantity: isDigital ? 999999 : parseInt(formData.stock_quantity, 10), // Infinite stock for digital
         description: formData.description,
         category: formData.category,
-        images: imageUrls, // Now contains the real URLs!
+        images: imageUrls,
+        is_digital: isDigital,
+        file_url: uploadedFileUrl
       });
 
       if (error) throw error;
@@ -135,11 +155,53 @@ export default function AddProductPage() {
       <div className="bg-white rounded-[1.5rem] shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-5 sm:p-6 border-b border-slate-100 bg-slate-50/50">
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Add New Product</h1>
-          <p className="text-slate-500 text-sm mt-1 sm:mt-2">Fill out the details to add this item to your store.</p>
+          <p className="text-slate-500 text-sm mt-1 sm:mt-2">List a physical item or a downloadable digital product.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-6 sm:space-y-8">
           
+          {/* DIGITAL TOGGLE */}
+          <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 flex items-center justify-between gap-4 cursor-pointer hover:bg-blue-100/50 transition-colors" onClick={() => setIsDigital(!isDigital)}>
+            <div>
+              <h3 className="font-bold text-blue-900 flex items-center gap-2">
+                <FileDown className="h-5 w-5 text-blue-600" />
+                Digital Product
+              </h3>
+              <p className="text-sm text-blue-800/80 mt-0.5">Is this a downloadable item like an eBook, PDF, or ZIP file?</p>
+            </div>
+            <div className="relative shrink-0">
+              <input type="checkbox" checked={isDigital} readOnly className="sr-only peer" />
+              <div className="w-11 h-6 bg-slate-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </div>
+          </div>
+
+          {/* DIGITAL FILE UPLOAD ZONE (Only shows if digital) */}
+          {isDigital && (
+            <div className="animate-in fade-in slide-in-from-top-4 duration-300">
+              <label className="block text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Upload Downloadable File</label>
+              <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${digitalFile ? 'border-emerald-500 bg-emerald-50' : 'border-slate-300 bg-slate-50 hover:bg-slate-100 hover:border-slate-400'}`}>
+                <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
+                  {digitalFile ? (
+                    <>
+                      <FileDown className="w-8 h-8 text-emerald-600 mb-2" />
+                      <p className="text-sm font-bold text-emerald-900 truncate max-w-[250px]">{digitalFile.name}</p>
+                      <p className="text-xs text-emerald-700 mt-1">{(digitalFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                    </>
+                  ) : (
+                    <>
+                      <UploadCloud className="w-8 h-8 text-slate-400 mb-2" />
+                      <p className="text-sm font-bold text-slate-700 mb-1">Click to upload your product file</p>
+                      <p className="text-xs text-slate-500">ZIP, PDF, DOCX, etc. (Max 50MB)</p>
+                    </>
+                  )}
+                </div>
+                <input type="file" className="hidden" onChange={handleDigitalFileChange} />
+              </label>
+            </div>
+          )}
+
+          <hr className="border-slate-100" />
+
           {/* Image Upload Section */}
           <div>
             <label className="block text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 sm:mb-3">Product Images (Max {MAX_IMAGES})</label>
@@ -147,11 +209,7 @@ export default function AddProductPage() {
               {previewUrls.map((url, index) => (
                 <div key={index} className="relative w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-xl border border-slate-200 overflow-hidden group shadow-sm">
                   <img src={url} alt="Preview" className="w-full h-full object-cover" />
-                  <button 
-                    type="button" 
-                    onClick={() => removeImage(index)}
-                    className="absolute top-1.5 right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                  >
+                  <button type="button" onClick={() => removeImage(index)} className="absolute top-1.5 right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -167,22 +225,13 @@ export default function AddProductPage() {
             </div>
           </div>
 
-          <hr className="border-slate-100" />
-
           {/* Row 1: Title & Category */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
             <div>
               <label className="block text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Product Title</label>
               <div className="relative">
                 <Package className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400" />
-                <input 
-                  required 
-                  type="text" 
-                  value={formData.title} 
-                  onChange={(e) => setFormData({...formData, title: e.target.value})} 
-                  className="w-full pl-11 pr-4 py-3 sm:py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm font-medium bg-slate-50 focus:bg-white" 
-                  placeholder="e.g. iPhone 15 Pro" 
-                />
+                <input required type="text" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full pl-11 pr-4 py-3 sm:py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm font-medium bg-slate-50 focus:bg-white" placeholder="e.g. Master React JS eBook" />
               </div>
             </div>
 
@@ -190,11 +239,7 @@ export default function AddProductPage() {
               <label className="block text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Category</label>
               <div className="relative">
                 <Tags className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
-                <select 
-                  value={formData.category} 
-                  onChange={(e) => setFormData({...formData, category: e.target.value})} 
-                  className="w-full pl-11 pr-10 py-3 sm:py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm font-medium appearance-none bg-slate-50 focus:bg-white cursor-pointer"
-                >
+                <select value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} className="w-full pl-11 pr-10 py-3 sm:py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm font-medium appearance-none bg-slate-50 focus:bg-white cursor-pointer">
                   {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                 </select>
               </div>
@@ -202,38 +247,24 @@ export default function AddProductPage() {
           </div>
 
           {/* Row 2: Price & Stock */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 p-5 sm:p-6 bg-slate-50 rounded-2xl border border-slate-100">
+          <div className={`grid grid-cols-1 ${!isDigital ? 'md:grid-cols-2' : ''} gap-5 sm:gap-6 p-5 sm:p-6 bg-slate-50 rounded-2xl border border-slate-100`}>
             <div>
               <label className="block text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Selling Price (Ksh)</label>
               <div className="relative">
                 <DollarSign className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400" />
-                <input 
-                  required 
-                  type="number" 
-                  min="0" 
-                  value={formData.price} 
-                  onChange={(e) => setFormData({...formData, price: e.target.value})} 
-                  className="w-full pl-11 pr-4 py-3 sm:py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm font-black text-emerald-600 bg-white shadow-sm" 
-                  placeholder="0" 
-                />
+                <input required type="number" min="0" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} className="w-full pl-11 pr-4 py-3 sm:py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm font-black text-emerald-600 bg-white shadow-sm" placeholder="0" />
               </div>
             </div>
             
-            <div>
-              <label className="block text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Initial Stock Quantity</label>
-              <div className="relative">
-                <Hash className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400" />
-                <input 
-                  required 
-                  type="number" 
-                  min="1" 
-                  value={formData.stock_quantity} 
-                  onChange={(e) => setFormData({...formData, stock_quantity: e.target.value})} 
-                  className="w-full pl-11 pr-4 py-3 sm:py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm font-bold text-slate-900 bg-white shadow-sm" 
-                  placeholder="10" 
-                />
+            {!isDigital && (
+              <div className="animate-in fade-in zoom-in duration-200">
+                <label className="block text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Initial Stock Quantity</label>
+                <div className="relative">
+                  <Hash className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400" />
+                  <input required={!isDigital} type="number" min="1" value={formData.stock_quantity} onChange={(e) => setFormData({...formData, stock_quantity: e.target.value})} className="w-full pl-11 pr-4 py-3 sm:py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm font-bold text-slate-900 bg-white shadow-sm" placeholder="10" />
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Row 3: Description */}
@@ -241,24 +272,13 @@ export default function AddProductPage() {
             <label className="block text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Product Description</label>
             <div className="relative">
               <AlignLeft className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400" />
-              <textarea 
-                required 
-                rows={4} 
-                value={formData.description} 
-                onChange={(e) => setFormData({...formData, description: e.target.value})} 
-                className="w-full pl-11 pr-4 py-3.5 sm:py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm resize-none bg-slate-50 focus:bg-white font-medium text-slate-700" 
-                placeholder="Describe your product in detail..." 
-              />
+              <textarea required rows={4} value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full pl-11 pr-4 py-3.5 sm:py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm resize-none bg-slate-50 focus:bg-white font-medium text-slate-700" placeholder="Describe your product in detail..." />
             </div>
           </div>
 
           {/* Submit Button */}
           <div className="pt-2 sm:pt-4">
-            <button 
-              type="submit" 
-              disabled={isSubmitting} 
-              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 sm:py-3.5 rounded-xl transition-all active:scale-[0.98] flex justify-center items-center gap-2 shadow-md shadow-slate-900/10 disabled:opacity-70"
-            >
+            <button type="submit" disabled={isSubmitting} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 sm:py-3.5 rounded-xl transition-all active:scale-[0.98] flex justify-center items-center gap-2 shadow-md shadow-slate-900/10 disabled:opacity-70">
               {isSubmitting ? <><Loader2 className="animate-spin h-5 w-5" /> Publishing...</> : "Publish Product"}
             </button>
           </div>
