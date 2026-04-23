@@ -3,10 +3,8 @@
 import { useState, useEffect } from "react";
 import { Search, Plus, Minus, Trash2, CreditCard, Banknote, ShoppingBag } from "lucide-react";
 import { supabase } from "@/lib/supabase"; 
-import Image from "next/image";
 import { toast } from "sonner";
 
-// TypeScript Interfaces
 interface Product {
   id: string;
   title: string;
@@ -42,27 +40,22 @@ export default function PointOfSalePage() {
 
       if (store) {
         setStoreId(store.id); 
-        
         const { data: items } = await supabase
           .from('products')
           .select('*')
           .eq('store_id', store.id)
           .gt('stock_quantity', 0); 
-        
         if (items) setProducts(items);
       }
       setIsLoading(false);
     }
-    
     fetchInventory();
   }, []);
 
-  // 2. Cart Logic
   const addToCart = (product: Product) => {
     setCart((prev) => {
       const existing = prev.find((item) => item.id === product.id);
       if (existing) {
-        // Don't let them add more than what's in stock
         if (existing.cartQuantity >= product.stock_quantity) {
           toast.error("Not enough stock!");
           return prev;
@@ -75,9 +68,7 @@ export default function PointOfSalePage() {
     });
   };
 
-  const removeFromCart = (productId: string) => {
-    setCart((prev) => prev.filter((item) => item.id !== productId));
-  };
+  const removeFromCart = (productId: string) => setCart((prev) => prev.filter((item) => item.id !== productId));
 
   const updateQuantity = (productId: string, delta: number) => {
     setCart((prev) => prev.map(item => {
@@ -93,113 +84,101 @@ export default function PointOfSalePage() {
     }));
   };
 
-  // 3. Math Calculations
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.cartQuantity, 0);
-  const tax = subtotal * 0.16; // 16% VAT Example
+  const tax = subtotal * 0.02; 
   const total = subtotal + tax;
 
   const handleCheckout = async (method: 'Cash' | 'M-Pesa') => {
-  if (cart.length === 0) return toast.error("Cart is empty");
-  if (!storeId) return toast.error("Store configuration missing");
-  
-  setIsLoading(true);
-  const toastId = toast.loading(`Processing ${method} payment...`);
-
-  try {
-    const posReference = `POS-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
-    // 1. Log the Order
-    const { error: orderError } = await supabase
-      .from('orders')
-      .insert({
-        store_id: storeId,
-        paystack_reference: posReference,
-        customer_name: `In-Store Customer (${method})`,
-        customer_email: "pos@in-store.local",
-        amount_paid: total,
-        total_amount: total,
-        fulfillment_type: 'IN_STORE',
-        status: 'COMPLETED',
-        product_id: cart[0].id 
-      });
-
-    if (orderError) throw orderError;
-
-    // 2. Critical Fix: Deduct Stock for every item in cart
-    for (const item of cart) {
-      const { error: stockError } = await supabase.rpc('decrement_stock', {
-        row_id: item.id,
-        quantity: item.cartQuantity
-      });
-
-      if (stockError) {
-        console.error(`Failed to update stock for ${item.title}:`, stockError);
-        // We continue anyway so the sale isn't lost, but log it for the dev
-      }
-    }
-
-    toast.success("Order logged & inventory updated!", { id: toastId });
-    setCart([]); 
+    if (cart.length === 0) return toast.error("Cart is empty");
+    if (!storeId) return toast.error("Store configuration missing");
     
-    // Refresh local product list to show new stock levels
-    const { data: updatedItems } = await supabase
-      .from('products')
-      .select('*')
-      .eq('store_id', storeId)
-      .gt('stock_quantity', 0);
-    if (updatedItems) setProducts(updatedItems);
+    setIsLoading(true);
+    const toastId = toast.loading(`Processing ${method} payment...`);
 
-  } catch (error: any) {
-    console.error("POS Checkout Error:", error);
-    toast.error("Failed to log order.", { id: toastId });
-  } finally {
-    setIsLoading(false);
-  }
-};
+    try {
+      const posReference = `POS-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+      const { error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          store_id: storeId,
+          paystack_reference: posReference,
+          customer_name: `In-Store Customer (${method})`,
+          customer_email: "pos@in-store.local",
+          amount_paid: total,
+          total_amount: total, // Ensures total is logged correctly
+          fulfillment_type: 'IN_STORE',
+          status: 'COMPLETED',
+          product_id: cart[0].id 
+        });
+
+      if (orderError) throw orderError;
+
+      for (const item of cart) {
+        await supabase.rpc('decrement_stock', { row_id: item.id, quantity: item.cartQuantity });
+      }
+
+      toast.success("Order logged & inventory updated!", { id: toastId });
+      setCart([]); 
+      
+      const { data: updatedItems } = await supabase
+        .from('products')
+        .select('*')
+        .eq('store_id', storeId)
+        .gt('stock_quantity', 0);
+      if (updatedItems) setProducts(updatedItems);
+
+    } catch (error: any) {
+      console.error("POS Checkout Error:", error);
+      toast.error("Failed to log order.", { id: toastId });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex flex-col lg:flex-row gap-6">
+    // Height adapts: Natural on mobile, strictly fixed on Large (lg) screens like iPads/Desktop
+    <div className="flex flex-col lg:flex-row gap-6 h-auto lg:h-[calc(100vh-6.5rem)]">
       
       {/* LEFT PANEL: PRODUCT GRID */}
-      <div className="flex-1 flex flex-col min-h-0 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        {/* Search Bar */}
-        <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+      {/* On mobile, this falls below the cart. On desktop, it's on the left. */}
+      <div className="order-2 lg:order-1 flex-1 flex flex-col min-h-[60vh] lg:min-h-0 bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
+        <div className="p-4 sm:p-5 border-b border-slate-100 bg-slate-50/50">
           <div className="relative">
-            <Search className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+            <Search className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
             <input
               type="text"
               placeholder="Search inventory by name..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+              className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm font-medium"
             />
           </div>
         </div>
 
-        {/* The Grid */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 custom-scrollbar">
           {isLoading ? (
-             <div className="flex justify-center items-center h-full text-slate-400">Loading POS...</div>
+             <div className="flex justify-center items-center h-full text-slate-400 font-medium">Loading POS...</div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
               {products
                 .filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()))
                 .map((product) => (
                 <button
                   key={product.id}
                   onClick={() => addToCart(product)}
-                  className="flex flex-col items-start p-3 bg-white border border-slate-100 rounded-xl hover:border-emerald-500 hover:shadow-md transition-all text-left group"
+                  className="flex flex-col items-start p-3 sm:p-4 bg-white border border-slate-100 rounded-2xl hover:border-emerald-500 hover:shadow-lg transition-all text-left group active:scale-[0.98]"
                 >
-                  <div className="w-full aspect-square bg-slate-100 rounded-lg mb-3 overflow-hidden relative">
+                  <div className="w-full aspect-square bg-slate-50 rounded-xl mb-3 overflow-hidden relative">
                     {product.images?.[0] ? (
-                      <img src={product.images[0]} alt={product.title} className="object-cover w-full h-full group-hover:scale-105 transition-transform" />
+                      <img src={product.images[0]} alt={product.title} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center"><ShoppingBag className="text-slate-300" /></div>
+                      <div className="w-full h-full flex items-center justify-center"><ShoppingBag className="h-8 w-8 text-slate-300" /></div>
                     )}
                   </div>
-                  <h3 className="font-bold text-slate-800 text-sm line-clamp-1">{product.title}</h3>
+                  <h3 className="font-bold text-slate-800 text-xs sm:text-sm line-clamp-2">{product.title}</h3>
                   <p className="text-emerald-600 font-black text-sm mt-1">Ksh {product.price.toLocaleString()}</p>
-                  <p className="text-xs text-slate-400 mt-1">{product.stock_quantity} in stock</p>
+                  <p className="text-[10px] sm:text-xs text-slate-400 mt-1.5 bg-slate-50 px-2 py-0.5 rounded-md font-medium">{product.stock_quantity} in stock</p>
                 </button>
               ))}
             </div>
@@ -208,75 +187,77 @@ export default function PointOfSalePage() {
       </div>
 
       {/* RIGHT PANEL: THE REGISTER / CART */}
-      <div className="w-full lg:w-96 bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col h-full shrink-0">
-        <div className="p-4 border-b border-slate-100 bg-slate-900 text-white rounded-t-2xl">
-          <h2 className="font-bold text-lg flex items-center gap-2">
+      {/* On mobile, this is pushed to the TOP (order-1) so cashiers immediately see the cart. */}
+      <div className="order-1 lg:order-2 w-full lg:w-[400px] bg-white rounded-[2rem] shadow-sm border border-slate-200 flex flex-col h-[55vh] lg:h-full shrink-0 overflow-hidden">
+        <div className="p-5 border-b border-slate-100 bg-slate-900 text-white flex items-center justify-between">
+          <h2 className="font-black text-lg flex items-center gap-2">
             <ShoppingBag className="h-5 w-5 text-emerald-400" />
             Current Order
           </h2>
+          <span className="bg-slate-800 text-slate-300 text-xs font-bold px-2.5 py-1 rounded-lg">
+            {cart.reduce((sum, item) => sum + item.cartQuantity, 0)} Items
+          </span>
         </div>
 
-        {/* Cart Items */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
           {cart.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-2">
-              <ShoppingBag className="h-10 w-10 opacity-20" />
-              <p className="text-sm">Tap items to add to order</p>
+            <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-3">
+              <div className="h-16 w-16 bg-slate-50 rounded-full flex items-center justify-center">
+                <ShoppingBag className="h-8 w-8 opacity-40" />
+              </div>
+              <p className="text-sm font-medium">Tap items to add to order</p>
             </div>
           ) : (
             cart.map((item) => (
-              <div key={item.id} className="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0">
+              <div key={item.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
                 <div className="flex-1 min-w-0">
                   <h4 className="font-bold text-sm text-slate-800 truncate">{item.title}</h4>
-                  <p className="text-xs text-slate-500">Ksh {item.price.toLocaleString()}</p>
+                  <p className="text-xs text-emerald-600 font-bold mt-0.5">Ksh {item.price.toLocaleString()}</p>
                 </div>
                 
-                {/* Quantity Controls */}
-                <div className="flex items-center gap-3 bg-slate-50 rounded-lg p-1">
-                  <button onClick={() => updateQuantity(item.id, -1)} className="p-1 hover:bg-white rounded text-slate-600"><Minus className="h-4 w-4" /></button>
-                  <span className="font-bold text-sm w-4 text-center">{item.cartQuantity}</span>
-                  <button onClick={() => updateQuantity(item.id, 1)} className="p-1 hover:bg-white rounded text-slate-600"><Plus className="h-4 w-4" /></button>
+                <div className="flex items-center justify-between sm:justify-end gap-3">
+                  <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
+                    <button onClick={() => updateQuantity(item.id, -1)} className="p-1.5 hover:bg-slate-50 rounded-lg text-slate-600 active:scale-95"><Minus className="h-4 w-4" /></button>
+                    <span className="font-black text-sm w-4 text-center">{item.cartQuantity}</span>
+                    <button onClick={() => updateQuantity(item.id, 1)} className="p-1.5 hover:bg-slate-50 rounded-lg text-slate-600 active:scale-95"><Plus className="h-4 w-4" /></button>
+                  </div>
+                  <button onClick={() => removeFromCart(item.id)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors active:scale-95">
+                    <Trash2 className="h-5 w-5" />
+                  </button>
                 </div>
-                
-                <button onClick={() => removeFromCart(item.id)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                  <Trash2 className="h-4 w-4" />
-                </button>
               </div>
             ))
           )}
         </div>
 
-        {/* Totals & Checkout */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl">
-          <div className="space-y-2 mb-4">
-            <div className="flex justify-between text-sm text-slate-500">
+        <div className="p-5 bg-white border-t border-slate-100">
+          <div className="space-y-2 mb-5">
+            <div className="flex justify-between text-sm text-slate-500 font-medium">
               <span>Subtotal</span>
               <span>Ksh {subtotal.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between text-sm text-slate-500">
-              <span>Tax (16%)</span>
+            <div className="flex justify-between text-sm text-slate-500 font-medium">
+              <span>Tax (2%)</span>
               <span>Ksh {tax.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between text-lg font-black text-slate-900 pt-2 border-t border-slate-200">
+            <div className="flex justify-between text-xl font-black text-slate-900 pt-3 border-t border-slate-200">
               <span>Total</span>
-              <span>Ksh {total.toLocaleString()}</span>
+              <span className="text-emerald-600">Ksh {total.toLocaleString()}</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             <button 
               onClick={() => handleCheckout('Cash')}
-              className="flex items-center justify-center gap-2 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold transition-colors active:scale-95"
+              className="flex items-center justify-center gap-2 py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold transition-all active:scale-[0.98] shadow-md shadow-slate-900/20"
             >
-              <Banknote className="h-5 w-5 text-emerald-400" />
-              Cash
+              <Banknote className="h-5 w-5 text-emerald-400" /> Cash
             </button>
             <button 
               onClick={() => handleCheckout('M-Pesa')}
-              className="flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-colors active:scale-95"
+              className="flex items-center justify-center gap-2 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all active:scale-[0.98] shadow-md shadow-emerald-600/20"
             >
-              <CreditCard className="h-5 w-5" />
-              M-Pesa
+              <CreditCard className="h-5 w-5" /> M-Pesa
             </button>
           </div>
         </div>
