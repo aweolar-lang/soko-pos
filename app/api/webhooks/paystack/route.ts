@@ -121,34 +121,61 @@ export async function POST(req: Request) {
       }
     } 
     // ==========================================
+    // ==========================================
     // SCENARIO 2: TRANSFER SUCCESS (Money Out)
     // ==========================================
     else if (event.event === "transfer.success") {
       const transferData = event.data;
     
-      // Paystack sends the subaccount/recipient info. We find the store that owns it.
-      // Note: Depending on Paystack's exact transfer payload, the code might be inside 'recipient'
-      const subaccountCode = transferData.recipient?.subaccount || transferData.subaccount?.subaccount_code;
+      // 1. Cast a wider net for Paystack's payload structure
+      const subaccountCode = 
+        transferData.subaccount?.subaccount_code || 
+        transferData.recipient?.subaccount || 
+        transferData.recipient?.details?.subaccount;
 
-      if (subaccountCode) {
-        // Find the store linked to this subaccount
-        const { data: store } = await supabaseAdmin
-          .from("stores")
-          .select("id")
-          .eq("paystack_subaccount_code", subaccountCode)
-          .single();
+      if (!subaccountCode) {
+        console.error("🚨 Webhook Error: Transfer success received, but no subaccount code found in payload.", transferData);
+        return NextResponse.json({ received: true }, { status: 200 }); // Tell Paystack we got it so they don't retry, but log the error for you.
+      }
 
-        if (store) {
-          // Log the payout in the database!
-          await supabaseAdmin
-            .from("payouts")
-            .insert({
-              store_id: store.id,
-              amount_paid: transferData.amount / 100, // Convert from Kobo/Cents to Ksh
-              paystack_reference: transferData.reference,
-              status: "COMPLETED"
-            });
-        }
+      // 2. Prevent the "Double Payout" Glitch (Idempotency Check)
+      const { data: existingPayout } = await supabaseAdmin
+        .from("payouts")
+        .select("id")
+        .eq("paystack_reference", transferData.reference)
+        .single();
+
+      if (existingPayout) {
+        console.log("⚠️ Ignored duplicate Paystack webhook for reference:", transferData.reference);
+        return NextResponse.json({ received: true }, { status: 200 });
+      }
+
+      // 3. Find the exact store
+      const { data: store, error: storeError } = await supabaseAdmin
+        .from("stores")
+        .select("id")
+        .eq("paystack_subaccount_code", subaccountCode)
+        .single();
+
+      if (!store || storeError) {
+        console.error(`🚨 Webhook Error: Could not find store for subaccount ${subaccountCode}`);
+        return NextResponse.json({ received: true }, { status: 200 });
+      }
+
+      // 4. Safely Log the Payout
+      const { error: insertError } = await supabaseAdmin
+        .from("payouts")
+        .insert({
+          store_id: store.id,
+          amount_paid: transferData.amount / 100, 
+          paystack_reference: transferData.reference,
+          status: "COMPLETED"
+        });
+
+      if (insertError) {
+        console.error("🚨 Webhook Error: Failed to insert payout into database:", insertError);
+      } else {
+        console.log(`✅ Successfully logged payout of Ksh ${transferData.amount / 100} for store ${store.id}`);
       }
     }
 

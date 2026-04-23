@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Wallet, ArrowDownRight, Loader2, Activity, Settings, ShieldCheck, ArrowUpRight, CheckCircle2, Clock } from "lucide-react";
+import { Wallet, ArrowDownRight, Loader2, Settings, ArrowUpRight, CheckCircle2, Clock, Store } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 
@@ -13,6 +13,7 @@ interface Transaction {
   status: string;
   title: string;
   subtitle: string;
+  isPOS: boolean; // Added to help flag POS transactions
 }
 
 export default function WalletPage() {
@@ -20,7 +21,8 @@ export default function WalletPage() {
   const [isLoading, setIsLoading] = useState(true);
   
   const [metrics, setMetrics] = useState({
-    totalEarnings: 0,
+    onlineEarnings: 0,
+    posEarnings: 0,
     totalSettled: 0,
     pendingBalance: 0
   });
@@ -50,22 +52,32 @@ export default function WalletPage() {
             .select('id, created_at, amount_paid, status, paystack_reference')
             .eq('store_id', store.id);
 
-          let totalEarned = 0;
+          let onlineEarned = 0;
+          let posEarned = 0;
           let totalSettled = 0;
           let combinedTransactions: Transaction[] = [];
 
           // Process Orders
           if (orders) {
             orders.forEach(order => {
-              totalEarned += Number(order.amount_paid || 0);
+              const amount = Number(order.amount_paid || 0);
+              const isPOS = order.fulfillment_type === 'IN_STORE';
+
+              if (isPOS) {
+                posEarned += amount; // Seller already has this cash
+              } else {
+                onlineEarned += amount; // Platform holds this money
+              }
+
               combinedTransactions.push({
                 id: order.id,
                 created_at: order.created_at,
-                amount: Number(order.amount_paid),
+                amount: amount,
                 type: 'ORDER',
                 status: order.status,
                 title: order.customer_name || "Customer Order",
-                subtitle: order.fulfillment_type
+                subtitle: isPOS ? "In-Store Sale (POS)" : `Online Order (${order.fulfillment_type || "SHIPPING"})`,
+                isPOS: isPOS
               });
             });
           }
@@ -81,7 +93,8 @@ export default function WalletPage() {
                 type: 'PAYOUT',
                 status: payout.status,
                 title: "M-Pesa Settlement",
-                subtitle: "Auto-Payout via Paystack"
+                subtitle: "Auto-Payout via Paystack",
+                isPOS: false
               });
             });
           }
@@ -91,9 +104,11 @@ export default function WalletPage() {
 
           setTransactions(combinedTransactions);
           setMetrics({
-            totalEarnings: totalEarned,
+            onlineEarnings: onlineEarned,
+            posEarnings: posEarned,
             totalSettled: totalSettled,
-            pendingBalance: totalEarned - totalSettled // THE MAGIC MATH
+            // MAGIC MATH FIXED: Only subtract payouts from ONLINE earnings!
+            pendingBalance: onlineEarned - totalSettled 
           });
         }
       } catch (error) {
@@ -128,35 +143,49 @@ export default function WalletPage() {
         </Link>
       </div>
 
-      {/* Metrics Cards */}
+      {/* Metrics Cards - UPDATED FOR 3 COLUMNS */}
       <div className="grid sm:grid-cols-3 gap-6">
         
-        {/* PENDING BALANCE (Money waiting to be paid) */}
-        <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl shadow-slate-200 border border-slate-800 relative overflow-hidden sm:col-span-2">
+        {/* PENDING BALANCE (Money platform owes seller) */}
+        <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl shadow-slate-200 border border-slate-800 relative overflow-hidden">
           <div className="absolute top-0 right-0 p-6 opacity-10"><Wallet className="h-24 w-24" /></div>
           <div className="relative z-10">
-            <p className="text-slate-400 font-bold text-sm uppercase tracking-wider mb-2">Pending Settlement</p>
-            <h2 className="text-4xl sm:text-5xl font-black tracking-tight mb-6 text-amber-400">
-              <span className="text-amber-200/50 text-2xl sm:text-3xl mr-1">Ksh</span>
+            <p className="text-slate-400 font-bold text-xs uppercase tracking-wider mb-2">Pending Online Payout</p>
+            <h2 className="text-3xl font-black tracking-tight mb-4 text-amber-400">
+              <span className="text-amber-200/50 text-xl mr-1">Ksh</span>
               {metrics.pendingBalance.toLocaleString()}
             </h2>
-            <div className="flex items-center gap-2 bg-slate-800/50 w-fit px-3 py-1.5 rounded-lg border border-slate-700">
-              <Clock className="h-4 w-4 text-amber-400" />
-              <span className="text-xs font-medium text-slate-300">Processing to M-Pesa</span>
+            <div className="flex items-center gap-1.5 bg-slate-800/50 w-fit px-2.5 py-1 rounded-lg border border-slate-700">
+              <Clock className="h-3 w-3 text-amber-400" />
+              <span className="text-[10px] font-medium text-slate-300">Processing to M-Pesa</span>
             </div>
           </div>
         </div>
 
-        {/* TOTAL SETTLED (Money successfully sent to M-Pesa) */}
+        {/* TOTAL SETTLED (Money successfully sent by platform) */}
         <div className="bg-emerald-50 rounded-3xl p-6 shadow-sm border border-emerald-100 flex flex-col justify-center">
-          <p className="text-emerald-600 font-bold text-sm uppercase tracking-wider mb-2">Successfully Paid</p>
+          <p className="text-emerald-600 font-bold text-xs uppercase tracking-wider mb-2">Platform Settled</p>
           <h2 className="text-3xl font-black text-emerald-900 tracking-tight">
-            Ksh {metrics.totalSettled.toLocaleString()}
+            <span className="text-emerald-600/50 text-xl mr-1">Ksh</span>
+            {metrics.totalSettled.toLocaleString()}
           </h2>
-          <p className="text-sm text-emerald-600 mt-2 font-medium flex items-center gap-1">
-            <CheckCircle2 className="h-4 w-4" /> Settled to M-Pesa
+          <p className="text-xs text-emerald-600 mt-2 font-medium flex items-center gap-1">
+            <CheckCircle2 className="h-4 w-4" /> Paid via Paystack
           </p>
         </div>
+
+        {/* POS SALES (Money already collected physically) */}
+        <div className="bg-blue-50 rounded-3xl p-6 shadow-sm border border-blue-100 flex flex-col justify-center">
+          <p className="text-blue-600 font-bold text-xs uppercase tracking-wider mb-2">In-Store / POS Sales</p>
+          <h2 className="text-3xl font-black text-blue-900 tracking-tight">
+            <span className="text-blue-600/50 text-xl mr-1">Ksh</span>
+            {metrics.posEarnings.toLocaleString()}
+          </h2>
+          <p className="text-xs text-blue-600 mt-2 font-medium flex items-center gap-1">
+            <Store className="h-4 w-4" /> Handled Outside Platform
+          </p>
+        </div>
+
       </div>
 
       {/* Unified Transaction History (Orders + Payouts) */}
@@ -170,9 +199,10 @@ export default function WalletPage() {
             transactions.map((tx) => (
               <div key={tx.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-4">
-                  {/* Icon logic: Down Arrow for Orders (Money in), Up Arrow for Payouts (Money Out) */}
                   <div className={`p-3 rounded-full ${
-                    tx.type === 'ORDER' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-600'
+                    tx.type === 'ORDER' && !tx.isPOS ? 'bg-emerald-100 text-emerald-600' : 
+                    tx.type === 'ORDER' && tx.isPOS ? 'bg-blue-100 text-blue-600' :
+                    'bg-slate-100 text-slate-600'
                   }`}>
                     {tx.type === 'ORDER' ? <ArrowDownRight className="h-5 w-5" /> : <ArrowUpRight className="h-5 w-5" />}
                   </div>
@@ -184,12 +214,15 @@ export default function WalletPage() {
                   </div>
                 </div>
                 <div className="text-right">
-                  {/* Amount logic: Green for Sales, Gray/Negative for Payouts */}
-                  <p className={`font-black ${tx.type === 'ORDER' ? 'text-emerald-600' : 'text-slate-900'}`}>
+                  <p className={`font-black ${
+                    tx.type === 'ORDER' && !tx.isPOS ? 'text-emerald-600' : 
+                    tx.type === 'ORDER' && tx.isPOS ? 'text-blue-600' :
+                    'text-slate-900'
+                  }`}>
                     {tx.type === 'ORDER' ? '+' : '-'} Ksh {tx.amount.toLocaleString()}
                   </p>
                   <p className="text-xs font-bold mt-1 text-slate-400">
-                    {tx.type === 'PAYOUT' ? 'Settled' : 'Cleared'}
+                    {tx.type === 'PAYOUT' ? 'Settled' : tx.isPOS ? 'Collected' : 'Pending'}
                   </p>
                 </div>
               </div>
