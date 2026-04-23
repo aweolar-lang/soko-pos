@@ -14,15 +14,15 @@ export default async function OrderSuccessPage({
 }: {
   searchParams: Promise<{ reference?: string; trxref?: string }> | { reference?: string; trxref?: string };
 }) {
+  // 1. Safely await and grab the reference
   const resolvedParams = await searchParams;
   const reference = resolvedParams?.reference || resolvedParams?.trxref;
 
+  // 2. The Database Update "Brain"
   if (reference) {
     try {
       const verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
-        headers: {
-          Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-        },
+        headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },
         cache: "no-store", 
       });
 
@@ -31,8 +31,8 @@ export default async function OrderSuccessPage({
       if (verifyData.status && verifyData.data.status === "success") {
         const metadata = verifyData.data.metadata;
 
-        // 🚨 ADDED CHECK FOR store_id!
         if (metadata && metadata.product_id && metadata.store_id) {
+          // Check if order already exists
           const { data: existingOrder } = await supabaseAdmin
             .from("orders")
             .select("id")
@@ -43,7 +43,7 @@ export default async function OrderSuccessPage({
             const customFields = metadata.custom_fields || [];
             const getField = (name: string) => customFields.find((f: any) => f.variable_name === name)?.value;
 
-            // Safely parse time just like we did in the webhook
+            // Handle takeaway time
             const rawTakeawayTime = getField("takeaway_time");
             let formattedTakeawayTime = null;
             if (rawTakeawayTime && rawTakeawayTime !== "N/A") {
@@ -55,15 +55,15 @@ export default async function OrderSuccessPage({
                   formattedTakeawayTime = new Date(rawTakeawayTime).toISOString();
                 }
               } catch (e) {
-                console.error("Time parsing failed");
+                console.error("Takeaway time parsing failed");
               }
             }
 
-            // 1. INSERT ORDER (With the missing store_id!)
+            // Insert into Orders table
             const { data: newOrder, error: orderError } = await supabaseAdmin
               .from("orders")
               .insert({
-                store_id: metadata.store_id, // <-- This was missing!
+                store_id: metadata.store_id,
                 paystack_reference: reference,
                 customer_name: getField("buyer_name") || "Guest",
                 customer_email: verifyData.data.customer.email,
@@ -72,14 +72,14 @@ export default async function OrderSuccessPage({
                 fulfillment_type: getField("fulfillment_type") || "SHIPPING",
                 takeaway_time: formattedTakeawayTime,
                 status: 'NEW',
-                product_id: metadata.product_id 
+                product_id: metadata.product_id // Fully active now!
               })
               .select()
               .single();
 
             if (orderError) console.error("🚨 Order Insert Error:", orderError);
 
-            // 2. INSERT ORDER ITEMS
+            // Insert into Order Items table
             if (!orderError && newOrder) {
               const { error: itemsError } = await supabaseAdmin
                 .from("order_items")
@@ -100,6 +100,7 @@ export default async function OrderSuccessPage({
     }
   }
 
+  // 3. Your exact UI rendering
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="bg-white max-w-md w-full rounded-3xl shadow-xl border border-slate-100 overflow-hidden text-center animate-in fade-in zoom-in-95 duration-500">
@@ -121,7 +122,7 @@ export default async function OrderSuccessPage({
               Transaction Reference
             </div>
             <p className="font-mono text-slate-900 font-bold bg-white border border-slate-200 py-2 rounded-xl text-sm break-all">
-              {reference || "Sent via Email"}
+              {reference || "N/A"}
             </p>
           </div>
 
@@ -137,8 +138,13 @@ export default async function OrderSuccessPage({
               <Home className="h-5 w-5" />
               Back to Homepage
             </Link>
+            
+            <p className="text-xs text-slate-400 font-medium pt-2">
+              Powered by <span className="text-emerald-600 font-bold">LocalSoko</span>
+            </p>
           </div>
         </div>
+
       </div>
     </div>
   );
