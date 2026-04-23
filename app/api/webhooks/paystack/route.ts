@@ -90,6 +90,7 @@ export async function POST(req: Request) {
             customer_email: event.data.customer.email,
             customer_phone: buyerPhone,
             amount_paid: event.data.amount / 100, 
+            total_amount: event.data.amount / 100,
             fulfillment_type: fulfillmentType,
             takeaway_time: formattedTakeawayTime,
             status: 'NEW',

@@ -98,6 +98,7 @@ export default async function OrderSuccessPage({
         customer_email: verifyData.data.customer.email,
         customer_phone: getField("buyer_phone") || null,
         amount_paid: verifyData.data.amount / 100,
+        total_amount: verifyData.data.amount / 100,
         fulfillment_type: getField("fulfillment_type") || "SHIPPING",
         takeaway_time: formattedTakeawayTime,
         status: 'NEW',
