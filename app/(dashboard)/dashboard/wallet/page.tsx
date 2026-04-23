@@ -35,6 +35,8 @@ export default function WalletPage() {
     todayOnline: 0
   });
 
+  const [storeName, setStoreName] = useState("");
+
   useEffect(() => {
     async function fetchWalletData() {
       try {
@@ -43,7 +45,7 @@ export default function WalletPage() {
 
         const { data: store } = await supabase
           .from('stores')
-          .select('id')
+          .select('id, name')
           .eq('owner_id', user.id)
           .single();
 
@@ -123,6 +125,7 @@ export default function WalletPage() {
             todayPOS,
             todayOnline
           });
+          setStoreName(store.name || "");
         }
       } catch (error) {
         console.error("Error fetching wallet data:", error);
@@ -163,7 +166,17 @@ export default function WalletPage() {
     doc.text("Store Statement", 14, 22);
     doc.setFontSize(11);
     doc.setTextColor(100);
-    doc.text(`Period: ${start.toLocaleDateString()} to ${end.toLocaleDateString()}`, 14, 30);
+    doc.text("LokoSoko POS", 14, 28);
+    doc.setFontSize(9);
+    doc.setTextColor(150);
+    doc.text("www.lokosoko.com", 14, 32);
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.setFont("helvetica", "normal");
+    doc.setFillColor(245, 247, 250);
+    doc.text(`store: ${storeName}`, 14, 34);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 34);
+    doc.text(`Period: ${start.toLocaleDateString()} to ${end.toLocaleDateString()}`, 14, 40);
 
     // Calculate period totals
     const pOnline = filtered.filter(t => !t.isPOS && t.type === 'ORDER').reduce((sum, t) => sum + t.amount, 0);
