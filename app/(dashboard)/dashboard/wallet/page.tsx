@@ -164,17 +164,13 @@ export default function WalletPage() {
     // Add Header
     doc.setFontSize(20);
     doc.text("Store Statement", 14, 22);
+    doc.text(`store: ${storeName}`, 10, 32);
     doc.setFontSize(11);
     doc.setTextColor(100);
     doc.text("LokoSoko POS", 14, 28);
-    doc.setFontSize(9);
-    doc.setTextColor(150);
     doc.text("www.lokosoko.com", 14, 32);
-    doc.setFontSize(8);
-    doc.setTextColor(150);
-    doc.setFont("helvetica", "normal");
-    doc.setFillColor(245, 247, 250);
-    doc.text(`store: ${storeName}`, 14, 34);
+    doc.setFontSize(9);
+    doc.setTextColor(100);
     doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 34);
     doc.text(`Period: ${start.toLocaleDateString()} to ${end.toLocaleDateString()}`, 14, 40);
 
