@@ -16,6 +16,9 @@ export default function AddProductPage() {
   const [storeId, setStoreId] = useState<string | null>(null);
   const [storeCategory, setStoreCategory] = useState<string | null>(null);
   
+  // NEW: Track the store's currency
+  const [storeCurrency, setStoreCurrency] = useState("KES");
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [images, setImages] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
@@ -37,15 +40,17 @@ export default function AddProductPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // UPGRADE: Fetch the currency column alongside id and category
       const { data } = await supabase
         .from('stores')
-        .select('id, category')
+        .select('id, category, currency')
         .eq('owner_id', user.id)
         .single();
         
       if (data) {
         setStoreId(data.id);
         setStoreCategory(data.category);
+        setStoreCurrency(data.currency || "KES"); // Save currency to state
 
         // Auto-configure form based on Store Category
         if (data.category === "Digital Products") {
@@ -147,6 +152,10 @@ export default function AddProductPage() {
       }
 
       // 3. Save to Database
+      // Note: We don't need to save the currency to the product here because your SQL query earlier 
+      // added a DEFAULT 'KES' to the products table, and we'll eventually pull it directly from the `stores` table 
+      // or update products to explicitly match store currency if needed, but the checkout API relies on what's there.
+      // Actually, since we want products to have the right currency, let's explicitly inject it!
       const { error } = await supabase.from('products').insert({
         store_id: storeId,
         title: formData.title,
@@ -157,7 +166,8 @@ export default function AddProductPage() {
         category: formData.category,
         images: imageUrls,
         is_digital: isDigital,
-        file_url: uploadedFileUrl
+        file_url: uploadedFileUrl,
+        currency: storeCurrency // Explicitly save the store's currency to the product!
       });
 
       if (error) throw error;
@@ -291,7 +301,8 @@ export default function AddProductPage() {
           {/* Row 2: Price & Stock */}
           <div className={`grid grid-cols-1 ${!isDigital ? 'md:grid-cols-2' : ''} gap-5 sm:gap-6 p-5 sm:p-6 bg-slate-50 rounded-2xl border border-slate-100`}>
             <div>
-              <label className="block text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Selling Price (Ksh)</label>
+              {/* UPGRADE: Dynamic Currency Label */}
+              <label className="block text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Selling Price ({storeCurrency})</label>
               <div className="relative">
                 <DollarSign className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400" />
                 <input required type="number" min="0" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} className="w-full pl-11 pr-4 py-3 sm:py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm font-black text-emerald-600 bg-white shadow-sm" placeholder="0" />

@@ -23,6 +23,9 @@ export default function PointOfSalePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [storeId, setStoreId] = useState<string | null>(null);
+  
+  // NEW: Track the store's currency
+  const [storeCurrency, setStoreCurrency] = useState("KES");
 
   useEffect(() => {
     async function fetchInventory() {
@@ -32,14 +35,17 @@ export default function PointOfSalePage() {
         return;
       }
       
+      // UPGRADE: Fetch the currency column
       const { data: store } = await supabase
         .from('stores')
-        .select('id')
+        .select('id, currency')
         .eq('owner_id', user.id)
         .single();
 
       if (store) {
         setStoreId(store.id); 
+        setStoreCurrency(store.currency || "KES"); // Save currency to state
+
         const { data: items } = await supabase
           .from('products')
           .select('*')
@@ -88,6 +94,9 @@ export default function PointOfSalePage() {
   const tax = subtotal * 0.02; 
   const total = subtotal + tax;
 
+  // Helper to dynamically show currency symbol
+  const sym = storeCurrency === "USD" ? "$" : "Ksh ";
+
   const handleCheckout = async (method: 'Cash' | 'M-Pesa') => {
     if (cart.length === 0) return toast.error("Cart is empty");
     if (!storeId) return toast.error("Store configuration missing");
@@ -106,10 +115,11 @@ export default function PointOfSalePage() {
           customer_name: `In-Store Customer (${method})`,
           customer_email: "pos@in-store.local",
           amount_paid: total,
-          total_amount: total, // Ensures total is logged correctly
+          total_amount: total, 
           fulfillment_type: 'IN_STORE',
           status: 'COMPLETED',
-          product_id: cart[0].id 
+          product_id: cart[0].id,
+          currency: storeCurrency // Ensure order logs with correct currency!
         });
 
       if (orderError) throw orderError;
@@ -137,11 +147,8 @@ export default function PointOfSalePage() {
   };
 
   return (
-    // Height adapts: Natural on mobile, strictly fixed on Large (lg) screens like iPads/Desktop
     <div className="flex flex-col lg:flex-row gap-6 h-auto lg:h-[calc(100vh-6.5rem)]">
       
-      {/* LEFT PANEL: PRODUCT GRID */}
-      {/* On mobile, this falls below the cart. On desktop, it's on the left. */}
       <div className="order-2 lg:order-1 flex-1 flex flex-col min-h-[60vh] lg:min-h-0 bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 sm:p-5 border-b border-slate-100 bg-slate-50/50">
           <div className="relative">
@@ -177,7 +184,7 @@ export default function PointOfSalePage() {
                     )}
                   </div>
                   <h3 className="font-bold text-slate-800 text-xs sm:text-sm line-clamp-2">{product.title}</h3>
-                  <p className="text-emerald-600 font-black text-sm mt-1">Ksh {product.price.toLocaleString()}</p>
+                  <p className="text-emerald-600 font-black text-sm mt-1">{sym}{product.price.toLocaleString()}</p>
                   <p className="text-[10px] sm:text-xs text-slate-400 mt-1.5 bg-slate-50 px-2 py-0.5 rounded-md font-medium">{product.stock_quantity} in stock</p>
                 </button>
               ))}
@@ -186,8 +193,6 @@ export default function PointOfSalePage() {
         </div>
       </div>
 
-      {/* RIGHT PANEL: THE REGISTER / CART */}
-      {/* On mobile, this is pushed to the TOP (order-1) so cashiers immediately see the cart. */}
       <div className="order-1 lg:order-2 w-full lg:w-[400px] bg-white rounded-[2rem] shadow-sm border border-slate-200 flex flex-col h-[55vh] lg:h-full shrink-0 overflow-hidden">
         <div className="p-5 border-b border-slate-100 bg-slate-900 text-white flex items-center justify-between">
           <h2 className="font-black text-lg flex items-center gap-2">
@@ -212,7 +217,7 @@ export default function PointOfSalePage() {
               <div key={item.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
                 <div className="flex-1 min-w-0">
                   <h4 className="font-bold text-sm text-slate-800 truncate">{item.title}</h4>
-                  <p className="text-xs text-emerald-600 font-bold mt-0.5">Ksh {item.price.toLocaleString()}</p>
+                  <p className="text-xs text-emerald-600 font-bold mt-0.5">{sym}{item.price.toLocaleString()}</p>
                 </div>
                 
                 <div className="flex items-center justify-between sm:justify-end gap-3">
@@ -234,15 +239,15 @@ export default function PointOfSalePage() {
           <div className="space-y-2 mb-5">
             <div className="flex justify-between text-sm text-slate-500 font-medium">
               <span>Subtotal</span>
-              <span>Ksh {subtotal.toLocaleString()}</span>
+              <span>{sym}{subtotal.toLocaleString()}</span>
             </div>
             <div className="flex justify-between text-sm text-slate-500 font-medium">
               <span>Tax (2%)</span>
-              <span>Ksh {tax.toLocaleString()}</span>
+              <span>{sym}{tax.toLocaleString()}</span>
             </div>
             <div className="flex justify-between text-xl font-black text-slate-900 pt-3 border-t border-slate-200">
               <span>Total</span>
-              <span className="text-emerald-600">Ksh {total.toLocaleString()}</span>
+              <span className="text-emerald-600">{sym}{total.toLocaleString()}</span>
             </div>
           </div>
 

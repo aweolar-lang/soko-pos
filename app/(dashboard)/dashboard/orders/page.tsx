@@ -15,6 +15,7 @@ interface Order {
   customer_notes: string;
   status: string;
   created_at: string;
+  currency?: string; // NEW: optional for older orders
   products: {
     title: string; 
   } | null;
@@ -33,6 +34,9 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
+  
+  // NEW: Store currency
+  const [storeCurrency, setStoreCurrency] = useState("KES");
 
   useEffect(() => {
     fetchOrders();
@@ -43,9 +47,10 @@ export default function OrdersPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // UPGRADE: Fetch currency alongside the store ID
       const { data: store } = await supabase
         .from('stores')
-        .select('id')
+        .select('id, currency')
         .eq('owner_id', user.id)
         .single();
 
@@ -53,6 +58,8 @@ export default function OrdersPage() {
         setIsLoading(false);
         return;
       }
+      
+      setStoreCurrency(store.currency || "KES");
 
       const { data: ordersData, error } = await supabase
         .from('orders')
@@ -103,6 +110,12 @@ export default function OrdersPage() {
     );
   }
 
+  // Helper to dynamically show currency symbol based on order data or store fallback
+  const getCurrencySymbol = (orderCurrency?: string) => {
+    const currencyToUse = orderCurrency || storeCurrency;
+    return currencyToUse === "USD" ? "$" : "Ksh ";
+  };
+
   return (
     <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8 pb-24 sm:pb-12">
       <div>
@@ -122,6 +135,7 @@ export default function OrdersPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
           {orders.map((order) => {
             const statusConfig = STATUS_OPTIONS.find(s => s.value === order.status) || STATUS_OPTIONS[0];
+            const sym = getCurrencySymbol(order.currency);
 
             return (
               <div key={order.id} className="bg-white border border-slate-200 rounded-[1.5rem] p-5 sm:p-6 shadow-sm flex flex-col relative overflow-hidden group hover:border-emerald-200 transition-colors">
@@ -157,7 +171,8 @@ export default function OrdersPage() {
                   {/* Customer & Price */}
                   <div className="flex justify-between items-center bg-slate-50 p-3 sm:p-4 rounded-xl border border-slate-100">
                     <span className="text-sm font-bold text-slate-700 truncate pr-2">{order.customer_name}</span>
-                    <span className="text-sm sm:text-base font-black text-emerald-600 shrink-0">Ksh {order.amount_paid.toLocaleString()}</span>
+                    {/* UPGRADE: DYNAMIC CURRENCY LOGIC APPLIED */}
+                    <span className="text-sm sm:text-base font-black text-emerald-600 shrink-0">{sym}{order.amount_paid.toLocaleString()}</span>
                   </div>
 
                   {/* Phone Number */}

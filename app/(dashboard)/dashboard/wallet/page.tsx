@@ -36,6 +36,9 @@ export default function WalletPage() {
   });
 
   const [storeName, setStoreName] = useState("");
+  
+  // NEW: Track the store's currency
+  const [storeCurrency, setStoreCurrency] = useState("KES");
 
   useEffect(() => {
     async function fetchWalletData() {
@@ -43,9 +46,10 @@ export default function WalletPage() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
+        // UPGRADE: Fetch the currency column we just added!
         const { data: store } = await supabase
           .from('stores')
-          .select('id, name')
+          .select('id, name, currency')
           .eq('owner_id', user.id)
           .single();
 
@@ -67,16 +71,25 @@ export default function WalletPage() {
 
           if (orders) {
             orders.forEach(order => {
-              const amount = Number(order.amount_paid || 0);
+              const grossAmount = Number(order.amount_paid || 0);
               const isPOS = order.fulfillment_type === 'IN_STORE';
+              
+              let netAmount = grossAmount;
+              if (!isPOS) {
+                const totalFees = grossAmount * 0.025; 
+                netAmount = grossAmount - totalFees;
+              }
 
-              if (isPOS) posEarned += amount;
-              else onlineEarned += amount;
+              if (isPOS) {
+                posEarned += netAmount;
+              } else {
+                onlineEarned += netAmount;
+              }
 
               combinedTransactions.push({
                 id: order.id,
                 created_at: order.created_at,
-                amount: amount,
+                amount: netAmount,
                 type: 'ORDER',
                 status: order.status,
                 title: order.customer_name || "Customer Order",
@@ -95,7 +108,7 @@ export default function WalletPage() {
                 amount: Number(payout.amount_paid),
                 type: 'PAYOUT',
                 status: payout.status,
-                title: "M-Pesa Settlement",
+                title: "Platform Settlement",
                 subtitle: "Auto-Payout via Paystack",
                 isPOS: false
               });
@@ -126,6 +139,7 @@ export default function WalletPage() {
             todayOnline
           });
           setStoreName(store.name || "");
+          setStoreCurrency(store.currency || "KES"); // Save currency to state
         }
       } catch (error) {
         console.error("Error fetching wallet data:", error);
@@ -136,6 +150,9 @@ export default function WalletPage() {
 
     fetchWalletData();
   }, []);
+
+  // Helper to dynamically show currency symbol
+  const sym = storeCurrency === "USD" ? "$" : "Ksh ";
 
   const downloadPDF = () => {
     if (!startDate || !endDate) {
@@ -164,12 +181,12 @@ export default function WalletPage() {
     doc.setFontSize(18);
     doc.setTextColor(15, 23, 42); 
     doc.setFont("helvetica", "bold");
-    doc.text("LokoSoko POS", 14, 22);
+    doc.text("LocalSoko POS", 14, 22);
 
     doc.setFontSize(10);
     doc.setTextColor(100, 116, 139); 
     doc.setFont("helvetica", "normal");
-    doc.text("www.lokosoko.com", 14, 28);
+    doc.text("www.localsoko.com", 14, 28);
 
     doc.setFontSize(18);
     doc.setTextColor(15, 23, 42); 
@@ -181,31 +198,34 @@ export default function WalletPage() {
     doc.setFont("helvetica", "normal");
     doc.text(`Store: ${storeName}`, pageWidth - 14, 30, { align: "right" });
     doc.text(`Period: ${start.toLocaleDateString()} to ${end.toLocaleDateString()}`, pageWidth - 14, 36, { align: "right" });
+    doc.text(`Currency: ${storeCurrency}`, pageWidth - 14, 42, { align: "right" });
 
     doc.setFontSize(9);
     doc.setTextColor(148, 163, 184); 
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, pageWidth - 14, 42, { align: "right" });
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, pageWidth - 14, 48, { align: "right" });
 
     const pOnline = filtered.filter(t => !t.isPOS && t.type === 'ORDER').reduce((sum, t) => sum + t.amount, 0);
     const pPOS = filtered.filter(t => t.isPOS).reduce((sum, t) => sum + t.amount, 0);
     const pSettled = filtered.filter(t => t.type === 'PAYOUT').reduce((sum, t) => sum + t.amount, 0);
 
     doc.setFillColor(245, 247, 250);
-    doc.rect(14, 50, 182, 25, 'F'); 
+    doc.rect(14, 56, 182, 25, 'F'); 
     doc.setTextColor(0);
     doc.setFont("helvetica", "bold");
-    doc.text(`Online Sales: Ksh ${pOnline.toLocaleString()}`, 20, 60);
-    doc.text(`POS Sales: Ksh ${pPOS.toLocaleString()}`, 80, 60);
-    doc.text(`Platform Payouts: Ksh ${pSettled.toLocaleString()}`, 140, 60);
+    
+    // UPGRADE: Dynamic Currency in PDF
+    doc.text(`Online Sales: ${sym}${pOnline.toLocaleString()}`, 20, 66);
+    doc.text(`POS Sales: ${sym}${pPOS.toLocaleString()}`, 80, 66);
+    doc.text(`Platform Payouts: ${sym}${pSettled.toLocaleString()}`, 140, 66);
 
     autoTable(doc, {
-      startY: 85, 
+      startY: 90, 
       head: [['Date', 'Type', 'Description', 'Amount']],
       body: filtered.map(t => [
         new Date(t.created_at).toLocaleDateString(),
         t.type === 'ORDER' ? (t.isPOS ? 'POS Sale' : 'Online Sale') : 'Payout',
         t.title,
-        `Ksh ${t.amount.toLocaleString()}`
+        `${sym}${t.amount.toLocaleString()}`
       ]),
       theme: 'grid',
       headStyles: { fillColor: [15, 23, 42] }
@@ -230,7 +250,6 @@ export default function WalletPage() {
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Wallet & Accounting</h1>
           <p className="mt-1 sm:mt-2 text-sm text-slate-500">Track pending payouts and download business statements.</p>
         </div>
-        {/* Full width button on mobile, auto width on desktop */}
         <Link href="/dashboard/settings" className="w-full sm:w-auto flex justify-center items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 sm:py-2.5 px-4 rounded-xl transition-all active:scale-[0.98]">
           <Settings className="h-4 w-4" /> Payout Settings
         </Link>
@@ -241,21 +260,21 @@ export default function WalletPage() {
         <div className="bg-slate-900 text-white rounded-[1.5rem] p-5 sm:p-6 shadow-lg border border-slate-800">
           <p className="text-slate-400 font-bold text-xs uppercase tracking-wider mb-2">Pending Online Payout</p>
           <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-amber-400">
-            <span className="text-amber-200/50 text-xl sm:text-2xl mr-1">Ksh</span>{metrics.pendingBalance.toLocaleString()}
+            <span className="text-amber-200/50 text-xl sm:text-2xl mr-1">{sym}</span>{metrics.pendingBalance.toLocaleString()}
           </h2>
         </div>
 
         <div className="bg-emerald-50 rounded-[1.5rem] p-5 sm:p-6 border border-emerald-100">
           <p className="text-emerald-600 font-bold text-xs uppercase tracking-wider mb-2">Platform Settled (Lifetime)</p>
           <h2 className="text-3xl sm:text-4xl font-black text-emerald-900 tracking-tight">
-            <span className="text-emerald-600/50 text-xl sm:text-2xl mr-1">Ksh</span>{metrics.totalSettled.toLocaleString()}
+            <span className="text-emerald-600/50 text-xl sm:text-2xl mr-1">{sym}</span>{metrics.totalSettled.toLocaleString()}
           </h2>
         </div>
 
         <div className="bg-blue-50 rounded-[1.5rem] p-5 sm:p-6 border border-blue-100">
           <p className="text-blue-600 font-bold text-xs uppercase tracking-wider mb-2">POS Collected (Lifetime)</p>
           <h2 className="text-3xl sm:text-4xl font-black text-blue-900 tracking-tight">
-            <span className="text-blue-600/50 text-xl sm:text-2xl mr-1">Ksh</span>{metrics.posEarnings.toLocaleString()}
+            <span className="text-blue-600/50 text-xl sm:text-2xl mr-1">{sym}</span>{metrics.posEarnings.toLocaleString()}
           </h2>
         </div>
       </div>
@@ -271,11 +290,11 @@ export default function WalletPage() {
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center">
               <p className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase mb-1">Today's POS Cash</p>
-              <p className="text-xl sm:text-2xl font-black text-blue-600 truncate">Ksh {metrics.todayPOS.toLocaleString()}</p>
+              <p className="text-xl sm:text-2xl font-black text-blue-600 truncate">{sym}{metrics.todayPOS.toLocaleString()}</p>
             </div>
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center">
               <p className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase mb-1">Today's Online</p>
-              <p className="text-xl sm:text-2xl font-black text-emerald-600 truncate">Ksh {metrics.todayOnline.toLocaleString()}</p>
+              <p className="text-xl sm:text-2xl font-black text-emerald-600 truncate">{sym}{metrics.todayOnline.toLocaleString()}</p>
             </div>
           </div>
         </div>
@@ -286,7 +305,6 @@ export default function WalletPage() {
             <FileText className="h-5 w-5 text-slate-500" /> Generate Statement (PDF)
           </h3>
           <div className="space-y-4 sm:space-y-5">
-            {/* Flex-col on mobile so the date inputs stack, flex-row on desktop */}
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
                 <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block">Start Date</label>
@@ -317,7 +335,7 @@ export default function WalletPage() {
         </div>
       </div>
 
-      {/* RECENT ACTIVITY (Truncated to 5 items) */}
+      {/* RECENT ACTIVITY */}
       <div className="bg-white shadow-sm border border-slate-200 rounded-[1.5rem] overflow-hidden">
         <div className="px-5 sm:px-6 py-4 sm:py-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
           <h3 className="font-bold text-slate-900">Recent Activity</h3>
@@ -336,7 +354,6 @@ export default function WalletPage() {
                   }`}>
                     {tx.type === 'ORDER' ? <ArrowDownRight className="h-4 w-4 sm:h-5 sm:w-5" /> : <ArrowUpRight className="h-4 w-4 sm:h-5 sm:w-5" />}
                   </div>
-                  {/* min-w-0 and truncate ensure long names don't break the flex layout on small screens */}
                   <div className="min-w-0 pr-2">
                     <p className="font-bold text-slate-900 text-sm sm:text-base truncate">{tx.title}</p>
                     <p className="text-xs sm:text-sm text-slate-500 mt-0.5 truncate">
@@ -350,7 +367,7 @@ export default function WalletPage() {
                     tx.type === 'ORDER' && tx.isPOS ? 'text-blue-600' :
                     'text-slate-900'
                   }`}>
-                    {tx.type === 'ORDER' ? '+' : '-'} Ksh {tx.amount.toLocaleString()}
+                    {tx.type === 'ORDER' ? '+' : '-'} {sym}{tx.amount.toLocaleString()}
                   </p>
                   <p className="text-[10px] sm:text-xs font-bold mt-1 text-slate-400">
                     {tx.type === 'PAYOUT' ? 'Settled' : tx.isPOS ? 'Collected' : 'Pending'}

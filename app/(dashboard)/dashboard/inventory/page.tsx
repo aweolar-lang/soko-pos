@@ -19,6 +19,9 @@ export default function InventoryPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  
+  // NEW: Track the store's currency
+  const [storeCurrency, setStoreCurrency] = useState("KES");
 
   // QUICK EDIT STATE
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -35,13 +38,16 @@ export default function InventoryPage() {
         return;
       }
       
+      // UPGRADE: Fetch the currency column
       const { data: store } = await supabase
         .from('stores')
-        .select('id')
+        .select('id, currency')
         .eq('owner_id', user.id)
         .single();
 
       if (store) {
+        setStoreCurrency(store.currency || "KES"); // Save currency to state
+
         const { data: items } = await supabase
           .from('products')
           .select('*')
@@ -127,6 +133,9 @@ export default function InventoryPage() {
     p.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Helper to dynamically show currency symbol
+  const sym = storeCurrency === "USD" ? "$" : "Ksh ";
+
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-24 sm:pb-12">
       
@@ -199,7 +208,8 @@ export default function InventoryPage() {
                   <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-slate-900 text-sm truncate mb-0.5">{product.title}</h3>
                     <div className="flex items-center gap-2 mb-1.5">
-                      <span className="font-black text-emerald-600 text-sm">Ksh {product.price.toLocaleString()}</span>
+                      {/* UPGRADE: DYNAMIC CURRENCY */}
+                      <span className="font-black text-emerald-600 text-sm">{sym}{product.price.toLocaleString()}</span>
                       <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-bold truncate max-w-[80px]">
                         {product.category || "General"}
                       </span>
@@ -233,7 +243,8 @@ export default function InventoryPage() {
                   <tr>
                     <th className="px-6 py-4">Product</th>
                     <th className="px-6 py-4">Category</th>
-                    <th className="px-6 py-4">Price (Ksh)</th>
+                    {/* UPGRADE: DYNAMIC CURRENCY */}
+                    <th className="px-6 py-4">Price ({storeCurrency})</th>
                     <th className="px-6 py-4">Stock</th>
                     <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
@@ -261,7 +272,8 @@ export default function InventoryPage() {
                       </td>
 
                       <td className="px-6 py-4 font-black text-emerald-600">
-                        {product.price.toLocaleString()}
+                        {/* UPGRADE: DYNAMIC CURRENCY */}
+                        {sym}{product.price.toLocaleString()}
                       </td>
 
                       <td className="px-6 py-4">
@@ -319,7 +331,8 @@ export default function InventoryPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 block">Price (Ksh)</label>
+                  {/* UPGRADE: DYNAMIC CURRENCY */}
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 block">Price ({storeCurrency})</label>
                   <input 
                     type="number" 
                     value={editForm.price}

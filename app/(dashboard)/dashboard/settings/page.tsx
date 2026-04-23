@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase"; 
-import { Store, Link as LinkIcon, Loader2, Save, AlertCircle, MapPin, Building2, Map, ImagePlus, AlignLeft, Smartphone, Tags, Truck } from "lucide-react";
+import { Store, Link as LinkIcon, Loader2, Save, AlertCircle, MapPin, Building2, Map, ImagePlus, AlignLeft, Smartphone, Tags, Truck, Banknote } from "lucide-react";
 import { toast } from "sonner";
 
 const STORE_CATEGORIES = [
@@ -39,7 +39,8 @@ export default function SettingsPage() {
     paybill_number: "", 
     existingLogoUrl: "", 
     paystack_subaccount_code: "", 
-    offers_delivery: false, // <-- NEW STATE FOR DELIVERY
+    offers_delivery: false,
+    currency: "KES", // <-- NEW: CURRENCY STATE
   });
 
   useEffect(() => {
@@ -50,9 +51,10 @@ export default function SettingsPage() {
         
         setUserId(user.id);
 
+        // Fetch added 'currency' column
         const { data: store, error } = await supabase
           .from("stores")
-          .select("id, name, slug, description, category, county, town, area, paybill_number, logo_url, paystack_subaccount_code, offers_delivery")
+          .select("id, name, slug, description, category, county, town, area, paybill_number, logo_url, paystack_subaccount_code, offers_delivery, currency")
           .eq("owner_id", user.id)
           .single();
 
@@ -72,7 +74,8 @@ export default function SettingsPage() {
             paybill_number: store.paybill_number || "",
             existingLogoUrl: store.logo_url || "",
             paystack_subaccount_code: store.paystack_subaccount_code || "",
-            offers_delivery: store.offers_delivery || false, // <-- FETCH DELIVERY
+            offers_delivery: store.offers_delivery || false,
+            currency: store.currency || "KES", // <-- SET CURRENCY FROM DB
           });
         }
       } catch (error: any) {
@@ -137,7 +140,8 @@ export default function SettingsPage() {
         area: formData.area,
         paybill_number: formData.paybill_number,
         logo_url: finalLogoUrl,
-        offers_delivery: formData.offers_delivery, // <-- SAVE DELIVERY
+        offers_delivery: formData.offers_delivery,
+        currency: formData.currency, // <-- SAVE CURRENCY TO DB
       };
 
       if (storeId) {
@@ -148,6 +152,7 @@ export default function SettingsPage() {
         if (error) throw error;
       }
 
+      // Safe Payout Setup (Untouched)
       if (formData.paybill_number && formData.paybill_number !== originalPaybill) {
         toast.loading("Setting up payment details...", { id: toastId });
         
@@ -353,6 +358,43 @@ export default function SettingsPage() {
               </div>
               <span className="font-bold text-slate-800 text-sm">Yes, we offer delivery services</span>
             </label>
+          </div>
+
+          {/* NEW ROW: Currency Settings */}
+          <div className="bg-amber-50/30 p-5 sm:p-6 rounded-3xl border border-amber-100">
+            <h3 className="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
+              <Banknote className="h-5 w-5 text-amber-500" />
+              Store Currency
+            </h3>
+            <p className="text-sm text-slate-500 mb-5">Choose the base currency for your store. This is what buyers will be charged in.</p>
+            
+            <div className="flex gap-4 max-w-sm">
+              <label className={`flex-1 flex items-center justify-center gap-2 p-3.5 rounded-xl border-2 cursor-pointer transition-all ${formData.currency === 'KES' ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                <input 
+                  type="radio" 
+                  name="currency" 
+                  value="KES" 
+                  checked={formData.currency === 'KES'}
+                  onChange={(e) => setFormData({...formData, currency: e.target.value})}
+                  className="sr-only" 
+                />
+                <span className="font-bold text-xl">🇰🇪</span>
+                <span className="font-bold">KES</span>
+              </label>
+              
+              <label className={`flex-1 flex items-center justify-center gap-2 p-3.5 rounded-xl border-2 cursor-pointer transition-all ${formData.currency === 'USD' ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                <input 
+                  type="radio" 
+                  name="currency" 
+                  value="USD" 
+                  checked={formData.currency === 'USD'}
+                  onChange={(e) => setFormData({...formData, currency: e.target.value})}
+                  className="sr-only" 
+                />
+                <span className="font-bold text-xl">🇺🇸</span>
+                <span className="font-bold">USD</span>
+              </label>
+            </div>
           </div>
 
           {/* Row 4: Payout Details */}

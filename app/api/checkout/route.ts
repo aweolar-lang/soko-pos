@@ -18,7 +18,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
     }
 
-    // 1. Fetch the product, including the is_digital flag and the store's Paystack code
+    // UPGRADE: Fetch the store's currency column as well
     const { data: product, error: productError } = await supabase
       .from("products")
       .select(`
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
         price, 
         is_digital,
         store_id,
-        stores ( paystack_subaccount_code )
+        stores ( paystack_subaccount_code, currency )
       `)
       .eq("id", productId)
       .single();
@@ -38,21 +38,24 @@ export async function POST(req: Request) {
 
     // @ts-ignore - Supabase join typing workaround
     const subaccountCode = product.stores?.paystack_subaccount_code;
+    // @ts-ignore
+    const storeCurrency = product.stores?.currency || "KES";
 
     // Hardcoded base URL
     const baseUrl = "https://localsoko.com";
 
-    // 2. Build the Paystack Payload
+    // UPGRADE: Build Payload with dynamic currency
     const paystackPayload: any = {
       email: buyerEmail,
       amount: Math.round(product.price * 100),
-      currency: "KES",
+      currency: storeCurrency, // <-- DYNAMIC CURRENCY
       callback_url: `${baseUrl}/order-success`,
       subaccount: subaccountCode || undefined,
       metadata: {
         product_id: product.id,
         store_id: product.store_id,
         is_digital: product.is_digital,
+        currency: storeCurrency, // Pass currency in metadata to log it easily later if needed
         custom_fields: [
           { display_name: "Buyer Name", variable_name: "buyer_name", value: buyerName },
           { display_name: "Buyer Phone", variable_name: "buyer_phone", value: buyerPhone || "N/A" },

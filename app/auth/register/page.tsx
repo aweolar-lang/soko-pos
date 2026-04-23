@@ -100,7 +100,7 @@ export default function RegisterPage() {
                   <input 
                     id="firstName" type="text" required autoComplete="given-name"
                     value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} 
-                    className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" 
+                    className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white text-slate-900" 
                     placeholder="John" 
                   />
                 </div>
@@ -110,7 +110,7 @@ export default function RegisterPage() {
                 <input 
                   id="middleName" type="text" autoComplete="additional-name"
                   value={formData.middleName} onChange={(e) => setFormData({ ...formData, middleName: e.target.value })} 
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" 
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white text-slate-900" 
                   placeholder="Kamau (Optional)" 
                 />
               </div>
@@ -119,7 +119,7 @@ export default function RegisterPage() {
                 <input 
                   id="lastName" type="text" required autoComplete="family-name"
                   value={formData.lastName} onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} 
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" 
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white text-slate-900" 
                   placeholder="Doe" 
                 />
               </div>
@@ -133,7 +133,7 @@ export default function RegisterPage() {
                 <input 
                   id="phone" type="tel" required autoComplete="tel"
                   value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} 
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" 
+                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white text-slate-900" 
                   placeholder="0712345678" 
                 />
               </div>
@@ -147,7 +147,7 @@ export default function RegisterPage() {
                 <input 
                   id="email" type="email" required autoComplete="email"
                   value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} 
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" 
+                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white text-slate-900" 
                   placeholder="you@localsoko.com" 
                 />
               </div>
@@ -161,7 +161,7 @@ export default function RegisterPage() {
                 <input 
                   id="password" type="password" required minLength={6} autoComplete="new-password"
                   value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} 
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" 
+                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white text-slate-900" 
                   placeholder="At least 6 characters" 
                 />
               </div>

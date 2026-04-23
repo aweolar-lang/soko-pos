@@ -154,20 +154,22 @@ export async function POST(req: Request) {
           let sellerEmail = null;
           let storeName = "LocalSoko Store";
 
-          // Fetch the seller's email from the profiles table
+          // Fetch the seller's email
           if (prodData && prodData.stores) {
             // @ts-ignore
-            storeName = prodData.stores.name;
+            storeName = prodData.stores.name || "LocalSoko Store";
             // @ts-ignore
             const ownerId = prodData.stores.owner_id;
             
             if (ownerId) {
-              const { data: profile } = await supabaseAdmin
-                .from("profiles")
-                .select("email")
-                .eq("id", ownerId)
-                .single();
-              if (profile) sellerEmail = profile.email;
+              // Fetch directly from Supabase Auth (Bulletproof!)
+              const { data: authData, error: authError } = await supabaseAdmin.auth.admin.getUserById(ownerId);
+              
+              if (authData?.user?.email) {
+                sellerEmail = authData.user.email;
+              } else {
+                console.error("🚨 Could not find seller email for owner ID:", ownerId);
+              }
             }
           }
 

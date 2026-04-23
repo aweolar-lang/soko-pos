@@ -139,7 +139,7 @@ export default function OrderModal({ product, storeId, isHotel }: OrderModalProp
                 <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Email (Required for Receipt)</label>
                 <input 
                   type="email" required value={formData.buyerEmail} onChange={(e) => setFormData({...formData, buyerEmail: e.target.value})}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white transition-all" 
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 text-slate-900 focus:bg-white transition-all" 
                   placeholder="john@example.com" 
                 />
               </div>
@@ -147,7 +147,7 @@ export default function OrderModal({ product, storeId, isHotel }: OrderModalProp
                 <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Phone</label>
                 <input 
                   type="tel" required value={formData.buyerPhone} onChange={(e) => setFormData({...formData, buyerPhone: e.target.value})}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white transition-all" 
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 text-slate-900 focus:bg-white transition-all" 
                   placeholder="07..." 
                 />
               </div>
@@ -159,7 +159,7 @@ export default function OrderModal({ product, storeId, isHotel }: OrderModalProp
                 <FileDown className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
                 <div>
                   <h4 className="font-bold text-blue-900 text-sm">Instant Digital Delivery</h4>
-                  <p className="text-xs text-blue-800/80 mt-1 font-medium">After completing payment via Paystack, you will receive a secure link to download this product.</p>
+                  <p className="text-xs text-blue-800/80 mt-1 font-medium">After completing payment, you will receive a secure link to download this product.</p>
                 </div>
               </div>
             ) : (
@@ -197,7 +197,7 @@ export default function OrderModal({ product, storeId, isHotel }: OrderModalProp
                     <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Pickup Time</label>
                     <input 
                       type="time" required value={formData.takeawayTime} onChange={(e) => setFormData({...formData, takeawayTime: e.target.value})}
-                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white transition-all" 
+                      className="text-slate-900 w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white transition-all" 
                     />
                   </div>
                 )}
@@ -209,7 +209,7 @@ export default function OrderModal({ product, storeId, isHotel }: OrderModalProp
                   <textarea 
                     rows={2} required={formData.fulfillmentType === 'DELIVERY' || formData.fulfillmentType === 'SHIPPING'}
                     value={formData.customerNotes} onChange={(e) => setFormData({...formData, customerNotes: e.target.value})}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white resize-none transition-all" 
+                    className="text-slate-900 w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white resize-none transition-all" 
                     placeholder={formData.fulfillmentType === 'TAKEAWAY' ? "e.g. No onions, extra sauce..." : "House number, street, landmarks..."} 
                   />
                 </div>
