@@ -2,10 +2,10 @@ import { notFound } from "next/navigation";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { MapPin, Clock, ShoppingBag, Utensils, Star, MessageCircle } from "lucide-react";
+import { MapPin, Clock, ShoppingBag, Utensils, Star, MessageCircle, Info, ArrowRight } from "lucide-react";
 import OrderModal from "./OrderModal";
 
-export default async function StorefrontPage({ params }: { params: { store_slug: string } }) {
+export default async function StorefrontPage({ params }: { params: Promise<{ store_slug: string }> | { store_slug: string } }) {
   const resolvedParams = await params; 
   const cookieStore = await cookies();
 
@@ -27,9 +27,7 @@ export default async function StorefrontPage({ params }: { params: { store_slug:
     .eq("slug", resolvedParams.store_slug) 
     .single();
 
-  if (storeError || !store) {
-    notFound(); 
-  }
+  if (storeError || !store) notFound(); 
 
   const { data: products } = await supabase
     .from("products")
@@ -41,125 +39,170 @@ export default async function StorefrontPage({ params }: { params: { store_slug:
   const locationText = [store.area, store.town, store.county].filter(Boolean).join(", ");
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-20 font-sans">
-      {/* Store Banner */}
-      <div className="relative w-full bg-gradient-to-br from-emerald-900 via-slate-900 to-slate-900 pt-32 pb-16 overflow-hidden shadow-lg">
-        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 rounded-full bg-emerald-500/10 blur-3xl" />
-        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 rounded-full bg-blue-500/10 blur-3xl" />
+    <div className="min-h-screen bg-[#F8FAFC] pb-24 font-sans selection:bg-emerald-500/30">
+      
+      {/* 1. NEW COMPACT & ELEGANT HEADER */}
+      <div className="relative h-64 md:h-72 w-full bg-slate-900 overflow-hidden">
+        {/* Abstract Cover Background */}
+        <div className="absolute inset-0 opacity-40 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-emerald-400 via-slate-900 to-slate-900"></div>
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+        <div className="absolute bottom-0 w-full h-32 bg-gradient-to-t from-black/60 to-transparent"></div>
+      </div>
 
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4 z-10">
-          {store.logo_url ? (
-            <div className="h-28 w-28 rounded-full border-4 border-white overflow-hidden relative mb-5 shadow-2xl bg-white">
-              <img src={store.logo_url} alt={`${store.name} logo`} className="object-cover h-full w-full" />
-            </div>
-          ) : (
-            <div className="h-28 w-28 rounded-full border-4 border-white bg-slate-800 flex items-center justify-center mb-5 shadow-2xl">
-              <ShoppingBag className="h-12 w-12 text-slate-400" />
-            </div>
-          )}
+      {/* STORE PROFILE INFO (Overlapping the header) */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative -mt-20 z-10 mb-8">
+        <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 p-6 md:p-8 flex flex-col md:flex-row items-center md:items-start gap-6 border border-white">
           
-          <div className="flex flex-col items-center gap-3">
-            <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight flex items-center gap-3">
-              {store.name}
-              {store.tier === 'VIP' && (
-                <span title="VIP Verified Store" className="flex items-center bg-yellow-400/20 p-1.5 rounded-full">
-                  <Star className="h-6 w-6 text-yellow-400 fill-yellow-400" />
-                </span>
-              )}
-            </h1>
-
-            {/* FUTURE FEATURE PLACEHOLDER: Reviews & Messages */}
-            <div className="flex items-center gap-3 mt-2">
-              <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full text-sm font-medium text-emerald-50">
-                <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                <span>4.8 (120 Reviews)</span>
+          {/* Logo */}
+          <div className="shrink-0 h-32 w-32 md:h-40 md:w-40 rounded-full border-4 border-white overflow-hidden shadow-lg bg-slate-50 -mt-16 md:-mt-20 relative z-20">
+            {store.logo_url ? (
+              <img src={store.logo_url} alt={`${store.name} logo`} className="object-cover h-full w-full" />
+            ) : (
+              <div className="h-full w-full flex items-center justify-center">
+                <ShoppingBag className="h-12 w-12 text-slate-300" />
               </div>
-              <button className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 transition-colors px-4 py-1.5 rounded-full text-sm font-bold text-white shadow-lg">
-                <MessageCircle className="h-4 w-4" />
-                Message Seller
-              </button>
-            </div>
+            )}
           </div>
 
-          <p className="mt-6 text-lg text-emerald-50 max-w-2xl mx-auto font-medium leading-relaxed">
-            {store.description || "Welcome to our official LocalSoko storefront."}
-          </p>
+          {/* Text Content */}
+          <div className="flex-1 text-center md:text-left mt-2 md:mt-0">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight flex items-center justify-center md:justify-start gap-2">
+                  {store.name}
+                  {store.tier === 'VIP' && (
+                    <Star className="h-6 w-6 text-yellow-400 fill-yellow-400 drop-shadow-sm" />
+                  )}
+                </h1>
+                <p className="text-slate-500 font-medium mt-1.5 flex items-center justify-center md:justify-start gap-1.5">
+                  <MapPin className="h-4 w-4 text-emerald-500" />
+                  {locationText || "Location unlisted"}
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3 justify-center">
+                <div className="flex items-center gap-1.5 bg-slate-50 px-4 py-2 rounded-full text-sm font-bold text-slate-700 border border-slate-100">
+                  <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                  4.8 <span className="text-slate-400 font-medium">(120)</span>
+                </div>
+                <button className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 transition-colors px-5 py-2 rounded-full text-sm font-bold text-white shadow-md active:scale-95">
+                  <MessageCircle className="h-4 w-4" /> Message
+                </button>
+              </div>
+            </div>
+
+            <p className="mt-4 text-slate-600 max-w-3xl leading-relaxed text-sm md:text-base">
+              {store.description || "Welcome to our official LocalSoko storefront. Browse our available items below."}
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Info Bar */}
-      <div className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-20">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-center md:justify-start gap-8 text-sm font-bold text-slate-600">
-          {locationText && (
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-emerald-500" />
-              <span>{locationText}</span>
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-emerald-500" />
-            <span>Accepting Orders</span>
+      {/* 2. FROSTED GLASS STICKY NAV */}
+      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-sm supports-[backdrop-filter]:bg-white/60">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-center md:justify-start gap-6 text-sm font-bold text-slate-600">
+          <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-full">
+            <Clock className="h-4 w-4" />
+            <span>Open & Accepting Orders</span>
           </div>
           {isHotel && (
-            <div className="flex items-center gap-2 bg-orange-100 text-orange-800 px-4 py-1.5 rounded-full shadow-sm">
+            <div className="flex items-center gap-2 text-slate-500">
               <Utensils className="h-4 w-4" />
               <span>Takeaway & Delivery Available</span>
             </div>
           )}
+          <div className="flex items-center gap-2 text-slate-500 ml-auto hidden md:flex">
+            <Info className="h-4 w-4" />
+            <span>100% Secure Checkout</span>
+          </div>
         </div>
       </div>
 
-      {/* Product Grid */}
-      <div className="max-w-6xl mx-auto px-4 mt-12">
-        <h2 className="text-2xl font-black text-slate-900 mb-8 flex items-center gap-2">
-          {isHotel ? "Our Menu" : "Available Inventory"}
-        </h2>
+      {/* 3. PREMIUM PRODUCT GRID */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
+        <div className="flex items-center justify-between mb-8">
+          <h2 className="text-2xl font-black text-slate-900">
+            {isHotel ? "Featured Menu" : "Latest Inventory"}
+          </h2>
+        </div>
 
         {products && products.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
             {products.map((product) => {
-              // Ensure we check for product images correctly based on how you store them
               const displayImage = product.images && product.images.length > 0 ? product.images[0] : (product.image_url || null);
+              const isOutOfStock = product.stock_quantity <= 0;
 
               return (
-                <div key={product.id} className="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col group">
+                <div key={product.id} className={`bg-white rounded-[2rem] border border-slate-100/80 shadow-sm overflow-hidden flex flex-col group transition-all duration-300 ${isOutOfStock ? 'opacity-75' : 'hover:shadow-2xl hover:shadow-slate-200/50 hover:-translate-y-1'}`}>
                   
-                  {/* WRAPPED IMAGE IN LINK */}
-                  <Link href={`/${resolvedParams.store_slug}/${product.slug}`} className="relative h-56 w-full bg-slate-50 overflow-hidden block">
+                  {/* Image Section */}
+                  <Link href={`/${resolvedParams.store_slug}/${product.slug}`} className="relative h-60 w-full bg-slate-50 overflow-hidden block">
                     {displayImage ? (
-                      <img src={displayImage} alt={product.title} className="object-cover h-full w-full group-hover:scale-105 transition-transform duration-500" />
+                      <img src={displayImage} alt={product.title} className={`object-cover h-full w-full transition-transform duration-700 ${isOutOfStock ? 'grayscale' : 'group-hover:scale-105'}`} />
                     ) : (
-                      <div className="absolute inset-0 flex items-center justify-center text-slate-300">
-                        <ShoppingBag className="h-12 w-12" />
+                      <div className="absolute inset-0 flex items-center justify-center text-slate-200">
+                        <ShoppingBag className="h-16 w-16" />
                       </div>
                     )}
-                    <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-md text-slate-900 font-black px-4 py-1.5 rounded-full shadow-lg">
-                      Ksh {product.price.toLocaleString()}
+
+                    {/* Overlay Gradient for Text readability */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
+                    {/* Top Badges */}
+                    <div className="absolute top-4 left-4 right-4 flex justify-between items-start">
+                      {isOutOfStock ? (
+                        <span className="bg-red-500/95 backdrop-blur-sm text-white text-[10px] font-black px-3 py-1.5 rounded-full shadow-lg uppercase tracking-widest">
+                          Sold Out
+                        </span>
+                      ) : (
+                        // Empty div to keep flexbox alignment if no left badge
+                        <div></div> 
+                      )}
+                      
+                      {/* Price Pill */}
+                      <span className="bg-white/95 backdrop-blur-md text-slate-900 font-black px-4 py-1.5 rounded-full shadow-lg border border-white/20">
+                        Ksh {product.price.toLocaleString()}
+                      </span>
                     </div>
                   </Link>
 
-                  <div className="p-5 flex-1 flex flex-col">
-                    {/* WRAPPED TITLE IN LINK */}
-                    <Link href={`/${resolvedParams.store_slug}/${product.slug}`}>
-                      <h3 className="text-lg font-bold text-slate-900 mb-2 hover:text-emerald-600 transition-colors">{product.title}</h3>
+                  {/* Content Section */}
+                  <div className="p-6 flex-1 flex flex-col bg-white">
+                    <Link href={`/${resolvedParams.store_slug}/${product.slug}`} className="group/title">
+                      <h3 className="text-xl font-black text-slate-900 mb-2 group-hover/title:text-emerald-600 transition-colors line-clamp-1">
+                        {product.title}
+                      </h3>
                     </Link>
                     
-                    <p className="text-sm text-slate-500 line-clamp-2 mb-6 flex-1">
-                      {product.description || "No description provided."}
+                    <p className="text-sm text-slate-500 line-clamp-2 mb-6 flex-1 leading-relaxed">
+                      {product.description || "Freshly added to our catalog. Click to view details."}
                     </p>
                     
-                    {/* The Full Product Object is now passed! */}
-                    <OrderModal product={product} storeId={store.id} isHotel={isHotel} />
+                    {/* The Action Button / OrderModal */}
+                    <div className="pt-2">
+                      {isOutOfStock ? (
+                        <button disabled className="w-full bg-slate-100 text-slate-400 font-bold py-3.5 px-4 rounded-2xl text-center flex items-center justify-center gap-2 cursor-not-allowed border border-slate-200">
+                          Unavailable
+                        </button>
+                      ) : (
+                        <div className="[&>button]:w-full [&>button]:py-3.5 [&>button]:rounded-2xl [&>button]:font-bold [&>button]:shadow-md [&>button:active]:scale-[0.98] [&>button]:transition-all">
+                           <OrderModal product={product} storeId={store.id} isHotel={isHotel} />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
             })}
           </div>
         ) : (
-          <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 shadow-sm">
-            <ShoppingBag className="h-16 w-16 mx-auto text-slate-300 mb-4" />
-            <h3 className="text-xl font-bold text-slate-900">No items available</h3>
-            <p className="text-slate-500 mt-2">This merchant hasn't uploaded any products yet.</p>
+          <div className="text-center py-24 bg-white rounded-[2rem] border border-slate-100 shadow-sm mt-8">
+            <div className="h-24 w-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <ShoppingBag className="h-10 w-10 text-slate-300" />
+            </div>
+            <h3 className="text-2xl font-black text-slate-900">No items available</h3>
+            <p className="text-slate-500 mt-2 font-medium">This merchant hasn't stocked their digital shelves yet.</p>
           </div>
         )}
       </div>
