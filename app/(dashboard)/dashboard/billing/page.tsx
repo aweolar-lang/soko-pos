@@ -66,7 +66,6 @@ export default function BillingPage() {
 
       if (!response.ok) throw new Error(data.error || "Failed to initialize payment.");
 
-      // Redirect to Paystack secure checkout
       window.location.href = data.checkoutUrl;
       
     } catch (error: any) {
@@ -87,18 +86,17 @@ export default function BillingPage() {
   const isPaidActive = !storeStatus?.isSubExpired && storeStatus?.tier !== 'FREE';
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 pb-12">
+    <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8 pb-24 sm:pb-12">
       
       {/* Header & Status Banner */}
       <div>
-        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Upgrade Your Store</h1>
-        <p className="mt-2 text-sm text-slate-500">
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Upgrade Your Store</h1>
+        <p className="mt-1.5 sm:mt-2 text-sm text-slate-500">
           Choose a plan to keep your storefront active and unlock premium features.
         </p>
 
-        {/* 1. Locked Out Banner */}
         {isLockedOut && (
-          <div className="mt-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+          <div className="mt-5 sm:mt-6 bg-red-50 border border-red-200 rounded-2xl p-4 sm:p-5 flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
             <div>
               <h3 className="text-sm font-bold text-red-800">Your access has expired</h3>
@@ -109,136 +107,134 @@ export default function BillingPage() {
           </div>
         )}
 
-        {/* 2. Free Trial Active Banner */}
         {!isLockedOut && !isPaidActive && storeStatus?.tier === 'FREE' && (
-          <div className="mt-6 bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-3">
+          <div className="mt-5 sm:mt-6 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 sm:p-5 flex items-start gap-3">
             <Zap className="h-5 w-5 text-emerald-600 mt-0.5 shrink-0" />
             <div>
               <h3 className="text-sm font-bold text-emerald-800">Trial Active</h3>
               <p className="mt-1 text-sm text-emerald-600">
-                You are currently on the free trial. It expires on {storeStatus.trialEnds?.toLocaleDateString()}.
+                You are currently on the free trial. It expires on <span className="font-bold">{storeStatus.trialEnds?.toLocaleDateString()}</span>.
               </p>
             </div>
           </div>
         )}
 
-        {/* 3. NEW: Paid Subscription Active Banner */}
         {isPaidActive && (
-          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+          <div className="mt-5 sm:mt-6 bg-blue-50 border border-blue-200 rounded-2xl p-4 sm:p-5 flex items-start gap-3">
             <ShieldCheck className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
             <div>
               <h3 className="text-sm font-bold text-blue-800">Active {storeStatus?.tier} Subscription</h3>
               <p className="mt-1 text-sm text-blue-600">
-                Thank you for subscribing! Your store is fully active until {storeStatus?.subEnds?.toLocaleDateString()}. You can renew early below.
+                Thank you for subscribing! Your store is fully active until <span className="font-bold">{storeStatus?.subEnds?.toLocaleDateString()}</span>. You can renew early below.
               </p>
             </div>
           </div>
         )}
       </div>
 
-      {/* Pricing Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+      {/* Pricing Cards - 1 col on mobile, 3 col on large screens */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 pt-4 sm:pt-6">
         
         {/* 1 Month Plan */}
-        <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm hover:shadow-md transition-shadow relative flex flex-col">
-          <div className="mb-6">
+        <div className="bg-white rounded-[2rem] border border-slate-200 p-6 sm:p-8 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all relative flex flex-col group">
+          <div className="mb-5 sm:mb-6">
             <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-slate-400" />
+              <ShieldCheck className="h-5 w-5 text-slate-400 group-hover:text-emerald-500 transition-colors" />
               1 Month
             </h3>
             <p className="text-sm text-slate-500 mt-2">Perfect for testing the waters.</p>
           </div>
-          <div className="mb-6">
-            <span className="text-4xl font-black text-slate-900">Ksh 350</span>
+          <div className="mb-5 sm:mb-6">
+            <span className="text-3xl sm:text-4xl font-black text-slate-900">Ksh 350</span>
             <span className="text-slate-500 font-medium">/mo</span>
           </div>
           <ul className="space-y-3 mb-8 flex-1">
             <li className="flex items-center gap-3 text-sm text-slate-700 font-medium">
-              <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" /> Live Storefront
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500 shrink-0" /> Live Storefront
             </li>
             <li className="flex items-center gap-3 text-sm text-slate-700 font-medium">
-              <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" /> Unlimited Products
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500 shrink-0" /> Unlimited Products
             </li>
             <li className="flex items-center gap-3 text-sm text-slate-700 font-medium">
-              <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" /> Basic Support
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500 shrink-0" /> Basic Support
             </li>
           </ul>
           <button 
             onClick={() => handleSubscribe("1_MONTH", 350)}
             disabled={isProcessing !== null}
-            className="w-full py-3.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold rounded-xl transition-colors disabled:opacity-50"
+            className="w-full py-4 sm:py-3.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center"
           >
             {isProcessing === "1_MONTH" ? <Loader2 className="h-5 w-5 animate-spin mx-auto" /> : "Choose 1 Month"}
           </button>
         </div>
 
         {/* 1 Year Plan (Highlighted Best Value) */}
-        <div className="bg-slate-900 rounded-3xl border border-slate-800 p-8 shadow-xl relative flex flex-col transform md:-translate-y-4">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-emerald-500 text-white text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider">
+        <div className="bg-slate-900 rounded-[2rem] border border-slate-800 p-6 sm:p-8 shadow-2xl relative flex flex-col transform lg:-translate-y-4">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-emerald-500 text-white text-xs font-black px-4 py-1.5 rounded-full uppercase tracking-wider shadow-lg">
             Best Value
           </div>
-          <div className="mb-6">
+          <div className="mb-5 sm:mb-6">
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
               <Crown className="h-5 w-5 text-emerald-400" />
               1 Year
             </h3>
             <p className="text-sm text-slate-400 mt-2">Maximum savings for serious sellers.</p>
           </div>
-          <div className="mb-6">
-            <span className="text-4xl font-black text-white">Ksh 1,000</span>
+          <div className="mb-5 sm:mb-6">
+            <span className="text-3xl sm:text-4xl font-black text-white">Ksh 1,000</span>
             <span className="text-slate-400 font-medium">/yr</span>
           </div>
           <ul className="space-y-3 mb-8 flex-1">
             <li className="flex items-center gap-3 text-sm text-slate-300 font-medium">
-              <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" /> Everything in 1 Month
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400 shrink-0" /> Everything in 1 Month
             </li>
             <li className="flex items-center gap-3 text-sm text-slate-300 font-medium">
-              <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" /> Save Ksh 3,200 annually
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400 shrink-0" /> Save Ksh 3,200 annually
             </li>
             <li className="flex items-center gap-3 text-sm text-slate-300 font-medium">
-              <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" /> Priority Support
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400 shrink-0" /> Priority Support
             </li>
             <li className="flex items-center gap-3 text-sm text-slate-300 font-medium">
-              <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" /> "Verified" VIP Badge
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400 shrink-0" /> "Verified" VIP Badge
             </li>
           </ul>
           <button 
             onClick={() => handleSubscribe("1_YEAR", 1000)}
             disabled={isProcessing !== null}
-            className="w-full py-3.5 px-4 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-xl transition-colors disabled:opacity-50"
+            className="w-full py-4 sm:py-3.5 px-4 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center shadow-lg shadow-emerald-500/20"
           >
             {isProcessing === "1_YEAR" ? <Loader2 className="h-5 w-5 animate-spin mx-auto" /> : "Choose 1 Year"}
           </button>
         </div>
 
         {/* 6 Months Plan */}
-        <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm hover:shadow-md transition-shadow relative flex flex-col">
-          <div className="mb-6">
+        <div className="bg-white rounded-[2rem] border border-slate-200 p-6 sm:p-8 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all relative flex flex-col group">
+          <div className="mb-5 sm:mb-6">
             <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Zap className="h-5 w-5 text-slate-400" />
+              <Zap className="h-5 w-5 text-slate-400 group-hover:text-emerald-500 transition-colors" />
               6 Months
             </h3>
             <p className="text-sm text-slate-500 mt-2">A great balance of commitment and price.</p>
           </div>
-          <div className="mb-6">
-            <span className="text-4xl font-black text-slate-900">Ksh 650</span>
+          <div className="mb-5 sm:mb-6">
+            <span className="text-3xl sm:text-4xl font-black text-slate-900">Ksh 650</span>
             <span className="text-slate-500 font-medium">/6mo</span>
           </div>
           <ul className="space-y-3 mb-8 flex-1">
             <li className="flex items-center gap-3 text-sm text-slate-700 font-medium">
-              <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" /> Live Storefront
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500 shrink-0" /> Live Storefront
             </li>
             <li className="flex items-center gap-3 text-sm text-slate-700 font-medium">
-              <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" /> Unlimited Products
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500 shrink-0" /> Unlimited Products
             </li>
             <li className="flex items-center gap-3 text-sm text-slate-700 font-medium">
-              <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" /> Basic Support
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500 shrink-0" /> Basic Support
             </li>
           </ul>
           <button 
             onClick={() => handleSubscribe("6_MONTHS", 650)}
             disabled={isProcessing !== null}
-            className="w-full py-3.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold rounded-xl transition-colors disabled:opacity-50"
+            className="w-full py-4 sm:py-3.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center"
           >
             {isProcessing === "6_MONTHS" ? <Loader2 className="h-5 w-5 animate-spin mx-auto" /> : "Choose 6 Months"}
           </button>

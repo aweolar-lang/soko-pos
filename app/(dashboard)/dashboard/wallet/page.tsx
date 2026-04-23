@@ -158,60 +158,48 @@ export default function WalletPage() {
       return;
     }
 
-    // Initialize PDF
     const doc = new jsPDF();
-    
-    // 1. PDF HEADER with store info and statement details
-    
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    // --- TOP LEFT: Platform Info ---
     doc.setFontSize(18);
-    doc.setTextColor(15, 23, 42); // slate-900
+    doc.setTextColor(15, 23, 42); 
     doc.setFont("helvetica", "bold");
     doc.text("LokoSoko POS", 14, 22);
 
     doc.setFontSize(10);
-    doc.setTextColor(100, 116, 139); // slate-500
+    doc.setTextColor(100, 116, 139); 
     doc.setFont("helvetica", "normal");
     doc.text("www.lokosoko.com", 14, 28);
 
-    // --- TOP RIGHT: Statement Info ---
     doc.setFontSize(18);
-    doc.setTextColor(15, 23, 42); // slate-900
+    doc.setTextColor(15, 23, 42); 
     doc.setFont("helvetica", "bold");
-    // { align: "right" } makes it perfectly flush with the right margin!
     doc.text("STORE STATEMENT", pageWidth - 14, 22, { align: "right" });
 
     doc.setFontSize(11);
-    doc.setTextColor(71, 85, 105); // slate-600
+    doc.setTextColor(71, 85, 105); 
     doc.setFont("helvetica", "normal");
     doc.text(`Store: ${storeName}`, pageWidth - 14, 30, { align: "right" });
     doc.text(`Period: ${start.toLocaleDateString()} to ${end.toLocaleDateString()}`, pageWidth - 14, 36, { align: "right" });
 
     doc.setFontSize(9);
-    doc.setTextColor(148, 163, 184); // slate-400
+    doc.setTextColor(148, 163, 184); 
     doc.text(`Generated: ${new Date().toLocaleDateString()}`, pageWidth - 14, 42, { align: "right" });
 
-    // Calculate period totals
     const pOnline = filtered.filter(t => !t.isPOS && t.type === 'ORDER').reduce((sum, t) => sum + t.amount, 0);
     const pPOS = filtered.filter(t => t.isPOS).reduce((sum, t) => sum + t.amount, 0);
     const pSettled = filtered.filter(t => t.type === 'PAYOUT').reduce((sum, t) => sum + t.amount, 0);
 
-    // 2. Add Summary Box
     doc.setFillColor(245, 247, 250);
-    // Moved down from 35 to 50
     doc.rect(14, 50, 182, 25, 'F'); 
     doc.setTextColor(0);
     doc.setFont("helvetica", "bold");
-    // Moved down from 45 to 60
     doc.text(`Online Sales: Ksh ${pOnline.toLocaleString()}`, 20, 60);
     doc.text(`POS Sales: Ksh ${pPOS.toLocaleString()}`, 80, 60);
     doc.text(`Platform Payouts: Ksh ${pSettled.toLocaleString()}`, 140, 60);
 
-    // 3. Add Transactions Table using autoTable
     autoTable(doc, {
-      startY: 85, // Moved down from 65 to 85 so it clears the box!
+      startY: 85, 
       head: [['Date', 'Type', 'Description', 'Amount']],
       body: filtered.map(t => [
         new Date(t.created_at).toLocaleDateString(),
@@ -235,91 +223,93 @@ export default function WalletPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 py-6">
+    <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8 pb-24 sm:pb-8">
       
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Wallet & Accounting</h1>
-          <p className="mt-2 text-sm text-slate-500">Track pending payouts and download business statements.</p>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Wallet & Accounting</h1>
+          <p className="mt-1 sm:mt-2 text-sm text-slate-500">Track pending payouts and download business statements.</p>
         </div>
-        <Link href="/dashboard/settings" className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 px-4 rounded-xl transition-all">
+        {/* Full width button on mobile, auto width on desktop */}
+        <Link href="/dashboard/settings" className="w-full sm:w-auto flex justify-center items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 sm:py-2.5 px-4 rounded-xl transition-all active:scale-[0.98]">
           <Settings className="h-4 w-4" /> Payout Settings
         </Link>
       </div>
 
       {/* ROW 1: LIFETIME MACRO METRICS */}
-      <div className="grid sm:grid-cols-3 gap-4">
-        <div className="bg-slate-900 text-white rounded-2xl p-5 shadow-lg border border-slate-800">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+        <div className="bg-slate-900 text-white rounded-[1.5rem] p-5 sm:p-6 shadow-lg border border-slate-800">
           <p className="text-slate-400 font-bold text-xs uppercase tracking-wider mb-2">Pending Online Payout</p>
-          <h2 className="text-3xl font-black tracking-tight text-amber-400">
-            <span className="text-amber-200/50 text-xl mr-1">Ksh</span>{metrics.pendingBalance.toLocaleString()}
+          <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-amber-400">
+            <span className="text-amber-200/50 text-xl sm:text-2xl mr-1">Ksh</span>{metrics.pendingBalance.toLocaleString()}
           </h2>
         </div>
 
-        <div className="bg-emerald-50 rounded-2xl p-5 border border-emerald-100">
+        <div className="bg-emerald-50 rounded-[1.5rem] p-5 sm:p-6 border border-emerald-100">
           <p className="text-emerald-600 font-bold text-xs uppercase tracking-wider mb-2">Platform Settled (Lifetime)</p>
-          <h2 className="text-3xl font-black text-emerald-900 tracking-tight">
-            <span className="text-emerald-600/50 text-xl mr-1">Ksh</span>{metrics.totalSettled.toLocaleString()}
+          <h2 className="text-3xl sm:text-4xl font-black text-emerald-900 tracking-tight">
+            <span className="text-emerald-600/50 text-xl sm:text-2xl mr-1">Ksh</span>{metrics.totalSettled.toLocaleString()}
           </h2>
         </div>
 
-        <div className="bg-blue-50 rounded-2xl p-5 border border-blue-100">
+        <div className="bg-blue-50 rounded-[1.5rem] p-5 sm:p-6 border border-blue-100">
           <p className="text-blue-600 font-bold text-xs uppercase tracking-wider mb-2">POS Collected (Lifetime)</p>
-          <h2 className="text-3xl font-black text-blue-900 tracking-tight">
-            <span className="text-blue-600/50 text-xl mr-1">Ksh</span>{metrics.posEarnings.toLocaleString()}
+          <h2 className="text-3xl sm:text-4xl font-black text-blue-900 tracking-tight">
+            <span className="text-blue-600/50 text-xl sm:text-2xl mr-1">Ksh</span>{metrics.posEarnings.toLocaleString()}
           </h2>
         </div>
       </div>
 
       {/* ROW 2: DAILY SNAPSHOT & STATEMENT GENERATOR */}
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid md:grid-cols-2 gap-5 sm:gap-6">
         
         {/* Today's Snapshot */}
-        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
-          <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2">
+        <div className="bg-white rounded-[1.5rem] p-5 sm:p-6 border border-slate-200 shadow-sm">
+          <h3 className="font-bold text-slate-900 mb-5 sm:mb-6 flex items-center gap-2 text-lg">
             <Activity className="h-5 w-5 text-indigo-500" /> Today's Snapshot
           </h3>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center">
-              <p className="text-xs font-bold text-slate-500 uppercase mb-1">Today's POS Cash</p>
-              <p className="text-2xl font-black text-blue-600">Ksh {metrics.todayPOS.toLocaleString()}</p>
+              <p className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase mb-1">Today's POS Cash</p>
+              <p className="text-xl sm:text-2xl font-black text-blue-600 truncate">Ksh {metrics.todayPOS.toLocaleString()}</p>
             </div>
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center">
-              <p className="text-xs font-bold text-slate-500 uppercase mb-1">Today's Online</p>
-              <p className="text-2xl font-black text-emerald-600">Ksh {metrics.todayOnline.toLocaleString()}</p>
+              <p className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase mb-1">Today's Online</p>
+              <p className="text-xl sm:text-2xl font-black text-emerald-600 truncate">Ksh {metrics.todayOnline.toLocaleString()}</p>
             </div>
           </div>
         </div>
 
         {/* Statement Generator */}
-        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
-          <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+        <div className="bg-white rounded-[1.5rem] p-5 sm:p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
+          <h3 className="font-bold text-slate-900 mb-4 sm:mb-5 flex items-center gap-2 text-lg">
             <FileText className="h-5 w-5 text-slate-500" /> Generate Statement (PDF)
           </h3>
-          <div className="space-y-4">
-            <div className="flex gap-4">
+          <div className="space-y-4 sm:space-y-5">
+            {/* Flex-col on mobile so the date inputs stack, flex-row on desktop */}
+            <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
-                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Start Date</label>
+                <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block">Start Date</label>
                 <input 
                   type="date" 
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-slate-400"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 sm:py-2 text-base sm:text-sm outline-none focus:border-slate-400 focus:bg-white transition-colors"
                 />
               </div>
               <div className="flex-1">
-                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">End Date</label>
+                <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block">End Date</label>
                 <input 
                   type="date" 
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-slate-400"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 sm:py-2 text-base sm:text-sm outline-none focus:border-slate-400 focus:bg-white transition-colors"
                 />
               </div>
             </div>
             <button 
               onClick={downloadPDF}
-              className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl transition-colors active:scale-[0.98]"
+              className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 sm:py-3 rounded-xl transition-all active:scale-[0.98] shadow-md shadow-slate-900/10"
             >
               <Download className="h-4 w-4" /> Download PDF Report
             </button>
@@ -328,50 +318,50 @@ export default function WalletPage() {
       </div>
 
       {/* RECENT ACTIVITY (Truncated to 5 items) */}
-      <div className="bg-white shadow-sm border border-slate-200 rounded-3xl overflow-hidden">
-        <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+      <div className="bg-white shadow-sm border border-slate-200 rounded-[1.5rem] overflow-hidden">
+        <div className="px-5 sm:px-6 py-4 sm:py-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
           <h3 className="font-bold text-slate-900">Recent Activity</h3>
-          <span className="text-xs font-bold text-slate-400 uppercase">Last 5 Transactions</span>
+          <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase">Last 5 Transactions</span>
         </div>
         
         <div className="divide-y divide-slate-100">
           {transactions.length > 0 ? (
-            // ONLY slice the first 5 transactions
             transactions.slice(0, 5).map((tx) => (
-              <div key={tx.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                <div className="flex items-center gap-4">
-                  <div className={`p-3 rounded-full ${
+              <div key={tx.id} className="p-4 sm:p-6 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                  <div className={`p-2.5 sm:p-3 rounded-full shrink-0 ${
                     tx.type === 'ORDER' && !tx.isPOS ? 'bg-emerald-100 text-emerald-600' : 
                     tx.type === 'ORDER' && tx.isPOS ? 'bg-blue-100 text-blue-600' :
                     'bg-slate-100 text-slate-600'
                   }`}>
-                    {tx.type === 'ORDER' ? <ArrowDownRight className="h-5 w-5" /> : <ArrowUpRight className="h-5 w-5" />}
+                    {tx.type === 'ORDER' ? <ArrowDownRight className="h-4 w-4 sm:h-5 sm:w-5" /> : <ArrowUpRight className="h-4 w-4 sm:h-5 sm:w-5" />}
                   </div>
-                  <div>
-                    <p className="font-bold text-slate-900">{tx.title}</p>
-                    <p className="text-sm text-slate-500 mt-0.5">
+                  {/* min-w-0 and truncate ensure long names don't break the flex layout on small screens */}
+                  <div className="min-w-0 pr-2">
+                    <p className="font-bold text-slate-900 text-sm sm:text-base truncate">{tx.title}</p>
+                    <p className="text-xs sm:text-sm text-slate-500 mt-0.5 truncate">
                       {new Date(tx.created_at).toLocaleDateString()} • {tx.subtitle}
                     </p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className={`font-black ${
+                <div className="text-right shrink-0">
+                  <p className={`font-black text-sm sm:text-base ${
                     tx.type === 'ORDER' && !tx.isPOS ? 'text-emerald-600' : 
                     tx.type === 'ORDER' && tx.isPOS ? 'text-blue-600' :
                     'text-slate-900'
                   }`}>
                     {tx.type === 'ORDER' ? '+' : '-'} Ksh {tx.amount.toLocaleString()}
                   </p>
-                  <p className="text-xs font-bold mt-1 text-slate-400">
+                  <p className="text-[10px] sm:text-xs font-bold mt-1 text-slate-400">
                     {tx.type === 'PAYOUT' ? 'Settled' : tx.isPOS ? 'Collected' : 'Pending'}
                   </p>
                 </div>
               </div>
             ))
           ) : (
-            <div className="p-12 text-center text-slate-500">
+            <div className="p-8 sm:p-12 text-center text-slate-500">
               <Wallet className="h-10 w-10 mx-auto text-slate-300 mb-3" />
-              <p className="font-medium text-slate-900">No transactions yet</p>
+              <p className="font-medium text-slate-900 text-sm sm:text-base">No transactions yet</p>
             </div>
           )}
         </div>

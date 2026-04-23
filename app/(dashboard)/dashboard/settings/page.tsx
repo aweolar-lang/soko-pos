@@ -31,7 +31,7 @@ export default function SettingsPage() {
     storeName: "",
     storeSlug: "",
     description: "", 
-    category: "", // <-- NEWLY INTEGRATED CATEGORY STATE
+    category: "", 
     county: "",
     town: "",
     area: "",
@@ -50,7 +50,6 @@ export default function SettingsPage() {
 
         const { data: store, error } = await supabase
           .from("stores")
-          // Added category to the select query
           .select("id, name, slug, description, category, county, town, area, paybill_number, logo_url, paystack_subaccount_code")
           .eq("owner_id", user.id)
           .single();
@@ -64,7 +63,7 @@ export default function SettingsPage() {
             storeName: store.name || "",
             storeSlug: store.slug || "",
             description: store.description || "",
-            category: store.category || "", // <-- PREFILLS CATEGORY FROM DB
+            category: store.category || "", 
             county: store.county || "",
             town: store.town || "",
             area: store.area || "",
@@ -102,7 +101,6 @@ export default function SettingsPage() {
     try {
       let finalLogoUrl = formData.existingLogoUrl;
 
-      // 1. Upload Logo if changed
       if (logoFile) {
         const fileExt = logoFile.name.split('.').pop();
         const fileName = `${userId}-${Date.now()}.${fileExt}`;
@@ -121,18 +119,16 @@ export default function SettingsPage() {
         finalLogoUrl = publicUrlData.publicUrl;
       }
 
-      // 2. Format Slug
       const slugifiedName = formData.storeSlug
         ? formData.storeSlug.toLowerCase().replace(/[^a-z0-9]+/g, '-')
         : formData.storeName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-      // 3. Save to Database (including the Category)
       const updates = {
         owner_id: userId,
         name: formData.storeName,
         slug: slugifiedName,
         description: formData.description,
-        category: formData.category, // <-- SAVES CATEGORY TO DB
+        category: formData.category, 
         county: formData.county,
         town: formData.town,
         area: formData.area,
@@ -148,7 +144,6 @@ export default function SettingsPage() {
         if (error) throw error;
       }
 
-      // 4. Handle Paystack Setup ONLY if Paybill changed
       if (formData.paybill_number && formData.paybill_number !== originalPaybill) {
         toast.loading("Setting up payment details...", { id: toastId });
         
@@ -192,20 +187,20 @@ export default function SettingsPage() {
   const isFormValid = formData.storeName && formData.county && formData.paybill_number && formData.category;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-12">
+    <div className="max-w-4xl mx-auto space-y-6 pb-24 sm:pb-12">
       <div>
-        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Store Settings</h1>
-        <p className="mt-2 text-sm text-slate-500">
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Store Settings</h1>
+        <p className="mt-1.5 sm:mt-2 text-sm text-slate-500">
           Manage your storefront details, location, and payment routing.
         </p>
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        <form onSubmit={handleSave} className="p-6 sm:p-8 space-y-8">
+      <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
+        <form onSubmit={handleSave} className="p-5 sm:p-8 space-y-6 sm:space-y-8">
           
-          {/* Logo Upload */}
-          <div className="flex flex-col sm:flex-row gap-6 items-start">
-            <div className="relative h-24 w-24 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden shrink-0 group hover:border-emerald-500 transition-colors">
+          {/* Logo Upload - Adaptive Centering on Mobile */}
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-center sm:items-start text-center sm:text-left">
+            <div className="relative h-24 w-24 sm:h-28 sm:w-28 rounded-3xl bg-slate-50 border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden shrink-0 group hover:border-emerald-500 transition-colors">
               {(logoPreview || formData.existingLogoUrl) ? (
                 <img src={logoPreview || formData.existingLogoUrl} alt="Logo" className="h-full w-full object-cover" />
               ) : (
@@ -216,9 +211,9 @@ export default function SettingsPage() {
               </div>
               <input type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer" />
             </div>
-            <div>
-              <h3 className="font-bold text-slate-900">Store Logo</h3>
-              <p className="text-sm text-slate-500 mt-1 mb-2 max-w-sm">
+            <div className="mt-2 sm:mt-0">
+              <h3 className="font-bold text-slate-900 text-lg">Store Logo</h3>
+              <p className="text-sm text-slate-500 mt-1 max-w-sm">
                 Upload your brand's logo. This will be displayed on your public storefront and marketplace listings.
               </p>
             </div>
@@ -227,30 +222,30 @@ export default function SettingsPage() {
           <hr className="border-slate-100" />
 
           {/* Row 1: Store Name & Category */}
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 gap-5 sm:gap-6">
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-2">Store Name</label>
               <div className="relative">
-                <Store className="absolute left-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
+                <Store className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
+                {/* Notice the text-base sm:text-sm trick applied to inputs! */}
                 <input 
                   type="text" required value={formData.storeName} 
                   onChange={(e) => setFormData({ ...formData, storeName: e.target.value })} 
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" 
+                  className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-slate-50 focus:bg-white" 
                   placeholder="e.g. The Coffee House" 
                 />
               </div>
             </div>
 
-            {/* INTEGRATED CATEGORY DROPDOWN HERE */}
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-2">Store Category</label>
               <div className="relative">
-                <Tags className="absolute left-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
+                <Tags className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
                 <select 
                   required
                   value={formData.category} 
                   onChange={(e) => setFormData({...formData, category: e.target.value})}
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white appearance-none"
+                  className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-slate-50 focus:bg-white appearance-none"
                 >
                   <option value="" disabled>Select a category...</option>
                   {STORE_CATEGORIES.map(cat => (
@@ -262,31 +257,31 @@ export default function SettingsPage() {
           </div>
 
           {/* Row 2: Slug & Description */}
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 gap-5 sm:gap-6">
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-2">Store URL (Slug)</label>
               <div className="relative">
-                <LinkIcon className="absolute left-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
+                <LinkIcon className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
                 <input 
                   type="text" value={formData.storeSlug} 
                   onChange={(e) => setFormData({ ...formData, storeSlug: e.target.value })} 
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" 
+                  className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-slate-50 focus:bg-white" 
                   placeholder="e.g. the-coffee-house" 
                 />
               </div>
               <p className="text-xs text-slate-500 mt-2 ml-1">
-                Your store will be live at: <span className="font-bold text-slate-700">localsoko.com/{formData.storeSlug || "..."}</span>
+                Live at: <span className="font-bold text-slate-700">localsoko.com/{formData.storeSlug || "..."}</span>
               </p>
             </div>
 
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-2">Store Description</label>
               <div className="relative">
-                <AlignLeft className="absolute left-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
+                <AlignLeft className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
                 <textarea 
                   rows={3} value={formData.description} 
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })} 
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white resize-none" 
+                  className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-slate-50 focus:bg-white resize-none" 
                   placeholder="Tell buyers what you sell..." 
                 />
               </div>
@@ -295,42 +290,42 @@ export default function SettingsPage() {
 
           <hr className="border-slate-100" />
 
-          {/* Row 3: Location */}
+          {/* Row 3: Location - Responsive Grid (1 col -> 2 col -> 3 col) */}
           <div>
-            <h3 className="text-lg font-bold text-slate-900 mb-4">Location Details</h3>
-            <div className="grid md:grid-cols-3 gap-6">
+            <h3 className="text-lg font-bold text-slate-900 mb-4 sm:mb-5">Location Details</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">County</label>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">County</label>
                 <div className="relative">
-                  <Map className="absolute left-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
+                  <Map className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
                   <input 
                     type="text" required value={formData.county} 
                     onChange={(e) => setFormData({ ...formData, county: e.target.value })} 
-                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" 
+                    className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-slate-50 focus:bg-white" 
                     placeholder="e.g. Nairobi" 
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Town/City</label>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Town/City</label>
                 <div className="relative">
-                  <Building2 className="absolute left-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
+                  <Building2 className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
                   <input 
                     type="text" required value={formData.town} 
                     onChange={(e) => setFormData({ ...formData, town: e.target.value })} 
-                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" 
+                    className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-slate-50 focus:bg-white" 
                     placeholder="e.g. Westlands" 
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Specific Area</label>
+              <div className="sm:col-span-2 lg:col-span-1">
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Specific Area</label>
                 <div className="relative">
-                  <MapPin className="absolute left-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
+                  <MapPin className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
                   <input 
                     type="text" required value={formData.area} 
                     onChange={(e) => setFormData({ ...formData, area: e.target.value })} 
-                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-slate-50 focus:bg-white" 
+                    className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-slate-50 focus:bg-white" 
                     placeholder="e.g. Sarit Center" 
                   />
                 </div>
@@ -339,29 +334,29 @@ export default function SettingsPage() {
           </div>
 
           {/* Row 4: Payout Details */}
-          <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+          <div className="bg-slate-50 p-5 sm:p-6 rounded-3xl border border-slate-200">
             <h3 className="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
               <Smartphone className="h-5 w-5 text-emerald-600" />
               M-Pesa Payout Settings
             </h3>
-            <p className="text-sm text-slate-500 mb-6">Where should we automatically send your money when a customer pays?</p>
+            <p className="text-sm text-slate-500 mb-5 sm:mb-6">Where should we automatically send your money when a customer pays?</p>
             
-            <div className="grid md:grid-cols-2 gap-6 items-end">
-              <div>
+            <div className="flex flex-col md:flex-row md:items-end gap-4 sm:gap-6">
+              <div className="flex-1">
                 <label className="block text-sm font-bold text-slate-700 mb-2">M-Pesa Number / Till Number</label>
                 <div className="relative">
-                  <Smartphone className="absolute left-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
+                  <Smartphone className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
                   <input 
                     type="text" required value={formData.paybill_number} 
                     onChange={(e) => setFormData({ ...formData, paybill_number: e.target.value })} 
-                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm bg-white" 
+                    className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-white" 
                     placeholder="e.g. 0712345678 or Till Number" 
                   />
                 </div>
               </div>
               
               {formData.paystack_subaccount_code && (
-                <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-100 px-4 py-3 rounded-xl border border-emerald-200 font-medium">
+                <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-100 px-4 py-3 sm:py-3.5 rounded-xl border border-emerald-200 font-bold w-full md:w-auto justify-center md:justify-start">
                   <AlertCircle className="h-5 w-5 shrink-0" />
                   Payment Routing Active
                 </div>
@@ -369,11 +364,11 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Submit Button */}
-          <div className="pt-2 flex justify-end">
+          {/* Submit Button - Sticky-like on mobile by adding padding bottom to container and full width button */}
+          <div className="pt-4 border-t border-slate-100 flex justify-end">
             <button 
               type="submit" disabled={isLoading || !isFormValid} 
-              className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-8 rounded-xl shadow-md shadow-emerald-600/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-8 rounded-xl shadow-lg shadow-emerald-600/20 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <><Loader2 className="h-5 w-5 animate-spin" /><span>Saving...</span></>
