@@ -20,8 +20,8 @@ export default function UpdatePasswordPage() {
   // Verify that the user actually arrived here via a valid Supabase session
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
         toast.error("Invalid or expired reset link. Please request a new one.");
         router.push("/auth/forgot-password");
       } else {

@@ -19,13 +19,13 @@ export default function BillingPage() {
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
         const { data: store, error } = await supabase
           .from('stores')
           .select('trial_ends_at, subscription_ends_at, tier')
-          .eq('owner_id', session.user.id)
+          .eq('owner_id', user.id)
           .single();
 
         if (error) throw error;

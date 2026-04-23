@@ -43,16 +43,16 @@ export default function SettingsPage() {
   useEffect(() => {
     const fetchStoreDetails = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
         
-        setUserId(session.user.id);
+        setUserId(user.id);
 
         const { data: store, error } = await supabase
           .from("stores")
           // Added category to the select query
           .select("id, name, slug, description, category, county, town, area, paybill_number, logo_url, paystack_subaccount_code")
-          .eq("owner_id", session.user.id)
+          .eq("owner_id", user.id)
           .single();
 
         if (error && error.code !== "PGRST116") throw error;

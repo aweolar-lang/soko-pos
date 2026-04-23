@@ -31,13 +31,13 @@ export default function AddProductPage() {
   // 2. The Bulletproof Fetch: Ask Supabase directly for the session
   useEffect(() => {
     async function fetchStore() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
       const { data } = await supabase
         .from('stores')
         .select('id')
-        .eq('owner_id', session.user.id)
+        .eq('owner_id', user.id)
         .single();
         
       if (data) setStoreId(data.id);

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({
     request: { headers: request.headers },
   });
@@ -40,10 +40,10 @@ export async function middleware(request: NextRequest) {
   // We only want to protect routes that start with /dashboard
   if (path.startsWith('/dashboard')) {
     // Upgraded: Securely check the session using the SSR client instead of raw cookie strings
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { user } } = await supabase.auth.getUser();
 
     // 1. If there is no session, kick them straight to the login page
-    if (!session) {
+    if (!user) {
       return NextResponse.redirect(new URL('/auth/login', request.url));
     }
 
@@ -55,7 +55,7 @@ export async function middleware(request: NextRequest) {
       const { data: store } = await supabase
         .from('stores')
         .select('trial_ends_at, subscription_ends_at')
-        .eq('owner_id', session.user.id)
+        .eq('owner_id', user.id)
         .single();
 
       if (store) {

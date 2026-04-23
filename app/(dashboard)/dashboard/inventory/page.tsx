@@ -25,9 +25,9 @@ export default function InventoryPage() {
   useEffect(() => {
     async function fetchInventory() {
       // 3. Ask Supabase directly for the absolute latest session
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { user } } = await supabase.auth.getUser();
       
-      if (!session?.user) {
+      if (!user) {
         setIsLoading(false);
         return;
       }
@@ -35,7 +35,7 @@ export default function InventoryPage() {
       const { data: store } = await supabase
         .from('stores')
         .select('id')
-        .eq('owner_id', session.user.id)
+        .eq('owner_id', user.id)
         .single();
 
       if (store) {

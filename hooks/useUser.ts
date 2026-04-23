@@ -9,8 +9,8 @@ export function useUser() {
   useEffect(() => {
     // 1. Check if there is an active session right now
     const fetchSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user ?? null);
       setLoading(false);
     };
 

@@ -28,13 +28,13 @@ export default function WalletPage() {
   useEffect(() => {
     async function fetchWalletData() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
         const { data: store } = await supabase
           .from('stores')
           .select('id')
-          .eq('owner_id', session.user.id)
+          .eq('owner_id', user.id)
           .single();
 
         if (store) {
