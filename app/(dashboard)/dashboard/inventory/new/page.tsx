@@ -2,23 +2,25 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Package, DollarSign, Image as ImageIcon, X, Hash, Loader2, ArrowLeft, AlignLeft, Tags, FileDown, UploadCloud } from "lucide-react"; 
+import { Package, DollarSign, Image as ImageIcon, X, Hash, Loader2, ArrowLeft, AlignLeft, Tags, FileDown, UploadCloud, Lock } from "lucide-react"; 
 import { toast } from "sonner";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
-const CATEGORIES = ["Electronics", "Fashion", "Food & Beverage", "Furniture", "Services", "Supermarket", "Beauty", "Digital Products", "Other"];
+const CATEGORIES = ["Electronics", "Fashion", "Food & Beverage", "Furniture", "Services", "Supermarket", "Beauty", "Other"];
+const DIGITAL_CATEGORIES = ["eBook", "Software", "Template", "Audio", "Video", "Course", "Digital Art", "Other Digital"];
 const MAX_IMAGES = 5;
 
 export default function AddProductPage() {
   const router = useRouter();
   const [storeId, setStoreId] = useState<string | null>(null);
+  const [storeCategory, setStoreCategory] = useState<string | null>(null);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [images, setImages] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   
-  // NEW: Digital Product State
+  // Digital Product State
   const [isDigital, setIsDigital] = useState(false);
   const [digitalFile, setDigitalFile] = useState<File | null>(null);
   
@@ -37,11 +39,22 @@ export default function AddProductPage() {
 
       const { data } = await supabase
         .from('stores')
-        .select('id')
+        .select('id, category')
         .eq('owner_id', user.id)
         .single();
         
-      if (data) setStoreId(data.id);
+      if (data) {
+        setStoreId(data.id);
+        setStoreCategory(data.category);
+
+        // Auto-configure form based on Store Category
+        if (data.category === "Digital Products") {
+          setIsDigital(true);
+          setFormData(prev => ({ ...prev, category: DIGITAL_CATEGORIES[0] }));
+        } else if (data.category !== "Supermarket") {
+          setFormData(prev => ({ ...prev, category: data.category }));
+        }
+      }
     }
     fetchStore();
   }, []);
@@ -70,11 +83,27 @@ export default function AddProductPage() {
     setPreviewUrls(prev => prev.filter((_, i) => i !== index));
   };
 
+  const toggleDigital = () => {
+    if (storeCategory === "Digital Products") return; // Locked for digital stores
+    
+    const nextDigital = !isDigital;
+    setIsDigital(nextDigital);
+    
+    // Auto-switch category list based on mode
+    if (nextDigital) {
+      setFormData(prev => ({ ...prev, category: DIGITAL_CATEGORIES[0] }));
+    } else {
+      setFormData(prev => ({ 
+        ...prev, 
+        category: storeCategory === "Supermarket" ? CATEGORIES[0] : (storeCategory || CATEGORIES[0]) 
+      }));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!storeId) return toast.error("Store profile not found!");
     
-    // Validation
     if (isDigital && !digitalFile) return toast.error("Please upload the digital file (PDF, ZIP, etc).");
     if (!isDigital && !formData.stock_quantity) return toast.error("Please provide a stock quantity for physical items.");
 
@@ -101,8 +130,7 @@ export default function AddProductPage() {
         }
       }
 
-      // 2. NEW: Upload Digital File (if applicable)
-      // 2. NEW: Upload Digital File (Secure Private Upload)
+      // 2. Upload Digital File (Secure Private Upload)
       if (isDigital && digitalFile) {
         toast.loading("Uploading digital asset...", { id: toastId });
         const fileExt = digitalFile.name.split('.').pop();
@@ -115,7 +143,6 @@ export default function AddProductPage() {
 
         if (fileUploadError) throw fileUploadError;
 
-        // INSTEAD of a public URL, we just save the secure file path!
         uploadedFileUrl = filePath; 
       }
 
@@ -125,7 +152,7 @@ export default function AddProductPage() {
         title: formData.title,
         slug: slug,
         price: parseFloat(formData.price),
-        stock_quantity: isDigital ? 999999 : parseInt(formData.stock_quantity, 10), // Infinite stock for digital
+        stock_quantity: isDigital ? 999999 : parseInt(formData.stock_quantity, 10),
         description: formData.description,
         category: formData.category,
         images: imageUrls,
@@ -161,21 +188,25 @@ export default function AddProductPage() {
         <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-6 sm:space-y-8">
           
           {/* DIGITAL TOGGLE */}
-          <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 flex items-center justify-between gap-4 cursor-pointer hover:bg-blue-100/50 transition-colors" onClick={() => setIsDigital(!isDigital)}>
+          <div 
+            className={`p-5 rounded-2xl border flex items-center justify-between gap-4 transition-colors ${storeCategory === 'Digital Products' ? 'bg-slate-50 border-slate-200 opacity-80 cursor-not-allowed' : 'bg-blue-50 border-blue-100 hover:bg-blue-100/50 cursor-pointer'}`} 
+            onClick={toggleDigital}
+          >
             <div>
               <h3 className="font-bold text-blue-900 flex items-center gap-2">
                 <FileDown className="h-5 w-5 text-blue-600" />
                 Digital Product
+                {storeCategory === 'Digital Products' && <Lock className="h-3 w-3 text-slate-400 ml-1" />}
               </h3>
               <p className="text-sm text-blue-800/80 mt-0.5">Is this a downloadable item like an eBook, PDF, or ZIP file?</p>
             </div>
             <div className="relative shrink-0">
               <input type="checkbox" checked={isDigital} readOnly className="sr-only peer" />
-              <div className="w-11 h-6 bg-slate-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              <div className={`w-11 h-6 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${storeCategory === 'Digital Products' ? 'bg-blue-400' : 'bg-slate-300 peer-checked:bg-blue-600'}`}></div>
             </div>
           </div>
 
-          {/* DIGITAL FILE UPLOAD ZONE (Only shows if digital) */}
+          {/* DIGITAL FILE UPLOAD ZONE */}
           {isDigital && (
             <div className="animate-in fade-in slide-in-from-top-4 duration-300">
               <label className="block text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Upload Downloadable File</label>
@@ -236,12 +267,23 @@ export default function AddProductPage() {
             </div>
 
             <div>
-              <label className="block text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Category</label>
+              <label className="block text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                {isDigital ? "Digital Format" : "Category"}
+              </label>
               <div className="relative">
                 <Tags className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
-                <select value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} className="w-full pl-11 pr-10 py-3 sm:py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm font-medium appearance-none bg-slate-50 focus:bg-white cursor-pointer">
-                  {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                </select>
+                
+                {isDigital ? (
+                  <select value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} className="w-full pl-11 pr-10 py-3 sm:py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm font-medium appearance-none bg-slate-50 focus:bg-white cursor-pointer">
+                    {DIGITAL_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                  </select>
+                ) : storeCategory === "Supermarket" ? (
+                  <select value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} className="w-full pl-11 pr-10 py-3 sm:py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm font-medium appearance-none bg-slate-50 focus:bg-white cursor-pointer">
+                    {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                  </select>
+                ) : (
+                  <input type="text" readOnly value={formData.category} className="w-full pl-11 pr-4 py-3 sm:py-2.5 border border-slate-200 rounded-xl outline-none text-base sm:text-sm font-bold text-slate-600 bg-slate-100 cursor-not-allowed" />
+                )}
               </div>
             </div>
           </div>

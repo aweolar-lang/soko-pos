@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CheckCircle2, Receipt, Home, AlertTriangle } from "lucide-react";
+import { CheckCircle2, Receipt, Home, AlertTriangle, Download } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +51,9 @@ export default async function OrderSuccessPage({
     
     const productId = metadata.product_id || getField("product_id");
     const storeId = metadata.store_id || getField("store_id");
+    
+    // NEW: Safely extract is_digital from the metadata
+    const isDigital = metadata.is_digital === true || metadata.is_digital === "true";
 
     if (!productId || !storeId) {
       return (
@@ -59,6 +62,27 @@ export default async function OrderSuccessPage({
           message={`product_id: ${productId || "MISSING"}, store_id: ${storeId || "MISSING"}`} 
         />
       );
+    }
+
+    // NEW: If it's a digital product, securely fetch the file path and generate a Signed URL (valid for 24 hours)
+    let downloadUrl: string | null = null;
+    if (isDigital) {
+      const { data: prodData } = await supabaseAdmin
+        .from("products")
+        .select("file_url")
+        .eq("id", productId)
+        .single();
+
+      if (prodData && prodData.file_url) {
+        // Create a secure URL that expires in 86400 seconds (24 hours)
+        const { data: signedData } = await supabaseAdmin.storage
+          .from("digital-products")
+          .createSignedUrl(prodData.file_url, 86400);
+
+        if (signedData?.signedUrl) {
+          downloadUrl = signedData.signedUrl;
+        }
+      }
     }
 
     // 4. CHECK DATABASE - ALREADY EXISTS?
@@ -70,7 +94,8 @@ export default async function OrderSuccessPage({
 
     if (existingOrder) {
       // It already saved successfully! We can show the normal success page here.
-      return <SuccessUI reference={reference} />;
+      // NEW: Pass the downloadUrl so if they refresh the page, they still get the button!
+      return <SuccessUI reference={reference} downloadUrl={downloadUrl} />;
     }
 
     // 5. INSERT ORDER
@@ -127,17 +152,21 @@ export default async function OrderSuccessPage({
       }
       
       // CALL THE DATABASE BACKEND TO REDUCE STOCK
-      const { error: stockError } = await supabaseAdmin.rpc('decrement_stock', {
-        row_id: productId,
-        quantity: 1
-      });
-      
-      if (stockError) {
-         console.error("Database failed to reduce stock:", stockError);
+      // NEW: Only reduce stock if it is a physical item
+      if (!isDigital) {
+        const { error: stockError } = await supabaseAdmin.rpc('decrement_stock', {
+          row_id: productId,
+          quantity: 1
+        });
+        
+        if (stockError) {
+           console.error("Database failed to reduce stock:", stockError);
+        }
       }
     }
 
-    return <SuccessUI reference={reference} />;
+    // NEW: Passed the downloadUrl
+    return <SuccessUI reference={reference} downloadUrl={downloadUrl} />;
 
   } catch (error: any) {
     return <ErrorUI title="Critical Code Crash" message={error.message || "Unknown error occurred"} />;
@@ -165,7 +194,8 @@ function ErrorUI({ title, message }: { title: string, message: string }) {
   );
 }
 
-function SuccessUI({ reference }: { reference: string }) {
+// NEW: Accepted downloadUrl as a prop
+function SuccessUI({ reference, downloadUrl }: { reference: string, downloadUrl?: string | null }) {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="bg-white max-w-md w-full rounded-3xl shadow-xl border border-slate-100 overflow-hidden text-center">
@@ -181,6 +211,14 @@ function SuccessUI({ reference }: { reference: string }) {
               {reference}
             </p>
           </div>
+          
+          {/* NEW: Render the download button if a secure URL was generated */}
+          {downloadUrl && (
+            <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 px-4 rounded-xl shadow-md shadow-blue-600/20 transition-all active:scale-95">
+              <Download className="h-5 w-5" /> Download Your File
+            </a>
+          )}
+
           <Link href="/" className="w-full flex items-center justify-center gap-2 bg-slate-900 text-white font-bold py-3.5 px-4 rounded-xl">
             <Home className="h-5 w-5" /> Back to Homepage
           </Link>
