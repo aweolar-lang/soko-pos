@@ -161,35 +161,57 @@ export default function WalletPage() {
     // Initialize PDF
     const doc = new jsPDF();
     
-    // Add Header
-    doc.setFontSize(20);
-    doc.text("Store Statement", 14, 22);
-    doc.text(`store: ${storeName}`, 10, 32);
+    // 1. PDF HEADER with store info and statement details
+    
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // --- TOP LEFT: Platform Info ---
+    doc.setFontSize(18);
+    doc.setTextColor(15, 23, 42); // slate-900
+    doc.setFont("helvetica", "bold");
+    doc.text("LokoSoko POS", 14, 22);
+
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139); // slate-500
+    doc.setFont("helvetica", "normal");
+    doc.text("www.lokosoko.com", 14, 28);
+
+    // --- TOP RIGHT: Statement Info ---
+    doc.setFontSize(18);
+    doc.setTextColor(15, 23, 42); // slate-900
+    doc.setFont("helvetica", "bold");
+    // { align: "right" } makes it perfectly flush with the right margin!
+    doc.text("STORE STATEMENT", pageWidth - 14, 22, { align: "right" });
+
     doc.setFontSize(11);
-    doc.setTextColor(100);
-    doc.text("LokoSoko POS", 14, 28);
-    doc.text("www.lokosoko.com", 14, 32);
+    doc.setTextColor(71, 85, 105); // slate-600
+    doc.setFont("helvetica", "normal");
+    doc.text(`Store: ${storeName}`, pageWidth - 14, 30, { align: "right" });
+    doc.text(`Period: ${start.toLocaleDateString()} to ${end.toLocaleDateString()}`, pageWidth - 14, 36, { align: "right" });
+
     doc.setFontSize(9);
-    doc.setTextColor(100);
-    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 34);
-    doc.text(`Period: ${start.toLocaleDateString()} to ${end.toLocaleDateString()}`, 14, 40);
+    doc.setTextColor(148, 163, 184); // slate-400
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, pageWidth - 14, 42, { align: "right" });
 
     // Calculate period totals
     const pOnline = filtered.filter(t => !t.isPOS && t.type === 'ORDER').reduce((sum, t) => sum + t.amount, 0);
     const pPOS = filtered.filter(t => t.isPOS).reduce((sum, t) => sum + t.amount, 0);
     const pSettled = filtered.filter(t => t.type === 'PAYOUT').reduce((sum, t) => sum + t.amount, 0);
 
-    // Add Summary Box
+    // 2. Add Summary Box
     doc.setFillColor(245, 247, 250);
-    doc.rect(14, 35, 182, 25, 'F');
+    // Moved down from 35 to 50
+    doc.rect(14, 50, 182, 25, 'F'); 
     doc.setTextColor(0);
-    doc.text(`Online Sales: Ksh ${pOnline.toLocaleString()}`, 20, 45);
-    doc.text(`POS Sales: Ksh ${pPOS.toLocaleString()}`, 80, 45);
-    doc.text(`Platform Payouts: Ksh ${pSettled.toLocaleString()}`, 140, 45);
+    doc.setFont("helvetica", "bold");
+    // Moved down from 45 to 60
+    doc.text(`Online Sales: Ksh ${pOnline.toLocaleString()}`, 20, 60);
+    doc.text(`POS Sales: Ksh ${pPOS.toLocaleString()}`, 80, 60);
+    doc.text(`Platform Payouts: Ksh ${pSettled.toLocaleString()}`, 140, 60);
 
-    // Add Table
+    // 3. Add Transactions Table using autoTable
     autoTable(doc, {
-      startY: 65,
+      startY: 85, // Moved down from 65 to 85 so it clears the box!
       head: [['Date', 'Type', 'Description', 'Amount']],
       body: filtered.map(t => [
         new Date(t.created_at).toLocaleDateString(),
