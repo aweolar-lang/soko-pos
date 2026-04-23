@@ -125,9 +125,18 @@ export default async function OrderSuccessPage({
       if (itemsError) {
         return <ErrorUI title="Supabase Insert Error (Items)" message={itemsError.message} />;
       }
+      
+      // CALL THE DATABASE BACKEND TO REDUCE STOCK
+      const { error: stockError } = await supabaseAdmin.rpc('decrement_stock', {
+        row_id: productId,
+        quantity: 1
+      });
+      
+      if (stockError) {
+         console.error("Database failed to reduce stock:", stockError);
+      }
     }
 
-    // IF IT MAKES IT HERE, IT ACTUALLY WORKED.
     return <SuccessUI reference={reference} />;
 
   } catch (error: any) {

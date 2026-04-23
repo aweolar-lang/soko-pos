@@ -80,7 +80,6 @@ export async function POST(req: Request) {
         }
 
         // Insert Order
-        // Insert Order
         const { data: newOrder, error: orderError } = await supabaseAdmin
           .from("orders")
           .insert({
@@ -99,7 +98,7 @@ export async function POST(req: Request) {
           .select()
           .single();
 
-        // 🚨 ADD THIS LOUD ERROR LOG:
+        //  ADD THIS LOUD ERROR LOG:
         if (orderError) {
           console.error("🚨 SUPABASE ORDER INSERT FAILED:", orderError);
         }
@@ -115,7 +114,6 @@ export async function POST(req: Request) {
               price_at_time: event.data.amount / 100
             });
             
-          // 🚨 ADD THIS LOUD ERROR LOG:
           if (itemsError) {
             console.error("🚨 SUPABASE ITEMS INSERT FAILED:", itemsError);
           }

@@ -117,6 +117,7 @@ export default function PointOfSalePage() {
         customer_name: `In-Store Customer (${method})`,
         customer_email: "pos@in-store.local",
         amount_paid: total,
+        total_amount: total,
         fulfillment_type: 'IN_STORE',
         status: 'COMPLETED',
         product_id: cart[0].id 
