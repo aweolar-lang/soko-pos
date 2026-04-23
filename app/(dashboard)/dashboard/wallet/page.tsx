@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Wallet, ArrowDownRight, Loader2, Settings, ArrowUpRight, CheckCircle2, Clock, Store } from "lucide-react";
+import { Wallet, ArrowDownRight, Loader2, Settings,Activity, ArrowUpRight, CheckCircle2, Clock, Store, FileText, Calendar, Download } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface Transaction {
   id: string;
@@ -13,18 +15,24 @@ interface Transaction {
   status: string;
   title: string;
   subtitle: string;
-  isPOS: boolean; // Added to help flag POS transactions
+  isPOS: boolean;
 }
 
 export default function WalletPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
+  // Date picker states for PDF
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+
   const [metrics, setMetrics] = useState({
     onlineEarnings: 0,
     posEarnings: 0,
     totalSettled: 0,
-    pendingBalance: 0
+    pendingBalance: 0,
+    todayPOS: 0,
+    todayOnline: 0
   });
 
   useEffect(() => {
@@ -40,13 +48,11 @@ export default function WalletPage() {
           .single();
 
         if (store) {
-          // 1. Fetch Orders (Money In)
           const { data: orders } = await supabase
             .from('orders')
             .select('id, created_at, amount_paid, status, customer_name, fulfillment_type')
             .eq('store_id', store.id);
 
-          // 2. Fetch Payouts (Money Out)
           const { data: payouts } = await supabase
             .from('payouts')
             .select('id, created_at, amount_paid, status, paystack_reference')
@@ -57,17 +63,13 @@ export default function WalletPage() {
           let totalSettled = 0;
           let combinedTransactions: Transaction[] = [];
 
-          // Process Orders
           if (orders) {
             orders.forEach(order => {
               const amount = Number(order.amount_paid || 0);
               const isPOS = order.fulfillment_type === 'IN_STORE';
 
-              if (isPOS) {
-                posEarned += amount; // Seller already has this cash
-              } else {
-                onlineEarned += amount; // Platform holds this money
-              }
+              if (isPOS) posEarned += amount;
+              else onlineEarned += amount;
 
               combinedTransactions.push({
                 id: order.id,
@@ -82,7 +84,6 @@ export default function WalletPage() {
             });
           }
 
-          // Process Payouts
           if (payouts) {
             payouts.forEach(payout => {
               totalSettled += Number(payout.amount_paid || 0);
@@ -99,16 +100,28 @@ export default function WalletPage() {
             });
           }
 
-          // Sort transactions by date (newest first)
           combinedTransactions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+          // Calculate "Today's" Math
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          const todayPOS = combinedTransactions
+            .filter(t => t.isPOS && new Date(t.created_at) >= today)
+            .reduce((sum, t) => sum + t.amount, 0);
+            
+          const todayOnline = combinedTransactions
+            .filter(t => !t.isPOS && t.type === 'ORDER' && new Date(t.created_at) >= today)
+            .reduce((sum, t) => sum + t.amount, 0);
 
           setTransactions(combinedTransactions);
           setMetrics({
             onlineEarnings: onlineEarned,
             posEarnings: posEarned,
             totalSettled: totalSettled,
-            // MAGIC MATH FIXED: Only subtract payouts from ONLINE earnings!
-            pendingBalance: onlineEarned - totalSettled 
+            pendingBalance: onlineEarned - totalSettled,
+            todayPOS,
+            todayOnline
           });
         }
       } catch (error) {
@@ -121,6 +134,67 @@ export default function WalletPage() {
     fetchWalletData();
   }, []);
 
+  const downloadPDF = () => {
+    if (!startDate || !endDate) {
+      alert("Please select both a Start Date and End Date.");
+      return;
+    }
+
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+
+    const filtered = transactions.filter(t => {
+      const txDate = new Date(t.created_at);
+      return txDate >= start && txDate <= end;
+    });
+
+    if (filtered.length === 0) {
+      alert("No transactions found for this period.");
+      return;
+    }
+
+    // Initialize PDF
+    const doc = new jsPDF();
+    
+    // Add Header
+    doc.setFontSize(20);
+    doc.text("Store Statement", 14, 22);
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Period: ${start.toLocaleDateString()} to ${end.toLocaleDateString()}`, 14, 30);
+
+    // Calculate period totals
+    const pOnline = filtered.filter(t => !t.isPOS && t.type === 'ORDER').reduce((sum, t) => sum + t.amount, 0);
+    const pPOS = filtered.filter(t => t.isPOS).reduce((sum, t) => sum + t.amount, 0);
+    const pSettled = filtered.filter(t => t.type === 'PAYOUT').reduce((sum, t) => sum + t.amount, 0);
+
+    // Add Summary Box
+    doc.setFillColor(245, 247, 250);
+    doc.rect(14, 35, 182, 25, 'F');
+    doc.setTextColor(0);
+    doc.text(`Online Sales: Ksh ${pOnline.toLocaleString()}`, 20, 45);
+    doc.text(`POS Sales: Ksh ${pPOS.toLocaleString()}`, 80, 45);
+    doc.text(`Platform Payouts: Ksh ${pSettled.toLocaleString()}`, 140, 45);
+
+    // Add Table
+    autoTable(doc, {
+      startY: 65,
+      head: [['Date', 'Type', 'Description', 'Amount']],
+      body: filtered.map(t => [
+        new Date(t.created_at).toLocaleDateString(),
+        t.type === 'ORDER' ? (t.isPOS ? 'POS Sale' : 'Online Sale') : 'Payout',
+        t.title,
+        `Ksh ${t.amount.toLocaleString()}`
+      ]),
+      theme: 'grid',
+      headStyles: { fillColor: [15, 23, 42] }
+    });
+
+    doc.save(`Statement_${startDate}_to_${endDate}.pdf`);
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -130,73 +204,109 @@ export default function WalletPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 py-6">
+    <div className="max-w-5xl mx-auto space-y-8 py-6">
       
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Wallet</h1>
-          <p className="mt-2 text-sm text-slate-500">Track your pending balance and successful M-Pesa payouts.</p>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Wallet & Accounting</h1>
+          <p className="mt-2 text-sm text-slate-500">Track pending payouts and download business statements.</p>
         </div>
         <Link href="/dashboard/settings" className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 px-4 rounded-xl transition-all">
-          <Settings className="h-4 w-4" />
-          Payout Settings
+          <Settings className="h-4 w-4" /> Payout Settings
         </Link>
       </div>
 
-      {/* Metrics Cards - UPDATED FOR 3 COLUMNS */}
-      <div className="grid sm:grid-cols-3 gap-6">
+      {/* ROW 1: LIFETIME MACRO METRICS */}
+      <div className="grid sm:grid-cols-3 gap-4">
+        <div className="bg-slate-900 text-white rounded-2xl p-5 shadow-lg border border-slate-800">
+          <p className="text-slate-400 font-bold text-xs uppercase tracking-wider mb-2">Pending Online Payout</p>
+          <h2 className="text-3xl font-black tracking-tight text-amber-400">
+            <span className="text-amber-200/50 text-xl mr-1">Ksh</span>{metrics.pendingBalance.toLocaleString()}
+          </h2>
+        </div>
+
+        <div className="bg-emerald-50 rounded-2xl p-5 border border-emerald-100">
+          <p className="text-emerald-600 font-bold text-xs uppercase tracking-wider mb-2">Platform Settled (Lifetime)</p>
+          <h2 className="text-3xl font-black text-emerald-900 tracking-tight">
+            <span className="text-emerald-600/50 text-xl mr-1">Ksh</span>{metrics.totalSettled.toLocaleString()}
+          </h2>
+        </div>
+
+        <div className="bg-blue-50 rounded-2xl p-5 border border-blue-100">
+          <p className="text-blue-600 font-bold text-xs uppercase tracking-wider mb-2">POS Collected (Lifetime)</p>
+          <h2 className="text-3xl font-black text-blue-900 tracking-tight">
+            <span className="text-blue-600/50 text-xl mr-1">Ksh</span>{metrics.posEarnings.toLocaleString()}
+          </h2>
+        </div>
+      </div>
+
+      {/* ROW 2: DAILY SNAPSHOT & STATEMENT GENERATOR */}
+      <div className="grid md:grid-cols-2 gap-6">
         
-        {/* PENDING BALANCE (Money platform owes seller) */}
-        <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl shadow-slate-200 border border-slate-800 relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-6 opacity-10"><Wallet className="h-24 w-24" /></div>
-          <div className="relative z-10">
-            <p className="text-slate-400 font-bold text-xs uppercase tracking-wider mb-2">Pending Online Payout</p>
-            <h2 className="text-3xl font-black tracking-tight mb-4 text-amber-400">
-              <span className="text-amber-200/50 text-xl mr-1">Ksh</span>
-              {metrics.pendingBalance.toLocaleString()}
-            </h2>
-            <div className="flex items-center gap-1.5 bg-slate-800/50 w-fit px-2.5 py-1 rounded-lg border border-slate-700">
-              <Clock className="h-3 w-3 text-amber-400" />
-              <span className="text-[10px] font-medium text-slate-300">Processing to M-Pesa</span>
+        {/* Today's Snapshot */}
+        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+          <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2">
+            <Activity className="h-5 w-5 text-indigo-500" /> Today's Snapshot
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center">
+              <p className="text-xs font-bold text-slate-500 uppercase mb-1">Today's POS Cash</p>
+              <p className="text-2xl font-black text-blue-600">Ksh {metrics.todayPOS.toLocaleString()}</p>
+            </div>
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center">
+              <p className="text-xs font-bold text-slate-500 uppercase mb-1">Today's Online</p>
+              <p className="text-2xl font-black text-emerald-600">Ksh {metrics.todayOnline.toLocaleString()}</p>
             </div>
           </div>
         </div>
 
-        {/* TOTAL SETTLED (Money successfully sent by platform) */}
-        <div className="bg-emerald-50 rounded-3xl p-6 shadow-sm border border-emerald-100 flex flex-col justify-center">
-          <p className="text-emerald-600 font-bold text-xs uppercase tracking-wider mb-2">Platform Settled</p>
-          <h2 className="text-3xl font-black text-emerald-900 tracking-tight">
-            <span className="text-emerald-600/50 text-xl mr-1">Ksh</span>
-            {metrics.totalSettled.toLocaleString()}
-          </h2>
-          <p className="text-xs text-emerald-600 mt-2 font-medium flex items-center gap-1">
-            <CheckCircle2 className="h-4 w-4" /> Paid via Paystack
-          </p>
+        {/* Statement Generator */}
+        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
+          <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+            <FileText className="h-5 w-5 text-slate-500" /> Generate Statement (PDF)
+          </h3>
+          <div className="space-y-4">
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Start Date</label>
+                <input 
+                  type="date" 
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-slate-400"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">End Date</label>
+                <input 
+                  type="date" 
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-slate-400"
+                />
+              </div>
+            </div>
+            <button 
+              onClick={downloadPDF}
+              className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl transition-colors active:scale-[0.98]"
+            >
+              <Download className="h-4 w-4" /> Download PDF Report
+            </button>
+          </div>
         </div>
-
-        {/* POS SALES (Money already collected physically) */}
-        <div className="bg-blue-50 rounded-3xl p-6 shadow-sm border border-blue-100 flex flex-col justify-center">
-          <p className="text-blue-600 font-bold text-xs uppercase tracking-wider mb-2">In-Store / POS Sales</p>
-          <h2 className="text-3xl font-black text-blue-900 tracking-tight">
-            <span className="text-blue-600/50 text-xl mr-1">Ksh</span>
-            {metrics.posEarnings.toLocaleString()}
-          </h2>
-          <p className="text-xs text-blue-600 mt-2 font-medium flex items-center gap-1">
-            <Store className="h-4 w-4" /> Handled Outside Platform
-          </p>
-        </div>
-
       </div>
 
-      {/* Unified Transaction History (Orders + Payouts) */}
+      {/* RECENT ACTIVITY (Truncated to 5 items) */}
       <div className="bg-white shadow-sm border border-slate-200 rounded-3xl overflow-hidden">
-        <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/50">
-          <h3 className="font-bold text-slate-900">History (Sales & Payouts)</h3>
+        <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+          <h3 className="font-bold text-slate-900">Recent Activity</h3>
+          <span className="text-xs font-bold text-slate-400 uppercase">Last 5 Transactions</span>
         </div>
         
         <div className="divide-y divide-slate-100">
           {transactions.length > 0 ? (
-            transactions.map((tx) => (
+            // ONLY slice the first 5 transactions
+            transactions.slice(0, 5).map((tx) => (
               <div key={tx.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-4">
                   <div className={`p-3 rounded-full ${
@@ -235,6 +345,7 @@ export default function WalletPage() {
           )}
         </div>
       </div>
+      
     </div>
   );
 }
