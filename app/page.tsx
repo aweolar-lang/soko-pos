@@ -6,7 +6,7 @@ import MarketplaceSearch from "@/components/MarketplaceSearch";
 export const revalidate = 0; 
 
 const CATEGORIES = [
-  { name: "Food & Cafe", icon: Coffee, color: "text-orange-600", bg: "bg-orange-50", border: "border-orange-200" },
+  { name: "Food & Beverage", icon: Coffee, color: "text-orange-600", bg: "bg-orange-50", border: "border-orange-200" },
   { name: "Electronics", icon: Smartphone, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-200" },
   { name: "Furniture", icon: Sofa, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
   { name: "Fashion", icon: Shirt, color: "text-pink-600", bg: "bg-pink-50", border: "border-pink-200" },

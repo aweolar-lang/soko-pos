@@ -29,7 +29,7 @@ export default async function ProductDetailsPage({
   // Added offers_delivery to the select query
   const { data: store, error: storeError } = await supabase
     .from("stores")
-    .select("id, name, description, tier, offers_delivery")
+    .select("id, name, description, tier, offers_delivery, category")
     .eq("slug", resolvedParams.store_slug)
     .single();
 
@@ -44,7 +44,7 @@ export default async function ProductDetailsPage({
 
   if (productError || !product) notFound();
 
-  const isHotel = store.description?.toLowerCase().includes("hotel") || store.description?.toLowerCase().includes("restaurant");
+  const isHotel = store.category === "Food & Beverage";
 
   // MAGIC FIX: Grab the array of images, or fallback to image_url, or return an empty array.
   const imagesList: string[] = product.images && product.images.length > 0 

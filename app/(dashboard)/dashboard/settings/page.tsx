@@ -6,14 +6,14 @@ import { Store, Link as LinkIcon, Loader2, Save, AlertCircle, MapPin, Building2,
 import { toast } from "sonner";
 
 const STORE_CATEGORIES = [
-  "Food & Cafe", 
+  "Food & Beverage", 
   "Electronics", 
   "Furniture", 
   "Fashion", 
   "Supermarket", 
   "Beauty", 
   "Services",
-  "Digital Products", // <-- Added this to help categorize digital stores
+  "Digital Products",
   "Other"
 ];
 

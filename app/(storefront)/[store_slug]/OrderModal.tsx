@@ -11,7 +11,7 @@ interface Product {
   price: number;
   description?: string;
   images?: string[];
-  is_digital?: boolean; // <-- Added this
+  is_digital?: boolean;
 }
 
 interface OrderModalProps {

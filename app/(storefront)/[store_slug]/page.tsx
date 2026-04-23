@@ -72,7 +72,7 @@ export default async function StorefrontPage({
     return bInStock - aInStock; 
   }) || [];
 
-  const isHotel = store.description?.toLowerCase().includes("hotel") || store.description?.toLowerCase().includes("restaurant") || store.description?.toLowerCase().includes("cafe") || store.name?.toLowerCase().includes("hotel") || store.name?.toLowerCase().includes("restaurant") || store.name?.toLowerCase().includes("cafe") || store.category?.toLowerCase().includes("hotel") || store.category?.toLowerCase().includes("restaurant") || store.category?.toLowerCase().includes("cafe");
+  const isHotel = store.category === "Food & Beverage";
   const locationText = [store.area, store.town, store.county].filter(Boolean).join(", ");
   
   // Format phone number for WhatsApp (remove spaces, ensure country code)
