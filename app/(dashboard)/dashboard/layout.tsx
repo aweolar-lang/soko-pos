@@ -74,7 +74,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   );
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex font-sans text-slate-900">
+    <div className="min-h-screen bg-[#F8FAFC] flex font-sans text-slate-900 overflow-hidden">
       
       {/* DESKTOP SIDEBAR */}
       <aside className="hidden lg:flex flex-col w-64 md:w-72 sticky top-0 h-screen bg-white border-r border-slate-200 z-10 shrink-0 shadow-sm">

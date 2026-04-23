@@ -35,29 +35,6 @@ export default function LocalSokoDetailsLayout({
           {children}
         </div>
       </main>
-
-      {/* 3. FOOTER */}
-      <footer className="bg-white border-t border-slate-200 py-10 sm:py-12 mt-auto">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row justify-between items-center gap-6 sm:gap-8">
-          
-          <div className="flex items-center gap-2 text-slate-300 font-black text-lg">
-            <Store className="h-5 w-5" />
-            <span>LocalSoko</span>
-          </div>
-
-          <div className="flex flex-wrap justify-center gap-x-6 gap-y-3 text-sm font-medium text-slate-500">
-            <Link href="/terms" className="hover:text-slate-900 transition-colors">Terms of Service</Link>
-            <Link href="/privacy" className="hover:text-slate-900 transition-colors">Privacy Policy</Link>
-            <Link href="/safety" className="hover:text-slate-900 transition-colors">Safety Guidelines</Link>
-            <Link href="/contact" className="hover:text-slate-900 transition-colors">Contact Us</Link>
-          </div>
-
-          <p className="text-sm text-slate-400 font-medium text-center md:text-right">
-            © {new Date().getFullYear()} LocalSoko. <br className="block sm:hidden" /> All rights reserved.
-          </p>
-
-        </div>
-      </footer>
       
     </div>
   );
