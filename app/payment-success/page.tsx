@@ -80,11 +80,11 @@ function PaymentSuccessContent() {
           </div>
 
           <Link 
-            href="https://localsoko.com" 
+            href="https://localsoko.com/dashboard/orders" 
             className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition-all active:scale-95"
           >
             <Receipt className="h-4 w-4" />
-            Continue Shopping
+            View Your Orders
           </Link>
         </div>
       </div>
