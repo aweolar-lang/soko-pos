@@ -61,6 +61,8 @@ export async function POST(req: Request) {
       metadata: {
         transaction_type: "marketplace_order",
         product_id: productId,
+        store_id: product.store_id,
+        is_digital: product.is_digital,
         custom_fields: [
           { display_name: "Buyer Name", variable_name: "buyer_name", value: buyerName },
           { display_name: "Buyer Phone", variable_name: "buyer_phone", value: buyerPhone || "N/A" },
