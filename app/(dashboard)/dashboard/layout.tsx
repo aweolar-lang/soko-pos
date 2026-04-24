@@ -129,7 +129,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       )}
 
       {/* MAIN CONTENT WRAPPER */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto overflow-x-hidden">
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen overflow-x-hidden">
         
         {/* FROSTED TOP HEADER */}
         <header className="h-16 bg-white/80 backdrop-blur-xl border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-20 shrink-0 supports-[backdrop-filter]:bg-white/60">
