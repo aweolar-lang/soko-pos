@@ -41,7 +41,7 @@ export default async function MarketplaceHome({
   const categoryQuery = resolvedParams.category || "";
   const locationQuery = resolvedParams.location || "";
 
-  // NEW: Added 'category' to the select statement
+  // Data fetching logic remains exactly the same
   const { data, error } = await supabase
     .rpc("search_stores", { 
       search_query: searchQuery, 
@@ -56,10 +56,10 @@ export default async function MarketplaceHome({
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex flex-col selection:bg-emerald-200">
       
-      {/* 1. SLIM TRUST BANNER (Top of page) */}
+      {/* 1. SLIM TRUST BANNER - Optimized wrapping for mobile */}
       <div className="bg-slate-900 text-slate-300 text-[10px] sm:text-xs py-2 px-4 border-b border-slate-800">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center sm:justify-between gap-x-6 gap-y-2 font-medium tracking-wide">
-          <div className="hidden md:flex items-center gap-6">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center lg:justify-between gap-x-6 gap-y-2 font-medium tracking-wide">
+          <div className="hidden lg:flex items-center gap-6">
             <span className="flex items-center gap-1.5 text-emerald-400">
               <Users className="h-3.5 w-3.5" /> 12,450 shoppers today
             </span>
@@ -67,10 +67,10 @@ export default async function MarketplaceHome({
               <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" /> 4.9 Average Rating
             </span>
           </div>
-          <div className="flex items-center justify-center w-full sm:w-auto gap-4 sm:gap-6">
+          <div className="flex items-center justify-center w-full lg:w-auto gap-4 sm:gap-6">
             <span className="flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-emerald-500" /> Verified sellers</span>
             <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5 text-emerald-500" /> Live inventory</span>
-            <span className="hidden sm:flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-emerald-500" /> Fast delivery</span>
+            <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-emerald-500" /> Fast delivery</span>
           </div>
         </div>
       </div>
@@ -86,8 +86,8 @@ export default async function MarketplaceHome({
               initialLocation={locationQuery}
             />
           </div>
-          <div className="hidden lg:flex items-center gap-3 shrink-0 bg-emerald-50 px-4 py-3 rounded-2xl border border-emerald-100 shadow-sm">
-            <div className="bg-white p-2 rounded-xl shadow-sm">
+          <div className="hidden lg:flex items-center gap-3 shrink-0 bg-emerald-50/50 px-5 py-3.5 rounded-2xl border border-emerald-100 shadow-sm transition-transform hover:scale-105">
+            <div className="bg-white p-2.5 rounded-xl shadow-sm">
               <Store className="h-5 w-5 text-emerald-600" />
             </div>
             <div className="flex flex-col">
@@ -99,12 +99,12 @@ export default async function MarketplaceHome({
       </div>
 
       {/* 3. MAIN LAYOUT: SIDEBAR + STORE GRID */}
-      <div className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex flex-col md:flex-row gap-6 sm:gap-8">
+      <div className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-10 flex flex-col md:flex-row gap-6 sm:gap-8 lg:gap-10">
         
         {/* LEFT SIDEBAR: Categories */}
         <aside className="w-full md:w-64 shrink-0 flex flex-col gap-4 sm:gap-6">
-          <div className="bg-white md:rounded-2xl md:border border-slate-200 md:p-5 md:shadow-sm md:sticky top-24 -mx-4 px-4 md:mx-0 md:px-0">
-            <div className="hidden md:flex items-center justify-between mb-4">
+          <div className="bg-white md:rounded-2xl md:border border-slate-200 md:p-5 md:shadow-sm md:sticky top-8 -mx-4 px-4 md:mx-0 md:px-0">
+            <div className="hidden md:flex items-center justify-between mb-5">
               <h2 className="font-black text-slate-900 uppercase tracking-wider text-sm flex items-center gap-2">
                 <Grid className="h-4 w-4" /> Categories
               </h2>
@@ -115,12 +115,14 @@ export default async function MarketplaceHome({
               )}
             </div>
             
-            {/* Mobile-optimized scrolling category pills */}
-            <div className="flex md:flex-col overflow-x-auto snap-x snap-mandatory md:overflow-visible gap-2.5 pb-2 md:pb-0 custom-scrollbar">
+            {/* Mobile-optimized scrolling category pills (Added hide-scrollbar styling conceptually) */}
+            <div className="flex md:flex-col overflow-x-auto snap-x snap-mandatory md:overflow-visible gap-2.5 pb-2 md:pb-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               <Link 
                 href="/"
-                className={`flex items-center gap-2 sm:gap-3 px-4 py-2.5 sm:px-3 sm:py-2.5 rounded-xl sm:rounded-xl font-bold text-sm transition-all whitespace-nowrap snap-start shrink-0 ${
-                  !categoryQuery ? "bg-slate-900 text-white shadow-md ring-2 ring-slate-900/20" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 md:border-transparent md:bg-transparent"
+                className={`flex items-center gap-2 sm:gap-3 px-4 py-2.5 sm:px-3 sm:py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap snap-start shrink-0 ${
+                  !categoryQuery 
+                    ? "bg-slate-900 text-white shadow-md shadow-slate-900/20 md:ring-2 ring-slate-900/20" 
+                    : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 md:border-transparent md:bg-transparent md:hover:bg-slate-100"
                 }`}
               >
                 <Grid className="h-4 w-4" />
@@ -136,8 +138,8 @@ export default async function MarketplaceHome({
                     href={`/?category=${encodeURIComponent(cat.name)}`}
                     className={`flex items-center gap-2 sm:gap-3 px-4 py-2.5 sm:px-3 sm:py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap snap-start shrink-0 border ${
                       isActive 
-                        ? `${cat.bg} ${cat.color} shadow-sm ring-2 ring-emerald-500/20 ${cat.border}` 
-                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 md:border-transparent md:bg-transparent"
+                        ? `${cat.bg} ${cat.color} shadow-sm md:ring-2 ring-emerald-500/20 ${cat.border}` 
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 md:border-transparent md:bg-transparent md:hover:bg-slate-100"
                     }`}
                   >
                     <Icon className="h-4 w-4" />
@@ -151,55 +153,58 @@ export default async function MarketplaceHome({
 
         {/* RIGHT CONTENT: Store Grid */}
         <main className="flex-1 min-w-0">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+          <div className="flex items-center justify-between mb-6 sm:mb-8">
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
               {categoryQuery ? `${categoryQuery} Stores` : "Featured Local Stores"}
             </h1>
-            <span className="text-xs sm:text-sm font-bold text-slate-500 bg-white px-3 py-1.5 rounded-full shadow-sm border border-slate-200">
+            <span className="text-xs sm:text-sm font-bold text-slate-500 bg-white px-3.5 py-1.5 rounded-full shadow-sm border border-slate-200">
               {stores.length} <span className="hidden sm:inline">Results</span>
             </span>
           </div>
 
           {stores.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {stores.map((store) => {
                 const locationText = [store.area, store.town, store.county].filter(Boolean).join(", ");
                 return (
-                  <Link key={store.id} href={`/${store.slug}`} className="group relative bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-emerald-300 hover:-translate-y-1 transition-all duration-300 flex flex-col overflow-hidden">
-                    
-                    {/* Top Accent Banner */}
-                    <div className="h-12 w-full bg-gradient-to-r from-slate-50 to-slate-100/50 absolute top-0 left-0 border-b border-slate-100 z-0"></div>
-
-                    <div className="p-5 flex flex-col h-full relative z-10">
-                      <div className="flex items-start justify-between mb-4 gap-4">
-                        {/* Store Logo */}
-                        <div className="shrink-0 bg-white p-1 rounded-2xl shadow-sm border border-slate-100">
-                          {store.logo_url ? (
-                            <img src={store.logo_url} alt={store.name} className="h-14 w-14 sm:h-16 sm:w-16 rounded-xl object-cover" />
-                          ) : (
-                            <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-xl bg-slate-50 flex items-center justify-center">
-                              <Store className="h-6 w-6 sm:h-8 sm:w-8 text-slate-300" />
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Badges (Tier & Category) */}
-                        <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <Link 
+                    key={store.id} 
+                    href={`/${store.slug}`} 
+                    className="group flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-emerald-300 transition-all duration-300 overflow-hidden relative active:scale-[0.98]"
+                  >
+                    {/* Store Cover Banner */}
+                    <div className="h-20 w-full bg-gradient-to-r from-emerald-50/50 via-slate-100 to-slate-50 border-b border-slate-100 relative">
+                       {/* Floating Badges over Banner */}
+                       <div className="absolute top-3 right-3 flex flex-col items-end gap-1.5 z-10">
                           {store.tier === 'VIP' && (
-                            <span className="bg-gradient-to-r from-yellow-400 to-amber-500 text-white text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md flex items-center gap-1 shadow-sm">
+                            <span className="bg-gradient-to-r from-yellow-400 to-amber-500 text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-sm">
                               <Star className="w-3 h-3 fill-white text-white" /> VIP
                             </span>
                           )}
                           {store.category && (
-                            <span className="bg-slate-100 text-slate-600 border border-slate-200 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md truncate max-w-[100px]">
+                            <span className="bg-white/90 backdrop-blur-sm text-slate-700 border border-slate-200/50 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md shadow-sm truncate max-w-[120px]">
                               {store.category}
                             </span>
+                          )}
+                        </div>
+                    </div>
+
+                    <div className="px-5 pb-5 pt-0 flex flex-col h-full relative">
+                      {/* Store Logo (Overlapping Banner) */}
+                      <div className="-mt-8 mb-3 shrink-0 relative z-20">
+                        <div className="inline-block p-1 bg-white rounded-2xl shadow-sm border border-slate-200 group-hover:border-emerald-200 transition-colors">
+                          {store.logo_url ? (
+                            <img src={store.logo_url} alt={store.name} className="h-16 w-16 sm:h-18 sm:w-18 rounded-xl object-cover bg-slate-50" />
+                          ) : (
+                            <div className="h-16 w-16 sm:h-18 sm:w-18 rounded-xl bg-slate-50 flex items-center justify-center">
+                              <Store className="h-8 w-8 text-slate-300" />
+                            </div>
                           )}
                         </div>
                       </div>
 
                       {/* Store Info */}
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 flex flex-col">
                         <h3 className="font-bold text-slate-900 text-lg leading-tight group-hover:text-emerald-600 transition-colors line-clamp-1">
                           {store.name}
                         </h3>
@@ -213,13 +218,12 @@ export default async function MarketplaceHome({
                         </p>
                       </div>
 
-                      {/* Call to Action Footer */}
-                      <div className="pt-4 mt-5 border-t border-slate-100">
-                        <div className="w-full flex items-center justify-between bg-slate-50 group-hover:bg-emerald-50 px-4 py-2.5 rounded-xl transition-colors border border-slate-100 group-hover:border-emerald-100">
-                          <span className="text-xs font-bold text-slate-600 group-hover:text-emerald-700 flex items-center gap-2">
-                            <ShoppingBag className="h-4 w-4" /> Shop Now
-                          </span>
-                          <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-emerald-600 transition-colors" />
+                      {/* Prominent CTA Button */}
+                      <div className="mt-6 pt-1">
+                        <div className="w-full flex items-center justify-center gap-2 bg-slate-50 text-slate-700 font-bold px-4 py-3 rounded-xl border border-slate-200 group-hover:bg-emerald-600 group-hover:text-white group-hover:border-emerald-600 transition-all duration-300">
+                          <ShoppingBag className="h-4 w-4" />
+                          <span className="text-sm">Visit Store</span>
+                          <ChevronRight className="h-4 w-4 opacity-70 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                         </div>
                       </div>
                     </div>
@@ -228,16 +232,16 @@ export default async function MarketplaceHome({
               })}
             </div>
           ) : (
-            <div className="bg-white rounded-3xl border border-slate-200 p-12 sm:p-16 text-center shadow-sm flex flex-col items-center">
-              <div className="h-20 w-20 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+            <div className="bg-white rounded-3xl border border-slate-200 p-12 sm:p-20 text-center shadow-sm flex flex-col items-center">
+              <div className="h-24 w-24 bg-slate-50 rounded-full flex items-center justify-center mb-6 border border-slate-100">
                 <Store className="h-10 w-10 text-slate-300" />
               </div>
               <h3 className="text-xl sm:text-2xl font-black text-slate-900">No stores found</h3>
-              <p className="text-slate-500 mt-2 text-sm sm:text-base max-w-md mx-auto">
-                We couldn't find any stores matching your current filters. Try adjusting your search or category.
+              <p className="text-slate-500 mt-3 text-sm sm:text-base max-w-md mx-auto leading-relaxed">
+                We couldn't find any stores matching your current filters. Try adjusting your search or switching categories.
               </p>
               {(searchQuery || categoryQuery || locationQuery) && (
-                <Link href="/" className="mt-8 inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-6 rounded-xl transition-all shadow-md active:scale-95">
+                <Link href="/" className="mt-8 inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-8 rounded-xl transition-all shadow-md hover:shadow-lg active:scale-95">
                   Clear all filters
                 </Link>
               )}
@@ -245,6 +249,10 @@ export default async function MarketplaceHome({
           )}
         </main>
       </div>
+      
+      {/* Optional: Add this generic CSS rule in your global stylesheet to hide scrollbars globally if needed 
+          .scrollbar-hide::-webkit-scrollbar { display: none; }
+      */}
     </div>
   );
 }
