@@ -39,7 +39,7 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/auth/login" className="text-sm font-medium text-slate-500 hover:text-emerald-600 transition-colors flex items-center gap-2 group">
+                <Link href="/login" className="text-sm font-medium text-slate-500 hover:text-emerald-600 transition-colors flex items-center gap-2 group">
                   <ArrowRight className="h-3 w-3 text-slate-300 group-hover:text-emerald-500 transition-colors" /> Start Selling
                 </Link>
               </li>

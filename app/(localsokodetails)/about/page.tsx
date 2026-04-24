@@ -102,7 +102,7 @@ export default function AboutPage() {
         <p className="text-slate-600 font-medium mb-8 max-w-xl mx-auto text-lg">
           Join the next generation of verified sellers building their storefronts on LocalSoko.
         </p>
-        <Link href="/auth/login" className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl transition-all shadow-xl shadow-emerald-600/20 active:scale-95 text-lg">
+        <Link href="/login" className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl transition-all shadow-xl shadow-emerald-600/20 active:scale-95 text-lg">
           Start Selling Today <ArrowRight className="h-6 w-6" />
         </Link>
       </div>

@@ -40,7 +40,7 @@ export default function Navbar() {
         <span className="truncate sm:whitespace-normal">
           Open your neighborhood store for free today!
         </span>
-        <Link href="/auth/login" className="font-bold hover:text-emerald-400 flex items-center gap-0.5 transition-colors shrink-0">
+        <Link href="/login" className="font-bold hover:text-emerald-400 flex items-center gap-0.5 transition-colors shrink-0">
           Sign up <ChevronRight className="h-3 w-3" />
         </Link>
       </div>
@@ -82,7 +82,7 @@ export default function Navbar() {
                 </div>
               ) : (
                 <Link
-                  href="/auth/login"
+                  href="/login"
                   className="group relative inline-flex items-center gap-2 overflow-hidden rounded-full bg-slate-900 px-5 sm:px-6 py-2.5 sm:py-3 font-bold text-white transition-all hover:bg-slate-800 hover:shadow-lg hover:shadow-slate-900/20 active:scale-[0.98]"
                 >
                   <LogIn className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
