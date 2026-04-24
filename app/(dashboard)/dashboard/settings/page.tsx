@@ -516,7 +516,7 @@ const isFormValid =
             {/* Currency Settings */}
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-2">Store Currency</label>
-              <div className="flex gap-4">
+              <div className="flex-wrap p-3 gap-4">
                 <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${isFinancialsLocked ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'} ${formData.currency === 'KES' ? (isFinancialsLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-emerald-500 bg-emerald-50 text-emerald-700') : 'border-slate-200 bg-white text-slate-600'}`}>
                   <input 
                     type="radio" name="currency" value="KES" 
@@ -552,7 +552,7 @@ const isFormValid =
             <p className="text-sm text-slate-500 mb-5 sm:mb-6">Where should we automatically send your marketplace earnings?</p>
             
             {/* Payout Toggle */}
-            <div className="flex-wrap gap-3 max-w-md mb-6">
+            <div className="flex-wrap p-3 gap-3 max-w-md mb-6">
               <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${isFinancialsLocked ? 'cursor-not-allowed' : 'cursor-pointer'} ${formData.payoutMethod === 'MOBILE_MONEY' ? (isFinancialsLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm') : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}>
                 <input 
                   type="radio" name="payoutMethod" value="MOBILE_MONEY" 
