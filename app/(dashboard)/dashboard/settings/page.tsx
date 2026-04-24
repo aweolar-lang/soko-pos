@@ -200,7 +200,7 @@ const isFormValid =
     }
   };
 
-  const handleSave = async (e: React.FormEvent) => {
+ const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId) return toast.error("User not authenticated.");
 
@@ -210,6 +210,7 @@ const isFormValid =
     try {
       let finalLogoUrl = formData.existingLogoUrl;
 
+      // 1. Upload Logo (Unchanged)
       if (logoFile) {
         const fileExt = logoFile.name.split('.').pop();
         const fileName = `${userId}-${Date.now()}.${fileExt}`;
@@ -226,6 +227,35 @@ const isFormValid =
           .getPublicUrl(filePath);
 
         finalLogoUrl = publicUrlData.publicUrl;
+      }
+
+      // ==========================================
+      // UPGRADE 1: Verify Paystack BEFORE saving to Database
+      // ==========================================
+      let currentSubaccountCode = formData.paystack_subaccount_code;
+
+      if (formData.paybill_number && formData.paybill_number !== originalPaybill) {
+        toast.loading("Verifying payment details...", { id: toastId });
+        
+        const payRes = await fetch("/api/seller/payout-setup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            payoutMethod: formData.payoutMethod,
+            accountNumber: formData.paybill_number,
+            bankCode: formData.payoutMethod === "BANK" ? formData.bankCode : undefined,
+            storeName: formData.storeName
+          }),
+        });
+        
+        const payData = await payRes.json();
+        
+        // If Paystack fails, we STOP the whole process right here.
+        if (!payRes.ok) {
+          throw new Error(payData.error || "Paystack rejected this account number.");
+        }
+        
+        currentSubaccountCode = payData.subaccount_code;
       }
 
       const slugifiedName = formData.storeSlug
@@ -247,46 +277,41 @@ const isFormValid =
         logo_url: finalLogoUrl,
         offers_delivery: formData.offers_delivery,
         currency: formData.currency, 
+        paystack_subaccount_code: currentSubaccountCode, // Safely save the verified code!
       };
 
       if (storeId) {
         const { error } = await supabase.from('stores').update(updates).eq('id', storeId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('stores').insert([updates]);
+        // We use .select('id').single() to grab the ID immediately after creating it
+        const { data: newStore, error } = await supabase.from('stores').insert([updates]).select('id').single();
         if (error) throw error;
+        
+        setStoreId(newStore.id); // This instantly fixes the "Create Store" button!
       }
 
-      // Payout Routing Call (Only fires if paybill changed/is new)
-      if (formData.paybill_number && formData.paybill_number !== originalPaybill) {
-        toast.loading("Setting up payment details...", { id: toastId });
-        
-        const payRes = await fetch("/api/seller/payout-setup", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            payoutMethod: formData.payoutMethod,
-            accountNumber: formData.paybill_number,
-            bankCode: formData.payoutMethod === "BANK" ? formData.bankCode : undefined,
-            storeName: formData.storeName
-          }),
-        });
-        
-        const payData = await payRes.json();
-        
-        if (!payRes.ok) {
-          throw new Error(payData.error || "Failed to verify payout details");
-        }
-        
-        setOriginalPaybill(formData.paybill_number);
-        setFormData(prev => ({...prev, paystack_subaccount_code: payData.subaccount_code}));
-      }
+      // Update local state
+      setOriginalPaybill(formData.paybill_number);
+      setFormData(prev => ({...prev, paystack_subaccount_code: currentSubaccountCode}));
 
       toast.success("Store profile saved successfully!", { id: toastId });
 
     } catch (error: any) {
-      console.error(error);
-      toast.error(error.message || "An error occurred while saving.", { id: toastId });
+      console.error("Save Error:", error);
+    
+      let errorMessage = error.message || "An error occurred while saving.";
+      
+      // Catch Database "Duplicate Key" error
+      if (error.code === '23505') {
+        errorMessage = "That Store URL is already taken. Please type a different URL.";
+      } 
+      // Catch Paystack specific errors
+      else if (errorMessage.toLowerCase().includes("paystack") || errorMessage.toLowerCase().includes("invalid")) {
+        errorMessage = "Payment Setup Failed: Double check your account number and try again.";
+      }
+
+      toast.error(errorMessage, { id: toastId });
     } finally {
       setIsLoading(false);
     }
@@ -300,8 +325,8 @@ const isFormValid =
     );
   }
 
-  // Once the store ID is generated, financials are permanently locked.
-  const isFinancialsLocked = !!storeId; 
+  // NEW: Only lock if we successfully have a Paystack code
+  const isFinancialsLocked = !!formData.paystack_subaccount_code;
   
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-24 sm:pb-12">
