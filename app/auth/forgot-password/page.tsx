@@ -5,14 +5,49 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Store, Mail, Loader2, ArrowLeft, Send } from "lucide-react";
 import { toast } from "sonner";
+import { isValidEmail } from "@/lib/validators"; // Import the validator
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
+  // NEW: Error state for real-time validation
+  const [errors, setErrors] = useState({
+    email: "",
+  });
+
+  // Handle Input Changes & Clear Errors
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEmail(e.target.value);
+    
+    // Clear error immediately when user starts typing to fix it
+    if (errors.email) {
+      setErrors({ email: "" });
+    }
+  };
+
+  // Validate on blur
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (!value) return; 
+
+    if (!isValidEmail(value)) {
+      setErrors({ email: "Please enter a valid email address." });
+    }
+  };
+
+  const isFormValid = email.trim() !== "" && errors.email === "";
+
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Final safety check
+    if (!isValidEmail(email)) {
+      setErrors({ email: "Please enter a valid email address." });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -31,8 +66,6 @@ export default function ForgotPasswordPage() {
       setIsLoading(false);
     }
   };
-
-  const isFormValid = email.trim() !== "";
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 selection:bg-emerald-200">
@@ -96,11 +129,17 @@ export default function ForgotPasswordPage() {
                     required 
                     autoComplete="email"
                     value={email} 
-                    onChange={(e) => setEmail(e.target.value)} 
-                    className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-sm text-slate-900 bg-slate-50 focus:bg-white" 
+                    onChange={handleInputChange} 
+                    onBlur={handleBlur}
+                    className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${
+                      errors.email 
+                        ? 'border-red-500 bg-red-50 focus:ring-red-500 text-red-900' 
+                        : 'border-slate-200 bg-slate-50 focus:bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500'
+                    }`} 
                     placeholder="you@localsoko.com" 
                   />
                 </div>
+                {errors.email && <p className="text-red-500 text-xs mt-1 font-medium">{errors.email}</p>}
               </div>
 
               {/* Submit Button */}

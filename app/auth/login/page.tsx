@@ -6,6 +6,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase"; 
 import { Store, Mail, Lock, Loader2, LogIn } from "lucide-react";
 import { toast } from "sonner";
+import { isValidEmail } from "@/lib/validators"; // Assuming you have this from earlier
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,11 +16,54 @@ export default function LoginPage() {
     email: "",
     password: "",
   });
-  
-  // Create the SSR-compatible browser client
+
+  // NEW: Error state for real-time validation feedback
+  const [errors, setErrors] = useState({
+    email: "",
+    password: "",
+  });
+
+  // Clear errors when the user starts typing
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    
+    if (errors[name as keyof typeof errors]) {
+      setErrors((prev) => ({ ...prev, [name]: "" }));
+    }
+  };
+
+  // Validate on blur (when user clicks out of the input)
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    if (!value) return; 
+
+    if (name === "email" && !isValidEmail(value)) {
+      setErrors((prev) => ({ ...prev, email: "Please enter a valid email address." }));
+    }
+
+    // Supabase default minimum password length is 6. 
+    // This prevents API calls if they accidentally typed 2 characters.
+    if (name === "password" && value.length < 6) {
+      setErrors((prev) => ({ ...prev, password: "Password must be at least 6 characters." }));
+    }
+  };
+
+  // Ensure form is valid before enabling the submit button
+  const isFormValid = 
+    formData.email.trim() !== "" && 
+    formData.password.length >= 6 &&
+    !Object.values(errors).some(error => error !== "");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Final safety check just in case
+    if (!isValidEmail(formData.email)) {
+      setErrors(prev => ({ ...prev, email: "Please enter a valid email address." }));
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -35,13 +79,12 @@ export default function LoginPage() {
       router.refresh(); // Ensure the layout grabs the new auth state
 
     } catch (error: any) {
+      // Handle generic auth errors beautifully
       toast.error(error.message || "Invalid email or password.");
     } finally {
       setIsLoading(false);
     }
   };
-
-  const isFormValid = formData.email.trim() !== "" && formData.password.trim() !== "";
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 selection:bg-emerald-200">
@@ -83,11 +126,17 @@ export default function LoginPage() {
                   required 
                   autoComplete="email"
                   value={formData.email} 
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })} 
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-sm text-slate-900 bg-slate-50 focus:bg-white" 
+                  onChange={handleInputChange} 
+                  onBlur={handleBlur}
+                  className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${
+                    errors.email 
+                      ? 'border-red-500 bg-red-50 focus:ring-red-500 text-red-900' 
+                      : 'border-slate-200 bg-slate-50 focus:bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500'
+                  }`} 
                   placeholder="you@localsoko.com" 
                 />
               </div>
+              {errors.email && <p className="text-red-500 text-xs mt-1 font-medium">{errors.email}</p>}
             </div>
 
             {/* Password Input */}
@@ -112,11 +161,17 @@ export default function LoginPage() {
                   required 
                   autoComplete="current-password"
                   value={formData.password} 
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })} 
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-sm text-slate-900 bg-slate-50 focus:bg-white" 
+                  onChange={handleInputChange}
+                  onBlur={handleBlur} 
+                  className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${
+                    errors.password 
+                      ? 'border-red-500 bg-red-50 focus:ring-red-500 text-red-900' 
+                      : 'border-slate-200 bg-slate-50 focus:bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500'
+                  }`}  
                   placeholder="••••••••" 
                 />
               </div>
+              {errors.password && <p className="text-red-500 text-xs mt-1 font-medium">{errors.password}</p>}
             </div>
 
             {/* Submit Button */}

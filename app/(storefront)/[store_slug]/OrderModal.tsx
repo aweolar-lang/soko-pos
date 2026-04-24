@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Loader2, ShoppingCart, X, Clock, MapPin, ShoppingBag, Info, FileDown } from "lucide-react";
 import { toast } from "sonner";
+import { isValidName, isValidEmail, formatKenyanPhone } from "@/lib/validators"; // Import your validators
 
 interface Product {
   id: string;
@@ -34,19 +35,77 @@ export default function OrderModal({ product, storeId, isHotel, storeCurrency = 
     buyerName: "",
     buyerEmail: "",
     buyerPhone: "",
-    // If digital, force 'DIGITAL'. Otherwise, default to Delivery/Shipping
     fulfillmentType: product.is_digital ? "DIGITAL" : (isHotel ? "DELIVERY" : "SHIPPING"),
     takeawayTime: "",
     customerNotes: "",
   });
 
-  // Ensure portal only renders on the client side
+  // NEW: Error State for Validation
+  const [errors, setErrors] = useState({
+    buyerName: "",
+    buyerEmail: "",
+    buyerPhone: "",
+  });
+
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  // Handle Input Changes & Clear Errors
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    
+    // Clear error immediately when user starts typing to fix it
+    if (errors[name as keyof typeof errors]) {
+      setErrors((prev) => ({ ...prev, [name]: "" }));
+    }
+  };
+
+  // Validate Fields on Blur
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    if (!value) return; 
+    
+    // Buyer Name Validation
+    if (name === "buyerName" && !isValidName(value)) {
+      setErrors((prev) => ({ ...prev, buyerName: "Please enter a valid full name (letters only)." }));
+    }
+
+    // Email Validation
+    if (name === "buyerEmail" && !isValidEmail(value)) {
+      setErrors((prev) => ({ ...prev, buyerEmail: "Please enter a valid email address." }));
+    }
+
+    // Phone Validation (Using the Kenyan Phone Formatter)
+    if (name === "buyerPhone") {
+      const formattedPhone = formatKenyanPhone(value);
+      if (!formattedPhone) {
+        setErrors((prev) => ({ ...prev, buyerPhone: "Invalid phone number. Start with 07, 01, or 254." }));
+      } else {
+        // Auto-format the phone number in the UI so the user sees it looks correct
+        setFormData((prev) => ({ ...prev, buyerPhone: formattedPhone }));
+      }
+    }
+  };
+
+  // Validity Check
+  const isFormValid = 
+    formData.buyerName.trim() !== "" &&
+    formData.buyerEmail.trim() !== "" &&
+    formData.buyerPhone.trim() !== "" &&
+    !Object.values(errors).some(error => error !== "");
+
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Final safety check
+    const finalPhone = formatKenyanPhone(formData.buyerPhone);
+    if (!finalPhone || !isValidEmail(formData.buyerEmail) || !isValidName(formData.buyerName)) {
+      toast.error("Please fix the highlighted errors before checking out.");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -57,7 +116,7 @@ export default function OrderModal({ product, storeId, isHotel, storeCurrency = 
           productId: product.id,
           buyerName: formData.buyerName,
           buyerEmail: formData.buyerEmail,
-          buyerPhone: formData.buyerPhone,
+          buyerPhone: finalPhone, // Always send the sanitized 254... format to the API
           fulfillmentType: formData.fulfillmentType,
           takeawayTime: formData.takeawayTime,
           customerNotes: formData.customerNotes,
@@ -83,7 +142,6 @@ export default function OrderModal({ product, storeId, isHotel, storeCurrency = 
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col md:flex-row animate-in zoom-in-95 duration-200 relative">
         
-        {/* Mobile Close Button */}
         <button onClick={() => setIsOpen(false)} className="md:hidden absolute top-4 right-4 z-10 p-2 bg-white/80 backdrop-blur rounded-full text-slate-900 shadow-sm">
           <X className="h-5 w-5" />
         </button>
@@ -100,7 +158,6 @@ export default function OrderModal({ product, storeId, isHotel, storeCurrency = 
               </div>
             )}
             <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-md text-slate-900 font-black px-4 py-2 rounded-full shadow-lg text-lg">
-              {/* UPGRADE: Dynamic Currency Symbol */}
               {currencySymbol}{product.price.toLocaleString()}
             </div>
           </div>
@@ -133,28 +190,40 @@ export default function OrderModal({ product, storeId, isHotel, storeCurrency = 
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Full Name</label>
               <input 
-                type="text" required value={formData.buyerName} onChange={(e) => setFormData({...formData, buyerName: e.target.value})}
-                className="w-full text-slate-900 px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white transition-all" 
+                type="text" required name="buyerName"
+                value={formData.buyerName} 
+                onChange={handleInputChange} 
+                onBlur={handleBlur}
+                className={`w-full px-4 py-3 border rounded-xl outline-none text-sm transition-all ${errors.buyerName ? 'border-red-500 bg-red-50 focus:ring-red-500 text-red-900' : 'border-slate-200 bg-slate-50 focus:bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500'}`} 
                 placeholder="John Doe"
               />
+              {errors.buyerName && <p className="text-red-500 text-[10px] mt-1 font-medium">{errors.buyerName}</p>}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Email (Required for Receipt)</label>
                 <input 
-                  type="email" required value={formData.buyerEmail} onChange={(e) => setFormData({...formData, buyerEmail: e.target.value})}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 text-slate-900 focus:bg-white transition-all" 
+                  type="email" required name="buyerEmail"
+                  value={formData.buyerEmail} 
+                  onChange={handleInputChange} 
+                  onBlur={handleBlur}
+                  className={`w-full px-4 py-3 border rounded-xl outline-none text-sm transition-all ${errors.buyerEmail ? 'border-red-500 bg-red-50 focus:ring-red-500 text-red-900' : 'border-slate-200 bg-slate-50 focus:bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500'}`} 
                   placeholder="john@example.com" 
                 />
+                {errors.buyerEmail && <p className="text-red-500 text-[10px] mt-1 font-medium">{errors.buyerEmail}</p>}
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Phone</label>
                 <input 
-                  type="tel" required value={formData.buyerPhone} onChange={(e) => setFormData({...formData, buyerPhone: e.target.value})}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 text-slate-900 focus:bg-white transition-all" 
+                  type="tel" required name="buyerPhone"
+                  value={formData.buyerPhone} 
+                  onChange={handleInputChange} 
+                  onBlur={handleBlur}
+                  className={`w-full px-4 py-3 border rounded-xl outline-none text-sm transition-all ${errors.buyerPhone ? 'border-red-500 bg-red-50 focus:ring-red-500 text-red-900' : 'border-slate-200 bg-slate-50 focus:bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500'}`} 
                   placeholder="07..." 
                 />
+                {errors.buyerPhone && <p className="text-red-500 text-[10px] mt-1 font-medium">{errors.buyerPhone}</p>}
               </div>
             </div>
 
@@ -201,7 +270,9 @@ export default function OrderModal({ product, storeId, isHotel, storeCurrency = 
                   <div className="animate-in slide-in-from-top-2">
                     <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Pickup Time</label>
                     <input 
-                      type="time" required value={formData.takeawayTime} onChange={(e) => setFormData({...formData, takeawayTime: e.target.value})}
+                      type="time" required name="takeawayTime"
+                      value={formData.takeawayTime} 
+                      onChange={handleInputChange}
                       className="text-slate-900 w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white transition-all" 
                     />
                   </div>
@@ -213,7 +284,9 @@ export default function OrderModal({ product, storeId, isHotel, storeCurrency = 
                   </label>
                   <textarea 
                     rows={2} required={formData.fulfillmentType === 'DELIVERY' || formData.fulfillmentType === 'SHIPPING'}
-                    value={formData.customerNotes} onChange={(e) => setFormData({...formData, customerNotes: e.target.value})}
+                    name="customerNotes"
+                    value={formData.customerNotes} 
+                    onChange={handleInputChange}
                     className="text-slate-900 w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white resize-none transition-all" 
                     placeholder={formData.fulfillmentType === 'TAKEAWAY' ? "e.g. No onions, extra sauce..." : "House number, street, landmarks..."} 
                   />
@@ -224,8 +297,8 @@ export default function OrderModal({ product, storeId, isHotel, storeCurrency = 
             <div className="pt-4 shrink-0 mt-auto">
               <button 
                 type="submit" 
-                disabled={isLoading}
-                className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 px-4 rounded-xl transition-all shadow-xl shadow-slate-900/20 active:scale-95 disabled:opacity-50"
+                disabled={isLoading || !isFormValid}
+                className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 px-4 rounded-xl transition-all shadow-xl shadow-slate-900/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
                   <><Loader2 className="h-5 w-5 animate-spin" /><span>Processing Secure Payment...</span></>

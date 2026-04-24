@@ -2,8 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase"; 
-import { Store, Link as LinkIcon, Loader2, Save, AlertCircle, MapPin, Building2, Map, ImagePlus, AlignLeft, Smartphone, Tags, Truck, Banknote, Landmark, Lock } from "lucide-react";
+import { 
+  Store, Link as LinkIcon, Loader2, Save, AlertCircle, MapPin, 
+  Building2, Map, ImagePlus, AlignLeft, Smartphone, Tags, Truck, 
+  Banknote, Landmark, Lock, FileText, User 
+} from "lucide-react";
 import { toast } from "sonner";
+import { isValidName, isValidKRAPin, formatKenyanPhone } from "@/lib/validators";
 
 const STORE_CATEGORIES = [
   "Food & Beverage", 
@@ -36,15 +41,107 @@ export default function SettingsPage() {
     county: "",
     town: "",
     area: "",
-    paybill_number: "", // We use this to store EITHER the M-Pesa number or Bank Account number locally
+    kra_pin: "", // NEW: KRA Pin for compliance
+    settlement_name: "", // NEW: Business/Owner Identity name
+    paybill_number: "", // M-Pesa or Bank Account
     existingLogoUrl: "", 
     paystack_subaccount_code: "", 
     offers_delivery: false,
     currency: "KES",
-    // NEW UI-ONLY STATES FOR GLOBAL PAYOUTS
     payoutMethod: "MOBILE_MONEY", 
     bankCode: "",
   });
+
+  const [errors, setErrors] = useState({
+  storeName: "",
+  description: "",
+  kra_pin: "",
+  settlement_name: "",
+  paybill_number: "",
+  });
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const { name, value } = e.target;
+  setFormData((prev) => ({ ...prev, [name]: value }));
+  
+  if (errors[name as keyof typeof errors]) {
+    setErrors((prev) => ({ ...prev, [name]: "" }));
+  }
+  };
+
+  // 4. Validate Fields on Blur
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    if (!value) return; 
+
+      // Store Name Validation
+    if (name === "storeName" && value.trim().length < 3) {
+      setErrors((prev) => ({ ...prev, storeName: "Store name must be at least 3 characters." }));
+    }
+
+  // Description Validation
+    if (name === "description" && value.trim().length < 10) {
+      setErrors((prev) => ({ ...prev, description: "Description must be at least 10 characters." }));
+    }
+  
+  // KRA PIN Validation
+    if (name === "kra_pin" && !isValidKRAPin(value)) {
+      setErrors((prev) => ({ ...prev, kra_pin: "Invalid KRA PIN. Must start with P/A, have 9 digits, and end with a letter." }));
+    }
+
+  // Settlement Name (Bank Account Name) Validation
+    if (name === "settlement_name" && !isValidName(value)) {
+      setErrors((prev) => ({ ...prev, settlement_name: "Please enter a valid legal name." }));
+    }
+
+    // Paybill / Account Number Validation (UPDATED FOR TILLS)
+    if (name === "paybill_number") {
+      
+      if (formData.payoutMethod === 'MOBILE_MONEY') {
+        // 1. Remove any accidental spaces the user typed
+        const cleanValue = value.replace(/\s/g, '');
+
+        // 2. Check if it is a Till or Paybill Number (Usually 5 to 8 digits long)
+        const isTillOrPaybill = /^\d{5,8}$/.test(cleanValue);
+
+        if (isTillOrPaybill) {
+          // It's a Till number! Just save the clean numeric value.
+          setFormData((prev) => ({ ...prev, paybill_number: cleanValue }));
+        } else {
+          // It's NOT a Till number, so it must be a Phone Number. Run our formatter.
+          const formattedPhone = formatKenyanPhone(value);
+          
+          if (!formattedPhone) {
+            setErrors((prev) => ({ 
+              ...prev, 
+              paybill_number: "Invalid entry. Enter a 5-8 digit Till Number OR a valid 07XX... phone number." 
+            }));
+          } else {
+            // It's a valid phone number! Save the 254... formatted version.
+            setFormData((prev) => ({ ...prev, paybill_number: formattedPhone }));
+          }
+        }
+      } 
+      
+      else if (formData.payoutMethod === 'BANK') {
+        // Basic Bank Account Validation (e.g., must be numeric and between 8-15 digits)
+        const bankRegex = /^\d{8,15}$/;
+        if (!bankRegex.test(value.replace(/\s/g, ''))) {
+          setErrors((prev) => ({ ...prev, paybill_number: "Invalid Bank Account Number (8-15 digits)." }));
+        }
+      }
+    }
+  };
+
+const isFormValid = 
+  formData.storeName.trim().length >= 3 &&
+  formData.kra_pin.trim() !== "" &&
+  formData.settlement_name.trim() !== "" &&
+  formData.paybill_number.trim() !== "" &&
+  formData.county.trim() !== "" &&
+  formData.category.trim() !== "" &&
+  !Object.values(errors).some(error => error !== "");
+
 
   useEffect(() => {
     const fetchStoreDetails = async () => {
@@ -56,7 +153,7 @@ export default function SettingsPage() {
 
         const { data: store, error } = await supabase
           .from("stores")
-          .select("id, name, slug, description, category, county, town, area, paybill_number, logo_url, paystack_subaccount_code, offers_delivery, currency")
+          .select("id, name, slug, description, category, county, town, area, kra_pin, settlement_name, paybill_number, logo_url, paystack_subaccount_code, offers_delivery, currency")
           .eq("owner_id", user.id)
           .single();
 
@@ -73,13 +170,13 @@ export default function SettingsPage() {
             county: store.county || "",
             town: store.town || "",
             area: store.area || "",
+            kra_pin: store.kra_pin || "",
+            settlement_name: store.settlement_name || "",
             paybill_number: store.paybill_number || "",
             existingLogoUrl: store.logo_url || "",
             paystack_subaccount_code: store.paystack_subaccount_code || "",
             offers_delivery: store.offers_delivery || false,
             currency: store.currency || "KES",
-            // We assume mobile money initially if they have an old account, 
-            // they can change it if they need to update routing
             payoutMethod: "MOBILE_MONEY",
             bankCode: "", 
           });
@@ -135,7 +232,6 @@ export default function SettingsPage() {
         ? formData.storeSlug.toLowerCase().replace(/[^a-z0-9]+/g, '-')
         : formData.storeName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-      // We DO NOT save payoutMethod or bankCode to the DB, they are just used to generate the Subaccount Code!
       const updates = {
         owner_id: userId,
         name: formData.storeName,
@@ -145,7 +241,9 @@ export default function SettingsPage() {
         county: formData.county,
         town: formData.town,
         area: formData.area,
-        paybill_number: formData.paybill_number, // Saves the actual account/phone number for record keeping
+        kra_pin: formData.kra_pin,
+        settlement_name: formData.settlement_name,
+        paybill_number: formData.paybill_number, 
         logo_url: finalLogoUrl,
         offers_delivery: formData.offers_delivery,
         currency: formData.currency, 
@@ -159,7 +257,7 @@ export default function SettingsPage() {
         if (error) throw error;
       }
 
-      // UPGRADE: Smarter Payout Routing Call!
+      // Payout Routing Call (Only fires if paybill changed/is new)
       if (formData.paybill_number && formData.paybill_number !== originalPaybill) {
         toast.loading("Setting up payment details...", { id: toastId });
         
@@ -202,22 +300,29 @@ export default function SettingsPage() {
     );
   }
 
-  // Currency can only be selected during initial setup
-  const isCurrencyLocked = !!storeId;
-  const isFormValid = formData.storeName && formData.county && formData.paybill_number && formData.category;
-
+  // Once the store ID is generated, financials are permanently locked.
+  const isFinancialsLocked = !!storeId; 
+  
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-24 sm:pb-12">
       <div>
         <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Store Settings</h1>
         <p className="mt-1.5 sm:mt-2 text-sm text-slate-500">
-          Manage your storefront details, location, and fulfillment options.
+          Manage your storefront details, location, and compliance documents.
         </p>
       </div>
 
-      <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
-        <form onSubmit={handleSave} className="p-5 sm:p-8 space-y-6 sm:space-y-8">
-          
+      <form onSubmit={handleSave} className="space-y-6 sm:space-y-8">
+        
+        {/* ==========================================
+            SECTION 1: STOREFRONT & OPERATIONS
+            ========================================== */}
+        <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-5 sm:p-8 space-y-6 sm:space-y-8">
+          <div className="border-b border-slate-100 pb-4">
+            <h2 className="text-xl font-black text-slate-900 tracking-tight">1. Storefront & Operations</h2>
+            <p className="text-sm text-slate-500 mt-1">Public details visible to your customers.</p>
+          </div>
+
           {/* Logo Upload */}
           <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-center sm:items-start text-center sm:text-left">
             <div className="relative h-24 w-24 sm:h-28 sm:w-28 rounded-3xl bg-slate-50 border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden shrink-0 group hover:border-emerald-500 transition-colors">
@@ -370,74 +475,98 @@ export default function SettingsPage() {
               <span className="font-bold text-slate-800 text-sm">Yes, we offer delivery services</span>
             </label>
           </div>
+        </div>
 
-          {/* Currency Settings (WITH LOCK LOGIC) */}
-          <div className={`p-5 sm:p-6 rounded-3xl border transition-colors ${isCurrencyLocked ? 'bg-slate-50 border-slate-200' : 'bg-amber-50/30 border-amber-100'}`}>
-            <h3 className="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
-              <Banknote className={`h-5 w-5 ${isCurrencyLocked ? 'text-slate-400' : 'text-amber-500'}`} />
-              Store Currency
-            </h3>
-            <p className="text-sm text-slate-500 mb-5">Choose the base currency for your store. This is what buyers will be charged in.</p>
-            
-            <div className="flex gap-4 max-w-sm">
-              <label className={`flex-1 flex items-center justify-center gap-2 p-3.5 rounded-xl border-2 transition-all ${isCurrencyLocked ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'} ${formData.currency === 'KES' ? (isCurrencyLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-amber-500 bg-amber-50 text-amber-700') : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
-                <input 
-                  type="radio" 
-                  name="currency" 
-                  value="KES" 
-                  disabled={isCurrencyLocked}
-                  checked={formData.currency === 'KES'}
-                  onChange={(e) => setFormData({...formData, currency: e.target.value})}
-                  className="sr-only" 
-                />
-                <span className="font-bold text-xl">🇰🇪</span>
-                <span className="font-bold">KES</span>
-              </label>
-              
-              <label className={`flex-1 flex items-center justify-center gap-2 p-3.5 rounded-xl border-2 transition-all ${isCurrencyLocked ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'} ${formData.currency === 'USD' ? (isCurrencyLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-amber-500 bg-amber-50 text-amber-700') : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
-                <input 
-                  type="radio" 
-                  name="currency" 
-                  value="USD" 
-                  disabled={isCurrencyLocked}
-                  checked={formData.currency === 'USD'}
-                  onChange={(e) => setFormData({...formData, currency: e.target.value})}
-                  className="sr-only" 
-                />
-                <span className="font-bold text-xl">🇺🇸</span>
-                <span className="font-bold">USD</span>
-              </label>
-            </div>
-
-            {isCurrencyLocked && (
-              <p className="text-xs text-amber-600 mt-4 flex items-center gap-1.5 font-bold bg-amber-50 px-3 py-2 rounded-lg border border-amber-100 w-fit">
-                <Lock className="h-3.5 w-3.5" /> Currency cannot be changed after setup. Contact support.
+        {/* ==========================================
+            SECTION 2: COMPLIANCE & PAYOUTS
+            ========================================== */}
+        <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-5 sm:p-8 space-y-6 sm:space-y-8">
+          <div className="border-b border-slate-100 pb-4 flex justify-between items-start">
+            <div>
+              <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                2. Compliance & Payouts 
+                {isFinancialsLocked && <Lock className="h-5 w-5 text-amber-500" />}
+              </h2>
+              <p className="text-sm text-slate-500 mt-1">
+                Required for marketplace compliance. <strong className="text-amber-600">These details cannot be changed once submitted.</strong>
               </p>
-            )}
+            </div>
           </div>
 
-          {/* UPGRADE: Payout Details (GLOBAL SUPPORT) */}
-          <div className="bg-slate-50 p-5 sm:p-6 rounded-3xl border border-slate-200">
+          <div className="grid md:grid-cols-2 gap-5 sm:gap-6">
+            {/* KRA PIN */}
+            <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1">KRA PIN</label>
+               <div className="relative">
+            <FileText className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+    <input 
+      type="text" 
+      name="kra_pin" 
+      required
+      value={formData.kra_pin} 
+      onChange={handleInputChange} 
+      onBlur={handleBlur}
+      className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm uppercase ${errors.kra_pin ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
+      placeholder="e.g. P123456789A" 
+    />
+  </div>
+  {errors.kra_pin && <p className="text-red-500 text-xs mt-1">{errors.kra_pin}</p>}
+</div>
+
+            {/* Currency Settings */}
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">Store Currency</label>
+              <div className="flex gap-4">
+                <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${isFinancialsLocked ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'} ${formData.currency === 'KES' ? (isFinancialsLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-emerald-500 bg-emerald-50 text-emerald-700') : 'border-slate-200 bg-white text-slate-600'}`}>
+                  <input 
+                    type="radio" name="currency" value="KES" 
+                    disabled={isFinancialsLocked}
+                    checked={formData.currency === 'KES'}
+                    onChange={(e) => setFormData({...formData, currency: e.target.value})}
+                    className="sr-only" 
+                  />
+                  <span className="font-bold text-xl">🇰🇪</span> <span className="font-bold">KES</span>
+                </label>
+                <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${isFinancialsLocked ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'} ${formData.currency === 'USD' ? (isFinancialsLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-emerald-500 bg-emerald-50 text-emerald-700') : 'border-slate-200 bg-white text-slate-600'}`}>
+                  <input 
+                    type="radio" name="currency" value="USD" 
+                    disabled={isFinancialsLocked}
+                    checked={formData.currency === 'USD'}
+                    onChange={(e) => setFormData({...formData, currency: e.target.value})}
+                    className="sr-only" 
+                  />
+                  <span className="font-bold text-xl">🇺🇸</span> <span className="font-bold">USD</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <hr className="border-slate-100" />
+
+          {/* Payout Details */}
+          <div className={`p-5 sm:p-6 rounded-3xl border transition-colors ${isFinancialsLocked ? 'bg-slate-50 border-slate-200' : 'bg-blue-50/30 border-blue-100'}`}>
             <h3 className="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
-              <Landmark className="h-5 w-5 text-emerald-600" />
-              Payout Settings
+              <Landmark className={`h-5 w-5 ${isFinancialsLocked ? 'text-slate-400' : 'text-blue-600'}`} />
+              Settlement Details
             </h3>
-            <p className="text-sm text-slate-500 mb-5 sm:mb-6">Where should we automatically send your money when a customer pays?</p>
+            <p className="text-sm text-slate-500 mb-5 sm:mb-6">Where should we automatically send your marketplace earnings?</p>
             
             {/* Payout Toggle */}
             <div className="flex gap-3 max-w-md mb-6">
-              <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all ${formData.payoutMethod === 'MOBILE_MONEY' ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-100'}`}>
+              <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${isFinancialsLocked ? 'cursor-not-allowed' : 'cursor-pointer'} ${formData.payoutMethod === 'MOBILE_MONEY' ? (isFinancialsLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm') : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}>
                 <input 
                   type="radio" name="payoutMethod" value="MOBILE_MONEY" 
+                  disabled={isFinancialsLocked}
                   checked={formData.payoutMethod === 'MOBILE_MONEY'}
                   onChange={(e) => setFormData({...formData, payoutMethod: e.target.value})}
                   className="sr-only" 
                 />
                 <Smartphone className="h-4 w-4" /> M-Pesa
               </label>
-              <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all ${formData.payoutMethod === 'BANK' ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-100'}`}>
+              <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${isFinancialsLocked ? 'cursor-not-allowed' : 'cursor-pointer'} ${formData.payoutMethod === 'BANK' ? (isFinancialsLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm') : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}>
                 <input 
                   type="radio" name="payoutMethod" value="BANK" 
+                  disabled={isFinancialsLocked}
                   checked={formData.payoutMethod === 'BANK'}
                   onChange={(e) => setFormData({...formData, payoutMethod: e.target.value})}
                   className="sr-only" 
@@ -446,19 +575,38 @@ export default function SettingsPage() {
               </label>
             </div>
 
-            <div className="flex flex-col md:flex-row md:items-end gap-4 sm:gap-6">
-              
+            <div className="grid md:grid-cols-2 gap-5 sm:gap-6">
+              {/* Account Name */}
+               <div>
+  <label className="block text-sm font-bold text-slate-700 mb-1">Legal Business / Owner Name</label>
+  <div className="relative">
+    <User className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+    <input 
+      type="text" 
+      name="settlement_name" 
+      required
+      value={formData.settlement_name} 
+      onChange={handleInputChange} 
+      onBlur={handleBlur}
+      className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${errors.settlement_name ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
+      placeholder="Name matching your KRA PIN" 
+    />
+  </div>
+  {errors.settlement_name && <p className="text-red-500 text-xs mt-1">{errors.settlement_name}</p>}
+</div>
+
               {/* Conditional Bank Code Input */}
               {formData.payoutMethod === 'BANK' && (
-                <div className="flex-1 animate-in fade-in zoom-in duration-200">
+                <div className="animate-in fade-in zoom-in duration-200">
                   <label className="block text-sm font-bold text-slate-700 mb-2">Bank Code</label>
                   <div className="relative">
                     <Landmark className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
                     <input 
                       type="text" required={formData.payoutMethod === 'BANK'} 
+                      disabled={isFinancialsLocked}
                       value={formData.bankCode} 
                       onChange={(e) => setFormData({ ...formData, bankCode: e.target.value })} 
-                      className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-white" 
+                      className={`w-full pl-11 pr-4 py-3 sm:py-3.5 border rounded-xl outline-none transition-all text-base sm:text-sm ${isFinancialsLocked ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' : 'bg-white border-slate-300 focus:ring-2 focus:ring-blue-500'}`} 
                       placeholder="e.g. 044 (Access Bank)" 
                     />
                   </div>
@@ -466,55 +614,51 @@ export default function SettingsPage() {
               )}
 
               {/* Account Number Input */}
-              <div className="flex-1">
-                <label className="block text-sm font-bold text-slate-700 mb-2">
-                  {formData.payoutMethod === 'MOBILE_MONEY' ? "M-Pesa Number / Till Number" : "Bank Account Number"}
-                </label>
-                <div className="relative">
-                  {formData.payoutMethod === 'MOBILE_MONEY' ? (
-                    <Smartphone className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
-                  ) : (
-                    <Banknote className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
-                  )}
-                  <input 
-                    type="text" required value={formData.paybill_number} 
-                    onChange={(e) => setFormData({ ...formData, paybill_number: e.target.value })} 
-                    className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-white" 
-                    placeholder={formData.payoutMethod === 'MOBILE_MONEY' ? "e.g. 0712345678 or Till Number" : "Enter account number"} 
-                  />
-                </div>
-              </div>
-              
-              {formData.paystack_subaccount_code && (
-                <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-100 px-4 py-3 sm:py-3.5 rounded-xl border border-emerald-200 font-bold w-full md:w-auto justify-center md:justify-start">
-                  <AlertCircle className="h-5 w-5 shrink-0" />
-                  Routing Active
-                </div>
-              )}
+              <div>
+  <label className="block text-sm font-bold text-slate-700 mb-1">
+    {formData.payoutMethod === 'MOBILE_MONEY' ? 'M-Pesa Number' : 'Bank Account Number'}
+  </label>
+  <div className="relative">
+    <Banknote className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+    <input 
+      type="text" 
+      name="paybill_number" 
+      required
+      value={formData.paybill_number} 
+      onChange={handleInputChange} 
+      onBlur={handleBlur}
+      className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${errors.paybill_number ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
+      placeholder={formData.payoutMethod === 'MOBILE_MONEY' ? "e.g. 0712345678" : "Enter account number"} 
+    />
+  </div>
+  {errors.paybill_number && <p className="text-red-500 text-xs mt-1">{errors.paybill_number}</p>}
+</div>
             </div>
             
-            {formData.payoutMethod === 'BANK' && (
-              <p className="text-xs text-slate-500 mt-3 font-medium">
-                Ensure your Bank Code matches your region's official Paystack bank routing codes.
-              </p>
+            {formData.paystack_subaccount_code && (
+              <div className="mt-5 flex items-center gap-2 text-sm text-blue-700 bg-blue-100 px-4 py-3 sm:py-3.5 rounded-xl border border-blue-200 font-bold justify-center md:justify-start w-fit">
+                <AlertCircle className="h-5 w-5 shrink-0" />
+                Verified & Routing Active
+              </div>
             )}
           </div>
+        </div>
 
-          <div className="pt-4 border-t border-slate-100 flex justify-end">
-            <button 
-              type="submit" disabled={isLoading || !isFormValid} 
-              className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-8 rounded-xl shadow-lg shadow-emerald-600/20 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? (
-                <><Loader2 className="h-5 w-5 animate-spin" /><span>Saving...</span></>
-              ) : (
-                <><span>{storeId ? "Save Profile" : "Create Store"}</span><Save className="h-5 w-5" /></>
-              )}
-            </button>
-          </div>
+        {/* Global Save Button */}
+        <div className="pt-2 flex justify-end">
+          <button 
+            type="submit" disabled={isLoading || !isFormValid} 
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 px-10 rounded-2xl shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoading ? (
+              <><Loader2 className="h-5 w-5 animate-spin" /><span>Processing...</span></>
+            ) : (
+              <><span>{storeId ? "Save Operations Updates" : "Create My Store"}</span><Save className="h-5 w-5" /></>
+            )}
+          </button>
+        </div>
 
-        </form>
-      </div>
+      </form>
     </div>
   );
 }

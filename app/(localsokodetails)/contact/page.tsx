@@ -2,19 +2,77 @@
 
 import { useState } from "react";
 import { Mail, MapPin, Send, MessageSquare, CheckCircle, Loader2, Globe, HelpCircle, Briefcase } from "lucide-react";
+import { isValidEmail, isValidName } from "@/lib/validators"; // Import validators
 
 export default function ContactPage() {
-  // Form State
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [message, setMessage] = useState("");
+  // 1. Unified Form State
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    message: "",
+  });
+
+  // 2. Error State
+  const [errors, setErrors] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    message: "",
+  });
   
   // Submission Status State
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
 
+  // Handle Input Changes & Clear Errors
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    
+    // Clear error immediately when user starts typing
+    if (errors[name as keyof typeof errors]) {
+      setErrors((prev) => ({ ...prev, [name]: "" }));
+    }
+  };
+
+  // Validate on blur
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    if (!value) return; 
+
+    if ((name === "firstName" || name === "lastName") && !isValidName(value)) {
+      setErrors((prev) => ({ ...prev, [name]: "Please enter a valid name (letters only)." }));
+    }
+
+    if (name === "email" && !isValidEmail(value)) {
+      setErrors((prev) => ({ ...prev, email: "Please enter a valid email address." }));
+    }
+
+    if (name === "message" && value.trim().length < 10) {
+      setErrors((prev) => ({ ...prev, message: "Please provide a bit more detail (at least 10 characters)." }));
+    }
+  };
+
+  // Check if form is valid enough to enable the submit button
+  const isFormValid = 
+    formData.firstName.trim() !== "" &&
+    formData.lastName.trim() !== "" &&
+    formData.email.trim() !== "" &&
+    formData.message.trim().length >= 10 &&
+    !Object.values(errors).some(error => error !== "");
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Final safety check
+    if (!isValidName(formData.firstName) || !isValidName(formData.lastName) || !isValidEmail(formData.email)) {
+      setErrors(prev => ({ 
+        ...prev, 
+        email: !isValidEmail(formData.email) ? "Invalid email." : prev.email 
+      }));
+      return;
+    }
+
     setStatus("submitting");
 
     try {
@@ -26,9 +84,9 @@ export default function ContactPage() {
         },
         body: JSON.stringify({
           access_key: "38be796f-78dd-4efd-a0b6-ea008cb56266", 
-          name: `${firstName} ${lastName}`,
-          email: email,
-          message: message,
+          name: `${formData.firstName} ${formData.lastName}`,
+          email: formData.email,
+          message: formData.message,
           subject: "New Contact Form Submission - LocalSoko", 
           from_name: "LocalSoko Platform"
         }),
@@ -39,10 +97,7 @@ export default function ContactPage() {
       if (result.success) {
         setStatus("success");
         // Clear the form
-        setFirstName("");
-        setLastName("");
-        setEmail("");
-        setMessage("");
+        setFormData({ firstName: "", lastName: "", email: "", message: "" });
       } else {
         setStatus("error");
       }
@@ -130,21 +185,36 @@ export default function ContactPage() {
                 <label className="text-xs font-black text-slate-400 uppercase ml-1 tracking-wider">First Name</label>
                 <input 
                   required 
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  className="w-full px-5 py-4 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all font-medium" 
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleInputChange}
+                  onBlur={handleBlur}
+                  className={`w-full px-5 py-4 rounded-xl border outline-none transition-all font-medium ${
+                    errors.firstName 
+                      ? 'bg-red-500/10 border-red-500/50 text-red-200 focus:ring-red-500' 
+                      : 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500'
+                  }`} 
                   placeholder="Jane"
                 />
+                {errors.firstName && <p className="text-red-400 text-xs ml-1 font-medium">{errors.firstName}</p>}
               </div>
+              
               <div className="space-y-2">
                 <label className="text-xs font-black text-slate-400 uppercase ml-1 tracking-wider">Last Name</label>
                 <input 
                   required 
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  className="w-full px-5 py-4 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all font-medium" 
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleInputChange}
+                  onBlur={handleBlur}
+                  className={`w-full px-5 py-4 rounded-xl border outline-none transition-all font-medium ${
+                    errors.lastName 
+                      ? 'bg-red-500/10 border-red-500/50 text-red-200 focus:ring-red-500' 
+                      : 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500'
+                  }`} 
                   placeholder="Doe"
                 />
+                {errors.lastName && <p className="text-red-400 text-xs ml-1 font-medium">{errors.lastName}</p>}
               </div>
             </div>
 
@@ -153,11 +223,18 @@ export default function ContactPage() {
               <input 
                 required 
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-5 py-4 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all font-medium" 
+                name="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                onBlur={handleBlur}
+                className={`w-full px-5 py-4 rounded-xl border outline-none transition-all font-medium ${
+                  errors.email 
+                    ? 'bg-red-500/10 border-red-500/50 text-red-200 focus:ring-red-500' 
+                    : 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500'
+                }`} 
                 placeholder="jane@company.com"
               />
+              {errors.email && <p className="text-red-400 text-xs ml-1 font-medium">{errors.email}</p>}
             </div>
 
             <div className="space-y-2">
@@ -165,11 +242,18 @@ export default function ContactPage() {
               <textarea 
                 required 
                 rows={5} 
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                className="w-full px-5 py-4 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all font-medium resize-none" 
+                name="message"
+                value={formData.message}
+                onChange={handleInputChange}
+                onBlur={handleBlur}
+                className={`w-full px-5 py-4 rounded-xl border outline-none transition-all font-medium resize-none ${
+                  errors.message 
+                    ? 'bg-red-500/10 border-red-500/50 text-red-200 focus:ring-red-500' 
+                    : 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500'
+                }`} 
                 placeholder="How can our team help you?"
               ></textarea>
+              {errors.message && <p className="text-red-400 text-xs ml-1 font-medium">{errors.message}</p>}
             </div>
 
             {status === "error" && (
@@ -185,8 +269,8 @@ export default function ContactPage() {
             ) : (
               <button 
                 type="submit"
-                disabled={status === "submitting"} 
-                className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 shadow-lg shadow-emerald-600/20 text-lg"
+                disabled={status === "submitting" || !isFormValid} 
+                className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-600/20 text-lg"
               >
                 {status === "submitting" ? (
                   <><Loader2 className="h-6 w-6 animate-spin" /> Sending securely...</>

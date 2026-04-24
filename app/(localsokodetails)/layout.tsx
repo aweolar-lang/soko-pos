@@ -20,6 +20,31 @@ export default function LocalSokoDetailsLayout({
 
           {/* Quick links for desktop */}
           <nav className="hidden sm:flex items-center gap-6 text-sm font-bold text-slate-500">
+            <a 
+              href="/acceptable-use" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-emerald-600 hover:underline"
+            >
+            Acceptable Use Policy
+            </a>
+            <a 
+              href="/shipping" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-emerald-600 hover:underline"
+            >
+            Shipping Policy
+            </a>
+             <a 
+              href="/returns" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-emerald-600 hover:underline"
+            >
+            Returns Policy
+            </a>
+             
             <Link href="/about" className="hover:text-emerald-600 transition-colors">About</Link>
             <Link href="/safety" className="hover:text-emerald-600 transition-colors">Safety</Link>
             <Link href="/contact" className="hover:text-emerald-600 transition-colors">Contact</Link>

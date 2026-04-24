@@ -15,18 +15,16 @@ export default function AddProductPage() {
   const router = useRouter();
   const [storeId, setStoreId] = useState<string | null>(null);
   const [storeCategory, setStoreCategory] = useState<string | null>(null);
-  
-  // NEW: Track the store's currency
   const [storeCurrency, setStoreCurrency] = useState("KES");
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [images, setImages] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   
-  // Digital Product State
   const [isDigital, setIsDigital] = useState(false);
   const [digitalFile, setDigitalFile] = useState<File | null>(null);
   
+  // 1. Data State
   const [formData, setFormData] = useState({
     title: "",
     price: "",
@@ -35,12 +33,19 @@ export default function AddProductPage() {
     stock_quantity: "1",
   });
 
+  // 2. Error State for Validation
+  const [errors, setErrors] = useState({
+    title: "",
+    price: "",
+    description: "",
+    stock_quantity: "",
+  });
+
   useEffect(() => {
     async function fetchStore() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // UPGRADE: Fetch the currency column alongside id and category
       const { data } = await supabase
         .from('stores')
         .select('id, category, currency')
@@ -50,9 +55,8 @@ export default function AddProductPage() {
       if (data) {
         setStoreId(data.id);
         setStoreCategory(data.category);
-        setStoreCurrency(data.currency || "KES"); // Save currency to state
+        setStoreCurrency(data.currency || "KES");
 
-        // Auto-configure form based on Store Category
         if (data.category === "Digital Products") {
           setIsDigital(true);
           setFormData(prev => ({ ...prev, category: DIGITAL_CATEGORIES[0] }));
@@ -63,6 +67,51 @@ export default function AddProductPage() {
     }
     fetchStore();
   }, []);
+
+  // 3. Handle Input Changes & Clear Errors
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    
+    if (errors[name as keyof typeof errors]) {
+      setErrors((prev) => ({ ...prev, [name]: "" }));
+    }
+  };
+
+  // 4. Validate Fields on Blur
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    
+    if (name === "title" && value.trim().length < 3) {
+      setErrors((prev) => ({ ...prev, title: "Title must be at least 3 characters." }));
+    }
+    
+    if (name === "price") {
+      const priceNum = parseFloat(value);
+      if (isNaN(priceNum) || priceNum < 0) {
+        setErrors((prev) => ({ ...prev, price: "Please enter a valid positive price." }));
+      }
+    }
+
+    if (name === "stock_quantity" && !isDigital) {
+      const stockNum = parseInt(value, 10);
+      if (isNaN(stockNum) || stockNum < 0) {
+        setErrors((prev) => ({ ...prev, stock_quantity: "Please enter a valid stock quantity." }));
+      }
+    }
+
+    if (name === "description" && value.trim().length < 10) {
+      setErrors((prev) => ({ ...prev, description: "Description must be at least 10 characters." }));
+    }
+  };
+
+  // 5. Form Validity Check for Submit Button
+  const isFormValid = 
+    formData.title.trim().length >= 3 &&
+    !isNaN(parseFloat(formData.price)) && parseFloat(formData.price) >= 0 &&
+    (isDigital || (!isNaN(parseInt(formData.stock_quantity, 10)) && parseInt(formData.stock_quantity, 10) >= 0)) &&
+    formData.description.trim().length >= 10 &&
+    !Object.values(errors).some(error => error !== "");
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -89,14 +138,14 @@ export default function AddProductPage() {
   };
 
   const toggleDigital = () => {
-    if (storeCategory === "Digital Products") return; // Locked for digital stores
+    if (storeCategory === "Digital Products") return; 
     
     const nextDigital = !isDigital;
     setIsDigital(nextDigital);
     
-    // Auto-switch category list based on mode
     if (nextDigital) {
       setFormData(prev => ({ ...prev, category: DIGITAL_CATEGORIES[0] }));
+      setErrors(prev => ({ ...prev, stock_quantity: "" })); // Clear stock errors if switching to digital
     } else {
       setFormData(prev => ({ 
         ...prev, 
@@ -120,7 +169,6 @@ export default function AddProductPage() {
       const imageUrls: string[] = []; 
       let uploadedFileUrl = null;
 
-      // 1. Upload Images
       if (images.length > 0) {
         for (const file of images) {
           const fileExt = file.name.split('.').pop();
@@ -135,7 +183,6 @@ export default function AddProductPage() {
         }
       }
 
-      // 2. Upload Digital File (Secure Private Upload)
       if (isDigital && digitalFile) {
         toast.loading("Uploading digital asset...", { id: toastId });
         const fileExt = digitalFile.name.split('.').pop();
@@ -151,11 +198,6 @@ export default function AddProductPage() {
         uploadedFileUrl = filePath; 
       }
 
-      // 3. Save to Database
-      // Note: We don't need to save the currency to the product here because your SQL query earlier 
-      // added a DEFAULT 'KES' to the products table, and we'll eventually pull it directly from the `stores` table 
-      // or update products to explicitly match store currency if needed, but the checkout API relies on what's there.
-      // Actually, since we want products to have the right currency, let's explicitly inject it!
       const { error } = await supabase.from('products').insert({
         store_id: storeId,
         title: formData.title,
@@ -167,7 +209,7 @@ export default function AddProductPage() {
         images: imageUrls,
         is_digital: isDigital,
         file_url: uploadedFileUrl,
-        currency: storeCurrency // Explicitly save the store's currency to the product!
+        currency: storeCurrency 
       });
 
       if (error) throw error;
@@ -272,8 +314,16 @@ export default function AddProductPage() {
               <label className="block text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Product Title</label>
               <div className="relative">
                 <Package className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400" />
-                <input required type="text" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full pl-11 pr-4 py-3 sm:py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm font-medium bg-slate-50 focus:bg-white" placeholder="e.g. Master React JS eBook" />
+                <input 
+                  required type="text" name="title"
+                  value={formData.title} 
+                  onChange={handleInputChange} 
+                  onBlur={handleBlur}
+                  className={`w-full pl-11 pr-4 py-3 sm:py-2.5 border rounded-xl outline-none transition-all text-base sm:text-sm font-medium ${errors.title ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
+                  placeholder="e.g. Master React JS eBook" 
+                />
               </div>
+              {errors.title && <p className="text-red-500 text-[10px] sm:text-xs mt-1 font-medium">{errors.title}</p>}
             </div>
 
             <div>
@@ -284,11 +334,11 @@ export default function AddProductPage() {
                 <Tags className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
                 
                 {isDigital ? (
-                  <select value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} className="w-full pl-11 pr-10 py-3 sm:py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm font-medium appearance-none bg-slate-50 focus:bg-white cursor-pointer">
+                  <select name="category" value={formData.category} onChange={handleInputChange} className="w-full pl-11 pr-10 py-3 sm:py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm font-medium appearance-none bg-slate-50 focus:bg-white cursor-pointer">
                     {DIGITAL_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
                 ) : storeCategory === "Supermarket" ? (
-                  <select value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} className="w-full pl-11 pr-10 py-3 sm:py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm font-medium appearance-none bg-slate-50 focus:bg-white cursor-pointer">
+                  <select name="category" value={formData.category} onChange={handleInputChange} className="w-full pl-11 pr-10 py-3 sm:py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm font-medium appearance-none bg-slate-50 focus:bg-white cursor-pointer">
                     {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
                 ) : (
@@ -301,12 +351,19 @@ export default function AddProductPage() {
           {/* Row 2: Price & Stock */}
           <div className={`grid grid-cols-1 ${!isDigital ? 'md:grid-cols-2' : ''} gap-5 sm:gap-6 p-5 sm:p-6 bg-slate-50 rounded-2xl border border-slate-100`}>
             <div>
-              {/* UPGRADE: Dynamic Currency Label */}
               <label className="block text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Selling Price ({storeCurrency})</label>
               <div className="relative">
                 <DollarSign className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400" />
-                <input required type="number" min="0" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} className="w-full pl-11 pr-4 py-3 sm:py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm font-black text-emerald-600 bg-white shadow-sm" placeholder="0" />
+                <input 
+                  required type="number" min="0" step="any" name="price"
+                  value={formData.price} 
+                  onChange={handleInputChange} 
+                  onBlur={handleBlur}
+                  className={`w-full pl-11 pr-4 py-3 sm:py-2.5 border rounded-xl outline-none transition-all text-base sm:text-sm font-black shadow-sm ${errors.price ? 'border-red-500 bg-red-50 text-red-600 focus:ring-red-500' : 'border-slate-200 bg-white text-emerald-600 focus:ring-2 focus:ring-emerald-500'}`} 
+                  placeholder="0" 
+                />
               </div>
+              {errors.price && <p className="text-red-500 text-[10px] sm:text-xs mt-1 font-medium">{errors.price}</p>}
             </div>
             
             {!isDigital && (
@@ -314,8 +371,16 @@ export default function AddProductPage() {
                 <label className="block text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Initial Stock Quantity</label>
                 <div className="relative">
                   <Hash className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400" />
-                  <input required={!isDigital} type="number" min="1" value={formData.stock_quantity} onChange={(e) => setFormData({...formData, stock_quantity: e.target.value})} className="w-full pl-11 pr-4 py-3 sm:py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm font-bold text-slate-900 bg-white shadow-sm" placeholder="10" />
+                  <input 
+                    required={!isDigital} type="number" min="1" name="stock_quantity"
+                    value={formData.stock_quantity} 
+                    onChange={handleInputChange} 
+                    onBlur={handleBlur}
+                    className={`w-full pl-11 pr-4 py-3 sm:py-2.5 border rounded-xl outline-none transition-all text-base sm:text-sm font-bold shadow-sm ${errors.stock_quantity ? 'border-red-500 bg-red-50 text-red-600 focus:ring-red-500' : 'border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500'}`} 
+                    placeholder="10" 
+                  />
                 </div>
+                {errors.stock_quantity && <p className="text-red-500 text-[10px] sm:text-xs mt-1 font-medium">{errors.stock_quantity}</p>}
               </div>
             )}
           </div>
@@ -325,13 +390,25 @@ export default function AddProductPage() {
             <label className="block text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Product Description</label>
             <div className="relative">
               <AlignLeft className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400" />
-              <textarea required rows={4} value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full pl-11 pr-4 py-3.5 sm:py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm resize-none bg-slate-50 focus:bg-white font-medium text-slate-700" placeholder="Describe your product in detail..." />
+              <textarea 
+                required rows={4} name="description"
+                value={formData.description} 
+                onChange={handleInputChange} 
+                onBlur={handleBlur}
+                className={`w-full pl-11 pr-4 py-3.5 sm:py-3 border rounded-xl outline-none transition-all text-base sm:text-sm resize-none font-medium ${errors.description ? 'border-red-500 bg-red-50 text-red-700 focus:ring-red-500' : 'border-slate-200 bg-slate-50 text-slate-700 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
+                placeholder="Describe your product in detail..." 
+              />
             </div>
+            {errors.description && <p className="text-red-500 text-[10px] sm:text-xs mt-1 font-medium">{errors.description}</p>}
           </div>
 
           {/* Submit Button */}
           <div className="pt-2 sm:pt-4">
-            <button type="submit" disabled={isSubmitting} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 sm:py-3.5 rounded-xl transition-all active:scale-[0.98] flex justify-center items-center gap-2 shadow-md shadow-slate-900/10 disabled:opacity-70">
+            <button 
+              type="submit" 
+              disabled={isSubmitting || !isFormValid} 
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 sm:py-3.5 rounded-xl transition-all active:scale-[0.98] flex justify-center items-center gap-2 shadow-md shadow-slate-900/10 disabled:opacity-70 disabled:cursor-not-allowed"
+            >
               {isSubmitting ? <><Loader2 className="animate-spin h-5 w-5" /> Publishing...</> : "Publish Product"}
             </button>
           </div>

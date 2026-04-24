@@ -17,6 +17,12 @@ export default function UpdatePasswordPage() {
     confirmPassword: "",
   });
 
+  // NEW: Error state for real-time validation feedback
+  const [errors, setErrors] = useState({
+    password: "",
+    confirmPassword: "",
+  });
+
   // Verify that the user actually arrived here via a valid Supabase session
   useEffect(() => {
     const checkSession = async () => {
@@ -32,11 +38,47 @@ export default function UpdatePasswordPage() {
     checkSession();
   }, [router]);
 
+  // Handle Input Changes & Clear Errors
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    
+    // Clear error immediately when user starts typing
+    if (errors[name as keyof typeof errors]) {
+      setErrors((prev) => ({ ...prev, [name]: "" }));
+    }
+
+    // Smart UX: If they change the main password, clear the confirm error so they can re-type it
+    if (name === "password" && errors.confirmPassword) {
+      setErrors((prev) => ({ ...prev, confirmPassword: "" }));
+    }
+  };
+
+  // Validate on blur
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    if (!value) return; 
+
+    if (name === "password" && value.length < 6) {
+      setErrors((prev) => ({ ...prev, password: "Password must be at least 6 characters." }));
+    }
+
+    if (name === "confirmPassword" && value !== formData.password) {
+      setErrors((prev) => ({ ...prev, confirmPassword: "Passwords do not match." }));
+    }
+  };
+
+  const isFormValid = 
+    formData.password.length >= 6 && 
+    formData.password === formData.confirmPassword &&
+    !Object.values(errors).some(error => error !== "");
+
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Final safety check
     if (formData.password !== formData.confirmPassword) {
-      toast.error("Passwords do not match.");
+      setErrors(prev => ({ ...prev, confirmPassword: "Passwords do not match." }));
       return;
     }
 
@@ -59,10 +101,6 @@ export default function UpdatePasswordPage() {
       setIsLoading(false);
     }
   };
-
-  const isFormValid = 
-    formData.password.length >= 6 && 
-    formData.password === formData.confirmPassword;
 
   if (isVerifying) {
     return (
@@ -108,16 +146,23 @@ export default function UpdatePasswordPage() {
                 <Lock className="absolute left-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
                 <input 
                   id="password"
+                  name="password"
                   type="password" 
                   required 
                   minLength={6}
                   autoComplete="new-password"
                   value={formData.password} 
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })} 
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-sm text-slate-900 bg-slate-50 focus:bg-white" 
+                  onChange={handleInputChange} 
+                  onBlur={handleBlur}
+                  className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${
+                    errors.password 
+                      ? 'border-red-500 bg-red-50 focus:ring-red-500 text-red-900' 
+                      : 'border-slate-200 bg-slate-50 focus:bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500'
+                  }`} 
                   placeholder="At least 6 characters" 
                 />
               </div>
+              {errors.password && <p className="text-red-500 text-xs mt-1 font-medium">{errors.password}</p>}
             </div>
 
             {/* Confirm Password Input */}
@@ -129,23 +174,23 @@ export default function UpdatePasswordPage() {
                 <Lock className="absolute left-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
                 <input 
                   id="confirmPassword"
+                  name="confirmPassword"
                   type="password" 
                   required 
                   minLength={6}
                   autoComplete="new-password"
                   value={formData.confirmPassword} 
-                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })} 
-                  className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm text-slate-900 bg-slate-50 focus:bg-white
-                    ${formData.confirmPassword && formData.password !== formData.confirmPassword 
-                      ? "border-red-300 focus:ring-2 focus:ring-red-500 focus:border-red-500" 
-                      : "border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                    }`} 
+                  onChange={handleInputChange} 
+                  onBlur={handleBlur}
+                  className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${
+                    errors.confirmPassword 
+                      ? 'border-red-500 bg-red-50 focus:ring-red-500 text-red-900' 
+                      : 'border-slate-200 bg-slate-50 focus:bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500'
+                  }`} 
                   placeholder="Type password again" 
                 />
               </div>
-              {formData.confirmPassword && formData.password !== formData.confirmPassword && (
-                <p className="mt-2 text-xs text-red-500 font-medium">Passwords do not match</p>
-              )}
+              {errors.confirmPassword && <p className="text-red-500 text-xs mt-1 font-medium">{errors.confirmPassword}</p>}
             </div>
 
             {/* Submit Button */}
