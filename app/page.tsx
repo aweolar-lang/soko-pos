@@ -52,7 +52,7 @@ const normalize = (value?: string | null) => (value ?? "").trim().toLowerCase();
 
 const isHotelStore = (category?: string | null) => {
   const c = normalize(category);
-  return c === "hotel" || c === "hotels" || c === "hospitality" || c === "lodging";
+  return c === "Food & Beverage" || c === "hotels" || c === "hospitality" || c === "lodging";
 };
 
 const isDigitalStore = (category?: string | null) => {
