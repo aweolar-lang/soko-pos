@@ -17,7 +17,6 @@ import {
   Clock,
   Tag,
   Download,
-  BedDouble,
 } from "lucide-react";
 import MarketplaceSearch from "@/components/MarketplaceSearch";
 
@@ -58,7 +57,7 @@ const getStoreCta = (store: StoreData) => {
   if (isHotelStore(store)) {
     return {
       label: "Make Order",
-      icon: BedDouble,
+      icon: Coffee,
     };
   }
 
