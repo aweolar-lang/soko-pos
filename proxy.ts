@@ -44,7 +44,7 @@ export async function proxy(request: NextRequest) {
 
     // 1. If there is no session, kick them straight to the login page
     if (!user) {
-      return NextResponse.redirect(new URL('/auth/login', request.url));
+      return NextResponse.redirect(new URL('/login', request.url));
     }
 
     // 2. The SaaS Lockout Mechanism (Only for authenticated users in the dashboard)
