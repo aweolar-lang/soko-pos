@@ -219,7 +219,9 @@ export default async function MarketplaceHome({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {stores.map((store) => {
                 const locationText = [store.area, store.town, store.county].filter(Boolean).join(", ");
-                const { label: ctaLabel, icon: CtaIcon } = getStoreCta(store.category);
+                
+                // THE FIX: We now correctly pass the entire `store` object!
+                const { label: ctaLabel, icon: CtaIcon } = getStoreCta(store);
 
                 return (
                   <Link
@@ -251,10 +253,11 @@ export default async function MarketplaceHome({
                             <img
                               src={store.logo_url}
                               alt={store.name}
-                              className="h-16 w-16 sm:h-18 sm:w-18 rounded-xl object-cover bg-slate-50"
+                              // THE FIX: Updated to valid standard Tailwind classes
+                              className="h-16 w-16 sm:h-20 sm:w-20 rounded-xl object-cover bg-slate-50"
                             />
                           ) : (
-                            <div className="h-16 w-16 sm:h-18 sm:w-18 rounded-xl bg-slate-50 flex items-center justify-center">
+                            <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-xl bg-slate-50 flex items-center justify-center">
                               <Store className="h-8 w-8 text-slate-300" />
                             </div>
                           )}

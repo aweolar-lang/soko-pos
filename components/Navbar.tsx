@@ -56,7 +56,8 @@ export default function Navbar() {
                 <Store className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
               <span className="hidden sm:block">Local<span className="text-emerald-600">Soko</span></span>
-              <span className="block sm:hidden">LokoSoko</span>
+              {/* FIXED TYPO: "LokoSoko" to "LocalSoko" */}
+              <span className="block sm:hidden">LocalSoko</span>
             </Link>
 
             {/* Auth State Actions */}
