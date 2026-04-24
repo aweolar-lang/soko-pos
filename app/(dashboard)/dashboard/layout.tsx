@@ -105,7 +105,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen bg-[#F8FAFC] flex font-sans text-slate-900 overflow-hidden">
       
       {/* DESKTOP SIDEBAR */}
-      <aside className="hidden lg:flex flex-col w-64 md:w-72 sticky top-0 h-screen bg-white border-r border-slate-200 z-10 shrink-0 shadow-sm">
+      <aside className="hidden lg:flex flex-col w-64 md:w-72 sticky top-0 h-screen bg-white border-r border-slate-200 z-10 shrink-0 shadow-sm print:hidden">
         <NavContent />
       </aside>
 
@@ -132,7 +132,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="flex-1 flex flex-col min-w-0 min-h-screen overflow-x-hidden">
         
         {/* FROSTED TOP HEADER */}
-        <header className="h-16 bg-white/80 backdrop-blur-xl border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-20 shrink-0 supports-[backdrop-filter]:bg-white/60">
+        <header className="h-16 bg-white/80 backdrop-blur-xl border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-20 shrink-0 supports-[backdrop-filter]:bg-white/60 print:hidden">
           
           <div className="flex items-center gap-3">
             {/* Mobile Menu Toggle */}
