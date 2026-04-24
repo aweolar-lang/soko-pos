@@ -152,7 +152,7 @@ export default async function MarketplaceHome({
       <div className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-10 flex flex-col md:flex-row gap-6 sm:gap-8 lg:gap-10">
         {/* LEFT SIDEBAR */}
         <aside className="w-full md:w-64 shrink-0 flex flex-col gap-4 sm:gap-6">
-          <div className="bg-white md:rounded-2xl md:border border-slate-200 md:p-5 md:shadow-sm md:sticky top-8 -mx-4 px-4 md:mx-0 md:px-0">
+          <div className="bg-white m-1 md:rounded-2xl md:border border-slate-200 md:p-5 md:shadow-sm md:sticky top-8 -mx-4 px-4 md:mx-0 md:px-0">
             <div className="hidden md:flex items-center justify-between mb-5">
               <h2 className="font-black text-slate-900 uppercase tracking-wider text-sm flex items-center gap-2">
                 <Grid className="h-4 w-4" /> Categories
