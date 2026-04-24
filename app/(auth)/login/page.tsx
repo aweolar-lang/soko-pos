@@ -4,13 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase"; 
-import { Store, Mail, Lock, Loader2, LogIn } from "lucide-react";
+import { Store, Mail, Lock, Loader2, LogIn, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { isValidEmail } from "@/lib/validators"; 
 
 export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false); // NEW: Toggle password visibility
   
   const [formData, setFormData] = useState({
     email: "",
@@ -106,11 +107,12 @@ export default function LoginPage() {
             name="email"
             type="email" 
             required 
+            disabled={isLoading}
             autoComplete="email"
             value={formData.email} 
             onChange={handleInputChange} 
             onBlur={handleBlur}
-            className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${
+            className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm disabled:bg-slate-50 disabled:text-slate-500 ${
               errors.email 
                 ? 'border-red-500 bg-red-50 focus:ring-red-500 text-red-900' 
                 : 'border-slate-200 bg-slate-50 focus:bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500'
@@ -138,19 +140,30 @@ export default function LoginPage() {
           <input 
             id="password"
             name="password"
-            type="password" 
+            type={showPassword ? "text" : "password"} 
             required 
+            disabled={isLoading}
             autoComplete="current-password"
             value={formData.password} 
             onChange={handleInputChange}
             onBlur={handleBlur} 
-            className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${
+            className={`w-full pl-10 pr-12 py-2.5 border rounded-xl outline-none transition-all text-sm disabled:bg-slate-50 disabled:text-slate-500 ${
               errors.password 
                 ? 'border-red-500 bg-red-50 focus:ring-red-500 text-red-900' 
                 : 'border-slate-200 bg-slate-50 focus:bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500'
             }`}  
             placeholder="••••••••" 
           />
+          {/* UX UPGRADE: Password Toggle Visibility */}
+          <button 
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            disabled={isLoading}
+            className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-50"
+            aria-label={showPassword ? "Hide password" : "Show password"}
+          >
+            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+          </button>
         </div>
         {errors.password && <p className="text-red-500 text-xs mt-1 font-medium">{errors.password}</p>}
       </div>
@@ -158,7 +171,7 @@ export default function LoginPage() {
       <button 
         type="submit" 
         disabled={isLoading || !isFormValid} 
-        className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+        className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
       >
         {isLoading ? (
           <>
