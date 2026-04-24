@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Search, MapPin, Navigation, Loader2, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -22,22 +22,43 @@ export default function MarketplaceSearch({
   const [query, setQuery] = useState(initialQuery ?? "");
   const [location, setLocation] = useState(initialLocation ?? "");
   const [isLocating, setIsLocating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    setQuery(initialQuery ?? "");
+    setLocation(initialLocation ?? "");
+  }, [initialQuery, initialLocation]);
+
+  const buildUrl = (q: string, loc: string) => {
+    const params = new URLSearchParams();
+
+    if (q.trim()) params.set("q", q.trim());
+    if (loc.trim()) params.set("location", loc.trim());
+    if (initialCategory.trim()) params.set("category", initialCategory.trim());
+
+    const qs = params.toString();
+    return qs ? `${pathname}?${qs}` : pathname;
+  };
 
   const handleSearch = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setIsSubmitting(true);
 
-    const params = new URLSearchParams();
-    if (query.trim()) params.set("q", query.trim());
-    if (location.trim()) params.set("location", location.trim());
-    if (initialCategory.trim()) params.set("category", initialCategory.trim());
+    const url = buildUrl(query, location);
+    router.push(url, { scroll: false });
 
-    const url = params.toString() ? `${pathname}?${params.toString()}` : pathname;
-    router.push(url);
+    setTimeout(() => setIsSubmitting(false), 150);
   };
 
   const clearSearch = () => {
     setQuery("");
     setLocation("");
+
+    const params = new URLSearchParams();
+    if (initialCategory.trim()) params.set("category", initialCategory.trim());
+
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   };
 
   const detectLocation = () => {
@@ -63,9 +84,7 @@ export default function MarketplaceSearch({
             }
           );
 
-          if (!response.ok) {
-            throw new Error("Reverse geocode request failed");
-          }
+          if (!response.ok) throw new Error("Reverse geocode request failed");
 
           const data = await response.json();
           const detectedPlace =
@@ -94,12 +113,14 @@ export default function MarketplaceSearch({
     );
   };
 
+  const hasFilters = Boolean(query.trim() || location.trim());
+
   return (
     <form
       onSubmit={handleSearch}
       className="z-10 mx-auto flex w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-lg shadow-slate-200/50 transition-all hover:shadow-xl focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-500/10 sm:flex-row sm:rounded-full"
     >
-      <div className="group flex flex-1 items-center border-b border-slate-100 px-6 py-4 sm:border-b-0 sm:border-r">
+      <div className="group flex flex-1 items-center border-b border-slate-100 px-5 py-4 sm:border-b-0 sm:border-r sm:px-6">
         <Search className="h-5 w-5 shrink-0 text-slate-400 transition-colors group-focus-within:text-emerald-600" />
         <div className="flex w-full flex-col pl-3">
           <span className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -115,9 +136,9 @@ export default function MarketplaceSearch({
         </div>
       </div>
 
-      <div className="group relative flex flex-1 items-center px-6 py-4">
+      <div className="group relative flex flex-1 items-center px-5 py-4 sm:px-6">
         <MapPin className="h-5 w-5 shrink-0 text-slate-400 transition-colors group-focus-within:text-emerald-600" />
-        <div className="flex w-full flex-col pl-3 pr-10">
+        <div className="flex w-full flex-col pl-3 pr-12">
           <span className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
             Neighborhood
           </span>
@@ -129,12 +150,14 @@ export default function MarketplaceSearch({
             className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-300"
           />
         </div>
+
         <button
           type="button"
           onClick={detectLocation}
           disabled={isLocating}
           className="absolute right-4 rounded-full bg-slate-50 p-2 text-slate-400 transition-all hover:bg-emerald-50 hover:text-emerald-600 disabled:cursor-not-allowed"
           title="Use my current location"
+          aria-label="Use my current location"
         >
           {isLocating ? (
             <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
@@ -145,22 +168,28 @@ export default function MarketplaceSearch({
       </div>
 
       <div className="m-1.5 flex w-full gap-2 sm:w-auto">
-        {(query || location) && (
+        {hasFilters && (
           <button
             type="button"
             onClick={clearSearch}
-            className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-semibold text-slate-600 transition-all hover:bg-slate-50 sm:rounded-full"
+            className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-4 text-sm font-semibold text-slate-600 transition-all hover:bg-slate-50 sm:rounded-full sm:px-5"
+            aria-label="Clear search"
           >
             <X className="h-4 w-4" />
-            Clear
+            <span className="hidden sm:inline">Clear</span>
           </button>
         )}
 
         <button
           type="submit"
-          className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-8 py-4 text-sm font-bold text-white transition-all active:scale-95 hover:bg-emerald-500 sm:w-auto sm:rounded-full"
+          disabled={isLocating || isSubmitting}
+          className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-8 py-4 text-sm font-bold text-white transition-all hover:bg-emerald-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto sm:rounded-full"
         >
-          <Search className="h-4 w-4" />
+          {isSubmitting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Search className="h-4 w-4" />
+          )}
           Search
         </button>
       </div>
