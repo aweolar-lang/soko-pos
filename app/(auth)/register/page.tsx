@@ -103,7 +103,7 @@ export default function RegisterPage() {
           first_name: formData.firstName,
           middle_name: formData.middleName, // Saved properly!
           last_name: formData.lastName,
-          phone: finalPhone, 
+          phone_number: finalPhone, 
           email: formData.email,
         });
 
