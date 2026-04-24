@@ -3,7 +3,7 @@ import { Camera, Mail, Heart, X, Store, ArrowRight, ShieldCheck, Zap } from "luc
 
 export default function Footer() {
   return (
-    <footer className="bg-white border-t border-slate-200 mt-auto overflow-hidden">
+    <footer className="bg-white border-t border-slate-200 mt-auto overflow-hidden print:hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-10 lg:gap-12 mb-12">

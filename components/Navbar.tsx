@@ -33,7 +33,7 @@ export default function Navbar() {
   return (
     <>
       {/* Promotional Top Bar - Smart truncation on mobile */}
-      <div className="bg-slate-900 text-white px-4 py-2.5 sm:py-2 text-[10px] sm:text-xs font-medium flex items-center justify-center gap-2 relative z-50">
+      <div className="bg-slate-900 text-white px-4 py-2.5 sm:py-2 text-[10px] sm:text-xs font-medium flex items-center justify-center gap-2 relative z-50 print:hidden">
         <span className="bg-emerald-500 text-white text-[9px] sm:text-[10px] uppercase font-black px-2 py-0.5 rounded-full shrink-0 tracking-wider">
           New
         </span>
@@ -46,7 +46,7 @@ export default function Navbar() {
       </div>
 
       {/* Main Navbar - Sticky with Frosted Glass */}
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200/60 supports-[backdrop-filter]:bg-white/60">
+      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200/60 supports-[backdrop-filter]:bg-white/60 print:hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 sm:h-20 items-center justify-between gap-4">
             
