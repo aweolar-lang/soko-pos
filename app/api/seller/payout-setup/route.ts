@@ -24,32 +24,46 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { mpesaNumber, storeName } = body;
+    // UPGRADE: Now accepts a payoutMethod ('MOBILE_MONEY' or 'BANK') and an optional bankCode
+    const { payoutMethod = 'MOBILE_MONEY', accountNumber, bankCode, storeName } = body;
 
-    if (!mpesaNumber) {
-      return NextResponse.json({ error: "M-Pesa number is required" }, { status: 400 });
+    if (!accountNumber) {
+      return NextResponse.json({ error: "Account number is required" }, { status: 400 });
     }
 
-   // --- UPDATED: SMART AUTO-FORMATTER ---
-    // Remove spaces, dashes, and plus signs
-    let cleanNumber = mpesaNumber.replace(/[\s+-]/g, '');
-    
-    // If it starts with 254, convert to 0
-    if (cleanNumber.startsWith('254')) {
-      cleanNumber = '0' + cleanNumber.substring(3);
-    }
-
-    // Smart Routing: Decide if it's a Phone Number or a Till Number
+    let finalAccountNumber = accountNumber;
     let paystackBankCode = "";
 
-    if (cleanNumber.length === 10) {
-      paystackBankCode = "MPESA"; // Standard Safaricom Mobile Money
-    } else if (cleanNumber.length >= 5 && cleanNumber.length <= 8) {
-      paystackBankCode = "MPTILL"; // Business Till Number
-    } else {
-      return NextResponse.json({ 
-        error: "Please enter a valid 10-digit phone number or a 5-8 digit Till number." 
-      }, { status: 400 });
+    // SCENARIO 1: Local Mobile Money (M-Pesa / Till)
+    if (payoutMethod === 'MOBILE_MONEY') {
+      // Remove spaces, dashes, and plus signs
+      let cleanNumber = accountNumber.replace(/[\s+-]/g, '');
+      
+      // If it starts with 254, convert to 0
+      if (cleanNumber.startsWith('254')) {
+        cleanNumber = '0' + cleanNumber.substring(3);
+      }
+
+      // Smart Routing: Phone Number vs Till Number
+      if (cleanNumber.length === 10) {
+        paystackBankCode = "MPESA"; 
+      } else if (cleanNumber.length >= 5 && cleanNumber.length <= 8) {
+        paystackBankCode = "MPTILL"; 
+      } else {
+        return NextResponse.json({ 
+          error: "Please enter a valid 10-digit phone number or a 5-8 digit Till number." 
+        }, { status: 400 });
+      }
+      
+      finalAccountNumber = cleanNumber;
+    } 
+    // SCENARIO 2: Global Bank Account
+    else if (payoutMethod === 'BANK') {
+      if (!bankCode) {
+        return NextResponse.json({ error: "Bank Code is required for International Bank payouts." }, { status: 400 });
+      }
+      paystackBankCode = bankCode; // e.g., "044" for Access Bank Nigeria, or a US routing equivalent
+      finalAccountNumber = accountNumber.replace(/[\s-]/g, ''); // clean any formatting
     }
 
     if (!process.env.PAYSTACK_SECRET_KEY) {
@@ -65,8 +79,8 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         business_name: storeName || "LocalSoko Vendor",
-        settlement_bank: paystackBankCode, // EXACT code Paystack expects (MPESA or MPTILL)
-        account_number: cleanNumber, 
+        settlement_bank: paystackBankCode, 
+        account_number: finalAccountNumber, 
         percentage_charge: 1, 
         description: `Automated Subaccount for ${storeName}`
       }),
@@ -74,10 +88,9 @@ export async function POST(req: Request) {
 
     const paystackData = await paystackRes.json();
 
-    // --- NEW: EXPOSE REAL ERROR ---
+    // EXPOSE REAL ERROR
     if (!paystackData.status) {
       console.error("Paystack API Error:", paystackData.message);
-      // We now pass the EXACT error message from Paystack to your frontend
       return NextResponse.json({ 
         error: `Paystack: ${paystackData.message}` 
       }, { status: 502 });

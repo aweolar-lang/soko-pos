@@ -1,75 +1,108 @@
-import { Scale, ShieldAlert, BadgeCheck, AlertTriangle } from "lucide-react";
+import { Scale, ShieldAlert, Globe, Landmark, FileDown, Gavel, FileText, CheckCircle2 } from "lucide-react";
 
 export default function TermsPage() {
   return (
-    <div className="space-y-12">
-      {/* Header */}
-      <div className="flex items-center gap-4 border-b border-slate-100 pb-8">
-        <div className="bg-slate-900 p-3 rounded-2xl">
-          <Scale className="h-8 w-8 text-emerald-400" />
+    <div className="max-w-5xl mx-auto space-y-16 pb-12 pt-8">
+      
+      {/* Hero Section */}
+      <div className="text-center">
+        <div className="inline-flex items-center justify-center p-4 bg-emerald-50 rounded-full mb-6 ring-4 ring-emerald-50/50">
+          <Scale className="h-12 w-12 text-emerald-600" />
         </div>
-        <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Terms of Service</h1>
-          <p className="text-sm text-slate-500 font-bold">Standard Usage Agreement for LocalSoko Platforms</p>
-        </div>
+        <h1 className="text-4xl sm:text-5xl font-black text-slate-900 mb-6 tracking-tight">
+          Global Terms <br />
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-blue-600">
+            of Service.
+          </span>
+        </h1>
+        <p className="text-lg sm:text-xl text-slate-500 max-w-2xl mx-auto font-medium leading-relaxed">
+          The standard legal agreement for merchants and buyers operating within the LocalSoko borderless commerce ecosystem.
+        </p>
       </div>
 
-      <div className="prose max-w-none text-slate-600 space-y-10 font-medium leading-relaxed">
+      <div className="space-y-8">
         
-        <section className="space-y-4">
-          <h2 className="text-xl font-black text-slate-900">1. Acceptance of Terms</h2>
-          <p>
-            By accessing LocalSoko or using the SokoPOS dashboard, you agree to be bound by these Terms of Service. LocalSoko provides a digital infrastructure (the "Platform") that connects independent Sellers with Buyers.
-          </p>
-        </section>
+        {/* Block 1: Platform Role & Usage */}
+        <div className="bg-white p-8 sm:p-10 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/40 space-y-8">
+          <section>
+            <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3 mb-4">
+              <Globe className="h-6 w-6 text-emerald-600" /> 1. The Platform's Role
+            </h2>
+            <p className="text-slate-600 leading-relaxed font-medium">
+              LocalSoko provides digital infrastructure (the "Platform") connecting independent Sellers with global and local Buyers. We are a venue and payment routing engine. We do not manufacture, store, or inspect physical items, nor do we create the digital assets sold. Consequently, LocalSoko is not liable for the quality, safety, or legality of items advertised by merchants.
+            </p>
+          </section>
 
-        <section className="space-y-4">
-          <h2 className="text-xl font-black text-slate-900">2. The Platform’s Role</h2>
-          <p>
-            LocalSoko is a venue. We are not a party to the transactions between Buyers and Sellers. We do not manufacture, store, or inspect the items sold through our storefronts. Consequently, LocalSoko is not responsible for the quality, safety, or legality of items advertised.
-          </p>
-        </section>
+          <div className="h-px w-full bg-slate-100"></div>
 
-        {/* Prohibited Items Section from original file */}
-        <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 space-y-4">
-          <h3 className="font-black text-slate-900 flex items-center gap-2">
-            <ShieldAlert className="h-5 w-5 text-red-500" /> 3. Prohibited Items & Conduct
-          </h3>
-          <p className="text-sm">Users are strictly prohibited from listing or selling:</p>
-          <ul className="grid sm:grid-cols-2 gap-3 text-sm">
-            <li className="flex gap-2"><span>•</span> Hazardous materials or regulated chemicals</li>
-            <li className="flex gap-2"><span>•</span> Counterfeit goods or unauthorized replicas</li>
-            <li className="flex gap-2"><span>•</span> Illegal substances or prescription drugs</li>
-            <li className="flex gap-2"><span>•</span> Items that promote hate speech or violence</li>
+          <section>
+            <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3 mb-4">
+              <FileDown className="h-6 w-6 text-blue-600" /> 2. Digital Assets & IP
+            </h2>
+            <p className="text-slate-600 leading-relaxed font-medium">
+              Merchants selling digital goods (eBooks, software, courses) guarantee they hold the explicit Intellectual Property (IP) rights to distribute these files. LocalSoko reserves the right to instantly terminate accounts and freeze payouts for merchants found distributing pirated, stolen, or unauthorized digital content.
+            </p>
+          </section>
+        </div>
+
+        {/* Block 2: Prohibited Items (Warning UI) */}
+        <div className="bg-slate-900 p-8 sm:p-10 rounded-[2rem] shadow-xl shadow-slate-900/20 text-white border border-slate-800">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="bg-red-500/20 p-3 rounded-2xl border border-red-500/30">
+              <ShieldAlert className="h-8 w-8 text-red-400" />
+            </div>
+            <h2 className="text-2xl font-black text-white">3. Prohibited Conduct & Items</h2>
+          </div>
+          <p className="text-slate-300 font-medium leading-relaxed mb-6">
+            To maintain a secure global marketplace, users are strictly prohibited from listing, routing payments for, or selling:
+          </p>
+          <ul className="grid sm:grid-cols-2 gap-4">
+            <li className="flex items-start gap-3 bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 text-slate-300 font-medium text-sm">
+              <CheckCircle2 className="h-5 w-5 text-red-400 shrink-0" /> Counterfeit goods, unauthorized replicas, or pirated digital media.
+            </li>
+            <li className="flex items-start gap-3 bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 text-slate-300 font-medium text-sm">
+              <CheckCircle2 className="h-5 w-5 text-red-400 shrink-0" /> Hazardous materials, illegal substances, or prescription drugs.
+            </li>
+            <li className="flex items-start gap-3 bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 text-slate-300 font-medium text-sm">
+              <CheckCircle2 className="h-5 w-5 text-red-400 shrink-0" /> Items or digital content that promote hate speech, discrimination, or violence.
+            </li>
+            <li className="flex items-start gap-3 bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 text-slate-300 font-medium text-sm">
+              <CheckCircle2 className="h-5 w-5 text-red-400 shrink-0" /> Fraudulent services, multi-level marketing (MLM) schemes, or scams.
+            </li>
           </ul>
         </div>
 
-        <section className="space-y-4">
-          <h2 className="text-xl font-black text-slate-900">4. Subscriptions & Billing</h2>
-          <p>
-            Store owners may access premium features via a subscription (Monthly or 6-Month plans). All fees are non-refundable. Trial periods are limited to one per user, and LocalSoko reserves the right to terminate trials if we suspect account duplication.
-          </p>
-        </section>
+        {/* Block 3: Financials */}
+        <div className="bg-white p-8 sm:p-10 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/40 space-y-8">
+          <section>
+            <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3 mb-4">
+              <Landmark className="h-6 w-6 text-emerald-600" /> 4. Global Payouts & Liability
+            </h2>
+            <p className="text-slate-600 leading-relaxed font-medium">
+              LocalSoko partners with verified payment gateways (e.g., Paystack) to route international and local payments. Sellers are responsible for ensuring their connected M-Pesa Till or Bank Account is accurate. LocalSoko is not liable for funds sent to incorrectly inputted merchant routing numbers, nor are we liable for "Reversal Scams" executed outside of our official payment gateway.
+            </p>
+          </section>
 
-        <section className="space-y-4">
-          <h2 className="text-xl font-black text-slate-900">5. M-Pesa & Payment Safety</h2>
-          <p>
-            Sellers using SokoPOS or online storefronts are responsible for verifying M-Pesa transaction codes. LocalSoko is not liable for "Reversal Scams" or fraudulent payment messages. We strongly advise all sellers to follow the guidelines in our <strong>Safety Center</strong>.
-          </p>
-        </section>
+          <div className="h-px w-full bg-slate-100"></div>
 
-        <section className="space-y-4">
-          <h2 className="text-xl font-black text-slate-900">6. Content Licensing</h2>
-          <p>
-            By posting images or descriptions on LocalSoko, you grant us a non-exclusive, worldwide license to display and use that content for the purpose of promoting your store and the Platform.
-          </p>
-        </section>
-
-        <div className="pt-8 border-t border-slate-100">
-          <p className="text-xs text-slate-400">
-            For legal inquiries, please contact <span className="font-bold text-slate-600 underline">legal@localsoko.com</span>
-          </p>
+          <section>
+            <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3 mb-4">
+              <FileText className="h-6 w-6 text-purple-600" /> 5. Subscriptions & Billing
+            </h2>
+            <p className="text-slate-600 leading-relaxed font-medium">
+              Merchants may access premium enterprise features via a subscription plan. All platform infrastructure fees are non-refundable. Trial periods are restricted to one per verified user identity, and LocalSoko reserves the right to terminate trials immediately upon detecting account duplication or abuse.
+            </p>
+          </section>
         </div>
+
+        {/* Footer Contact */}
+        <div className="mt-12 pt-8 border-t border-slate-200 text-center">
+          <div className="inline-flex items-center gap-2 text-slate-500 font-medium bg-slate-100 px-6 py-3 rounded-full border border-slate-200">
+            <Gavel className="h-5 w-5" />
+            For formal legal inquiries, please contact <a href="mailto:legal@localsoko.com" className="font-bold text-slate-900 hover:text-emerald-600 transition-colors">legal@localsoko.com</a>
+          </div>
+        </div>
+
       </div>
     </div>
   );

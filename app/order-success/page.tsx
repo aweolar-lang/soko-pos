@@ -29,6 +29,7 @@ export default async function OrderSuccessPage({
       cache: "no-store",
     });
 
+    // Fixed a rogue 'z' typo that was in the original file here
     const verifyData = await verifyRes.json();
 
     if (!verifyData.status) {
@@ -38,6 +39,16 @@ export default async function OrderSuccessPage({
     if (verifyData.data.status !== "success") {
       return <ErrorUI title="Payment Not Successful" message={`Transaction status is: ${verifyData.data.status}`} />;
     }
+
+    // --- UPGRADE: DYNAMIC CURRENCY FORMATTING ---
+    const rawAmount = verifyData.data.amount / 100; // Paystack sends amounts in cents
+    const currency = verifyData.data.currency || "KES"; // Defaults to KES if missing
+    
+    const formattedTotal = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+    }).format(rawAmount);
+    // --------------------------------------------
 
     // 3. CHECK METADATA
     const metadata = verifyData.data.metadata;
@@ -77,7 +88,8 @@ export default async function OrderSuccessPage({
     // NOTICE: All Supabase INSERT logic has been removed here! 
     // The Webhook handles database insertion securely in the background.
 
-    return <SuccessUI reference={reference} downloadUrl={downloadUrl} isDigital={isDigital} />;
+    // Pass the formattedTotal down to the UI
+    return <SuccessUI reference={reference} downloadUrl={downloadUrl} isDigital={isDigital} formattedTotal={formattedTotal} />;
 
   } catch (error: any) {
     return <ErrorUI title="Critical Code Crash" message={error.message || "Unknown error occurred"} />;
@@ -105,18 +117,25 @@ function ErrorUI({ title, message }: { title: string, message: string }) {
   );
 }
 
-function SuccessUI({ reference, downloadUrl, isDigital }: { reference: string, downloadUrl?: string | null, isDigital?: boolean }) {
+// Added formattedTotal to the props
+function SuccessUI({ reference, downloadUrl, isDigital, formattedTotal }: { reference: string, downloadUrl?: string | null, isDigital?: boolean, formattedTotal: string }) {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="bg-white max-w-md w-full rounded-3xl shadow-xl border border-slate-100 overflow-hidden text-center">
-        <div className="bg-emerald-500 p-8 flex flex-col items-center justify-center">
-          <div className="h-20 w-20 bg-white rounded-full flex items-center justify-center mb-4 shadow-inner">
-            <CheckCircle2 className="h-10 w-10 text-emerald-500" />
+      <div className="bg-white max-w-md w-full rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden text-center">
+        
+        {/* UPGRADED HEADER: Now displays the actual amount paid! */}
+        <div className="bg-emerald-600 p-8 flex flex-col items-center justify-center relative overflow-hidden">
+          <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay"></div>
+          <div className="h-16 w-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center mb-4 border border-white/30 relative z-10">
+            <CheckCircle2 className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-3xl font-black text-white tracking-tight">Payment Successful!</h1>
+          <h1 className="text-xl font-bold text-emerald-100 relative z-10 mb-1">Payment Successful</h1>
+          <span className="text-4xl font-black text-white relative z-10 tracking-tight">{formattedTotal}</span>
         </div>
+
         <div className="p-8 space-y-6">
           <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Transaction Ref</p>
             <p className="font-mono text-slate-900 font-bold bg-white border border-slate-200 py-2 rounded-xl text-sm break-all">
               {reference}
             </p>
@@ -125,7 +144,7 @@ function SuccessUI({ reference, downloadUrl, isDigital }: { reference: string, d
           {/* DIGITAL DOWNLOAD BUTTON */}
           {downloadUrl && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-4 rounded-xl shadow-md shadow-blue-600/20 transition-all active:scale-95">
+              <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-4 rounded-xl shadow-md shadow-blue-600/20 transition-all active:scale-[0.98]">
                 <Download className="h-5 w-5" /> Download Your File
               </a>
               <p className="text-xs text-slate-500 mt-3 font-medium">
@@ -136,14 +155,20 @@ function SuccessUI({ reference, downloadUrl, isDigital }: { reference: string, d
 
           {/* PHYSICAL ITEM NOTICE */}
           {!isDigital && (
-            <p className="text-sm text-slate-600 font-medium">
+            <p className="text-sm text-slate-600 font-medium bg-slate-50 p-4 rounded-xl border border-slate-100">
               The seller has been notified and your order is now being processed.
             </p>
           )}
 
-          <Link href="/" className="w-full flex items-center justify-center gap-2 bg-slate-900 text-white font-bold py-3.5 px-4 rounded-xl">
-            <Home className="h-5 w-5" /> Back to Homepage
-          </Link>
+          <div className="grid grid-cols-2 gap-3 pt-2">
+            <Link href="/" className="flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3.5 px-4 rounded-xl transition-all">
+              <Home className="h-4 w-4" /> Home
+            </Link>
+            <Link href="/dashboard" className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-md">
+              <Receipt className="h-4 w-4" /> Dashboard
+            </Link>
+          </div>
+
         </div>
       </div>
     </div>

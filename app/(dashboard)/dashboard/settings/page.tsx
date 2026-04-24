@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase"; 
-import { Store, Link as LinkIcon, Loader2, Save, AlertCircle, MapPin, Building2, Map, ImagePlus, AlignLeft, Smartphone, Tags, Truck, Banknote } from "lucide-react";
+import { Store, Link as LinkIcon, Loader2, Save, AlertCircle, MapPin, Building2, Map, ImagePlus, AlignLeft, Smartphone, Tags, Truck, Banknote, Landmark, Lock } from "lucide-react";
 import { toast } from "sonner";
 
 const STORE_CATEGORIES = [
@@ -36,11 +36,14 @@ export default function SettingsPage() {
     county: "",
     town: "",
     area: "",
-    paybill_number: "", 
+    paybill_number: "", // We use this to store EITHER the M-Pesa number or Bank Account number locally
     existingLogoUrl: "", 
     paystack_subaccount_code: "", 
     offers_delivery: false,
-    currency: "KES", // <-- NEW: CURRENCY STATE
+    currency: "KES",
+    // NEW UI-ONLY STATES FOR GLOBAL PAYOUTS
+    payoutMethod: "MOBILE_MONEY", 
+    bankCode: "",
   });
 
   useEffect(() => {
@@ -51,7 +54,6 @@ export default function SettingsPage() {
         
         setUserId(user.id);
 
-        // Fetch added 'currency' column
         const { data: store, error } = await supabase
           .from("stores")
           .select("id, name, slug, description, category, county, town, area, paybill_number, logo_url, paystack_subaccount_code, offers_delivery, currency")
@@ -75,7 +77,11 @@ export default function SettingsPage() {
             existingLogoUrl: store.logo_url || "",
             paystack_subaccount_code: store.paystack_subaccount_code || "",
             offers_delivery: store.offers_delivery || false,
-            currency: store.currency || "KES", // <-- SET CURRENCY FROM DB
+            currency: store.currency || "KES",
+            // We assume mobile money initially if they have an old account, 
+            // they can change it if they need to update routing
+            payoutMethod: "MOBILE_MONEY",
+            bankCode: "", 
           });
         }
       } catch (error: any) {
@@ -129,6 +135,7 @@ export default function SettingsPage() {
         ? formData.storeSlug.toLowerCase().replace(/[^a-z0-9]+/g, '-')
         : formData.storeName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
+      // We DO NOT save payoutMethod or bankCode to the DB, they are just used to generate the Subaccount Code!
       const updates = {
         owner_id: userId,
         name: formData.storeName,
@@ -138,10 +145,10 @@ export default function SettingsPage() {
         county: formData.county,
         town: formData.town,
         area: formData.area,
-        paybill_number: formData.paybill_number,
+        paybill_number: formData.paybill_number, // Saves the actual account/phone number for record keeping
         logo_url: finalLogoUrl,
         offers_delivery: formData.offers_delivery,
-        currency: formData.currency, // <-- SAVE CURRENCY TO DB
+        currency: formData.currency, 
       };
 
       if (storeId) {
@@ -152,7 +159,7 @@ export default function SettingsPage() {
         if (error) throw error;
       }
 
-      // Safe Payout Setup (Untouched)
+      // UPGRADE: Smarter Payout Routing Call!
       if (formData.paybill_number && formData.paybill_number !== originalPaybill) {
         toast.loading("Setting up payment details...", { id: toastId });
         
@@ -160,7 +167,9 @@ export default function SettingsPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            mpesaNumber: formData.paybill_number,
+            payoutMethod: formData.payoutMethod,
+            accountNumber: formData.paybill_number,
+            bankCode: formData.payoutMethod === "BANK" ? formData.bankCode : undefined,
             storeName: formData.storeName
           }),
         });
@@ -168,7 +177,7 @@ export default function SettingsPage() {
         const payData = await payRes.json();
         
         if (!payRes.ok) {
-          throw new Error(payData.error || "Failed to verify M-Pesa details");
+          throw new Error(payData.error || "Failed to verify payout details");
         }
         
         setOriginalPaybill(formData.paybill_number);
@@ -193,6 +202,8 @@ export default function SettingsPage() {
     );
   }
 
+  // Currency can only be selected during initial setup
+  const isCurrencyLocked = !!storeId;
   const isFormValid = formData.storeName && formData.county && formData.paybill_number && formData.category;
 
   return (
@@ -338,7 +349,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* NEW ROW: Delivery Toggle */}
+          {/* Delivery Toggle */}
           <div className="bg-blue-50/50 p-5 sm:p-6 rounded-3xl border border-blue-100">
             <h3 className="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
               <Truck className="h-5 w-5 text-blue-600" />
@@ -360,20 +371,21 @@ export default function SettingsPage() {
             </label>
           </div>
 
-          {/* NEW ROW: Currency Settings */}
-          <div className="bg-amber-50/30 p-5 sm:p-6 rounded-3xl border border-amber-100">
+          {/* Currency Settings (WITH LOCK LOGIC) */}
+          <div className={`p-5 sm:p-6 rounded-3xl border transition-colors ${isCurrencyLocked ? 'bg-slate-50 border-slate-200' : 'bg-amber-50/30 border-amber-100'}`}>
             <h3 className="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
-              <Banknote className="h-5 w-5 text-amber-500" />
+              <Banknote className={`h-5 w-5 ${isCurrencyLocked ? 'text-slate-400' : 'text-amber-500'}`} />
               Store Currency
             </h3>
             <p className="text-sm text-slate-500 mb-5">Choose the base currency for your store. This is what buyers will be charged in.</p>
             
             <div className="flex gap-4 max-w-sm">
-              <label className={`flex-1 flex items-center justify-center gap-2 p-3.5 rounded-xl border-2 cursor-pointer transition-all ${formData.currency === 'KES' ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+              <label className={`flex-1 flex items-center justify-center gap-2 p-3.5 rounded-xl border-2 transition-all ${isCurrencyLocked ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'} ${formData.currency === 'KES' ? (isCurrencyLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-amber-500 bg-amber-50 text-amber-700') : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
                 <input 
                   type="radio" 
                   name="currency" 
                   value="KES" 
+                  disabled={isCurrencyLocked}
                   checked={formData.currency === 'KES'}
                   onChange={(e) => setFormData({...formData, currency: e.target.value})}
                   className="sr-only" 
@@ -382,11 +394,12 @@ export default function SettingsPage() {
                 <span className="font-bold">KES</span>
               </label>
               
-              <label className={`flex-1 flex items-center justify-center gap-2 p-3.5 rounded-xl border-2 cursor-pointer transition-all ${formData.currency === 'USD' ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+              <label className={`flex-1 flex items-center justify-center gap-2 p-3.5 rounded-xl border-2 transition-all ${isCurrencyLocked ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'} ${formData.currency === 'USD' ? (isCurrencyLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-amber-500 bg-amber-50 text-amber-700') : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
                 <input 
                   type="radio" 
                   name="currency" 
                   value="USD" 
+                  disabled={isCurrencyLocked}
                   checked={formData.currency === 'USD'}
                   onChange={(e) => setFormData({...formData, currency: e.target.value})}
                   className="sr-only" 
@@ -395,26 +408,79 @@ export default function SettingsPage() {
                 <span className="font-bold">USD</span>
               </label>
             </div>
+
+            {isCurrencyLocked && (
+              <p className="text-xs text-amber-600 mt-4 flex items-center gap-1.5 font-bold bg-amber-50 px-3 py-2 rounded-lg border border-amber-100 w-fit">
+                <Lock className="h-3.5 w-3.5" /> Currency cannot be changed after setup. Contact support.
+              </p>
+            )}
           </div>
 
-          {/* Row 4: Payout Details */}
+          {/* UPGRADE: Payout Details (GLOBAL SUPPORT) */}
           <div className="bg-slate-50 p-5 sm:p-6 rounded-3xl border border-slate-200">
             <h3 className="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
-              <Smartphone className="h-5 w-5 text-emerald-600" />
-              M-Pesa Payout Settings
+              <Landmark className="h-5 w-5 text-emerald-600" />
+              Payout Settings
             </h3>
             <p className="text-sm text-slate-500 mb-5 sm:mb-6">Where should we automatically send your money when a customer pays?</p>
             
+            {/* Payout Toggle */}
+            <div className="flex gap-3 max-w-md mb-6">
+              <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all ${formData.payoutMethod === 'MOBILE_MONEY' ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-100'}`}>
+                <input 
+                  type="radio" name="payoutMethod" value="MOBILE_MONEY" 
+                  checked={formData.payoutMethod === 'MOBILE_MONEY'}
+                  onChange={(e) => setFormData({...formData, payoutMethod: e.target.value})}
+                  className="sr-only" 
+                />
+                <Smartphone className="h-4 w-4" /> M-Pesa
+              </label>
+              <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all ${formData.payoutMethod === 'BANK' ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-100'}`}>
+                <input 
+                  type="radio" name="payoutMethod" value="BANK" 
+                  checked={formData.payoutMethod === 'BANK'}
+                  onChange={(e) => setFormData({...formData, payoutMethod: e.target.value})}
+                  className="sr-only" 
+                />
+                <Landmark className="h-4 w-4" /> Bank Account
+              </label>
+            </div>
+
             <div className="flex flex-col md:flex-row md:items-end gap-4 sm:gap-6">
+              
+              {/* Conditional Bank Code Input */}
+              {formData.payoutMethod === 'BANK' && (
+                <div className="flex-1 animate-in fade-in zoom-in duration-200">
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Bank Code</label>
+                  <div className="relative">
+                    <Landmark className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
+                    <input 
+                      type="text" required={formData.payoutMethod === 'BANK'} 
+                      value={formData.bankCode} 
+                      onChange={(e) => setFormData({ ...formData, bankCode: e.target.value })} 
+                      className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-white" 
+                      placeholder="e.g. 044 (Access Bank)" 
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Account Number Input */}
               <div className="flex-1">
-                <label className="block text-sm font-bold text-slate-700 mb-2">M-Pesa Number / Till Number</label>
+                <label className="block text-sm font-bold text-slate-700 mb-2">
+                  {formData.payoutMethod === 'MOBILE_MONEY' ? "M-Pesa Number / Till Number" : "Bank Account Number"}
+                </label>
                 <div className="relative">
-                  <Smartphone className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
+                  {formData.payoutMethod === 'MOBILE_MONEY' ? (
+                    <Smartphone className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
+                  ) : (
+                    <Banknote className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
+                  )}
                   <input 
                     type="text" required value={formData.paybill_number} 
                     onChange={(e) => setFormData({ ...formData, paybill_number: e.target.value })} 
                     className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-white" 
-                    placeholder="e.g. 0712345678 or Till Number" 
+                    placeholder={formData.payoutMethod === 'MOBILE_MONEY' ? "e.g. 0712345678 or Till Number" : "Enter account number"} 
                   />
                 </div>
               </div>
@@ -426,6 +492,12 @@ export default function SettingsPage() {
                 </div>
               )}
             </div>
+            
+            {formData.payoutMethod === 'BANK' && (
+              <p className="text-xs text-slate-500 mt-3 font-medium">
+                Ensure your Bank Code matches your region's official Paystack bank routing codes.
+              </p>
+            )}
           </div>
 
           <div className="pt-4 border-t border-slate-100 flex justify-end">

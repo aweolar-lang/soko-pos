@@ -26,10 +26,10 @@ export default async function ProductDetailsPage({
     }
   );
 
-  // Added offers_delivery to the select query
+  // UPGRADE: Added 'currency' to the select query
   const { data: store, error: storeError } = await supabase
     .from("stores")
-    .select("id, name, description, tier, offers_delivery, category")
+    .select("id, name, description, tier, offers_delivery, category, currency")
     .eq("slug", resolvedParams.store_slug)
     .single();
 
@@ -46,6 +46,10 @@ export default async function ProductDetailsPage({
 
   const isHotel = store.category === "Food & Beverage";
 
+  // UPGRADE: Dynamic Currency Logic
+  const storeCurrency = store.currency || "KES";
+  const currencySymbol = storeCurrency === "USD" ? "$" : "Ksh ";
+
   // MAGIC FIX: Grab the array of images, or fallback to image_url, or return an empty array.
   const imagesList: string[] = product.images && product.images.length > 0 
     ? product.images 
@@ -61,7 +65,7 @@ export default async function ProductDetailsPage({
       <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-sm supports-[backdrop-filter]:bg-white/60">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <Link 
-            href={`/store/${resolvedParams.store_slug}`}
+            href={`/${resolvedParams.store_slug}`}
             className="flex items-center gap-2 text-slate-600 hover:text-emerald-600 font-bold transition-colors bg-slate-50 hover:bg-emerald-50 px-3 py-1.5 rounded-xl border border-slate-100"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -121,8 +125,9 @@ export default async function ProductDetailsPage({
               {product.title}
             </h1>
             
+            {/* UPGRADE: Dynamic Currency Symbol applied here! */}
             <div className={`text-3xl sm:text-4xl font-black mb-8 ${isOutOfStock ? 'text-slate-400' : 'text-slate-900'}`}>
-              Ksh {product.price.toLocaleString()}
+              {currencySymbol}{product.price.toLocaleString()}
             </div>
 
             <div className="prose prose-slate mb-8 flex-1">
@@ -169,7 +174,8 @@ export default async function ProductDetailsPage({
                 </button>
               ) : (
                 <div className="[&>button]:w-full [&>button]:py-4 [&>button]:rounded-2xl [&>button]:text-base [&>button]:font-bold [&>button]:shadow-md [&>button:active]:scale-[0.98] [&>button]:transition-all">
-                  <OrderModal product={product} storeId={store.id} isHotel={isHotel} />
+                  {/* UPGRADE: Passed storeCurrency to OrderModal */}
+                  <OrderModal product={product} storeId={store.id} isHotel={isHotel} storeCurrency={storeCurrency} />
                 </div>
               )}
             </div>

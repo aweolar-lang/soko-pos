@@ -18,7 +18,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
     }
 
-    // UPGRADE: Fetch the store's currency column as well
+    // UPGRADE: Fetch the product, including the store's Paystack code AND the newly added currency column
     const { data: product, error: productError } = await supabase
       .from("products")
       .select(`
@@ -38,24 +38,26 @@ export async function POST(req: Request) {
 
     // @ts-ignore - Supabase join typing workaround
     const subaccountCode = product.stores?.paystack_subaccount_code;
+    
+    // UPGRADE: Securely extract currency from the database (fallback to KES just in case)
     // @ts-ignore
     const storeCurrency = product.stores?.currency || "KES";
 
     // Hardcoded base URL
     const baseUrl = "https://localsoko.com";
 
-    // UPGRADE: Build Payload with dynamic currency
+    // 2. Build the Paystack Payload
     const paystackPayload: any = {
       email: buyerEmail,
       amount: Math.round(product.price * 100),
-      currency: storeCurrency, // <-- DYNAMIC CURRENCY
+      currency: storeCurrency, // UPGRADE: Pass the dynamic currency securely to Paystack
       callback_url: `${baseUrl}/order-success`,
       subaccount: subaccountCode || undefined,
       metadata: {
         product_id: product.id,
         store_id: product.store_id,
         is_digital: product.is_digital,
-        currency: storeCurrency, // Pass currency in metadata to log it easily later if needed
+        store_currency: storeCurrency, // Optional: Passing it in metadata makes viewing transaction logs easier
         custom_fields: [
           { display_name: "Buyer Name", variable_name: "buyer_name", value: buyerName },
           { display_name: "Buyer Phone", variable_name: "buyer_phone", value: buyerPhone || "N/A" },

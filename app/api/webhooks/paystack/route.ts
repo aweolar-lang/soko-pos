@@ -41,12 +41,10 @@ export async function POST(req: Request) {
         
         const now = new Date();
         let addMonths = plan === "1_MONTH" ? 1 : plan === "6_MONTHS" ? 6 : 12;
-        // Assuming 1_YEAR maps to VIP, and others to PREMIUM based on your existing logic
         let newTier = plan === "1_YEAR" ? 'VIP' : 'PREMIUM';
 
         const newSubEndsAt = new Date(now.setMonth(now.getMonth() + addMonths));
 
-        // Update the store
         const { error: subError } = await supabaseAdmin
           .from("stores")
           .update({
@@ -55,12 +53,11 @@ export async function POST(req: Request) {
           })
           .eq("owner_id", userId);
 
-        // NEW: Send the Subscription Welcome/Receipt Email
         if (!subError) {
           const amountPaid = event.data.amount / 100;
           await sendSubscriptionEmail(
             event.data.customer.email,
-            "LocalSoko Merchant", // You can hardcode this or fetch their profile name
+            "LocalSoko Merchant", 
             newTier,
             amountPaid,
             newSubEndsAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
@@ -92,6 +89,10 @@ export async function POST(req: Request) {
         const customerNotes = getField("customer_notes") || "None";
         
         const isDigital = metadata.is_digital === true || metadata.is_digital === "true";
+        
+        // UPGRADE: Safely extract currency from metadata (fallback to KES)
+        const storeCurrency = metadata.store_currency || event.data.currency || "KES";
+        const sym = storeCurrency === "USD" ? "$" : "Ksh ";
 
         // Safely parse time
         let formattedTakeawayTime = null;
@@ -122,7 +123,8 @@ export async function POST(req: Request) {
             fulfillment_type: fulfillmentType,
             takeaway_time: formattedTakeawayTime,
             status: 'NEW',
-            product_id: metadata.product_id 
+            product_id: metadata.product_id,
+            currency: storeCurrency // UPGRADE: Securely log the currency to the DB!
           })
           .select()
           .single();
@@ -162,7 +164,6 @@ export async function POST(req: Request) {
             const ownerId = prodData.stores.owner_id;
             
             if (ownerId) {
-              // Fetch directly from Supabase Auth (Bulletproof!)
               const { data: authData, error: authError } = await supabaseAdmin.auth.admin.getUserById(ownerId);
               
               if (authData?.user?.email) {
@@ -174,16 +175,18 @@ export async function POST(req: Request) {
           }
 
           // -----------------------------------------------------
-          // SEND SELLER ALERTS (Always send, physical or digital)
+          // SEND SELLER ALERTS
           // -----------------------------------------------------
           if (sellerEmail && prodData) {
+            // UPGRADE: Added the dynamic symbol parameter
             await sendSellerNotificationEmail(
               sellerEmail, 
               storeName, 
               prodData.title, 
               buyerName, 
               event.data.amount / 100,
-              fulfillmentType
+              fulfillmentType,
+              sym 
             );
           }
 
@@ -198,7 +201,7 @@ export async function POST(req: Request) {
             });
             if (stockError) console.error("🚨 Failed to reduce stock:", stockError);
 
-            // 2. Email Buyer (Physical Order Confirmation)
+            // 2. Email Buyer
             if (prodData) {
                await sendPhysicalOrderEmail(
                  event.data.customer.email, 
@@ -230,7 +233,7 @@ export async function POST(req: Request) {
       }
     } 
     // ==========================================
-    // SCENARIO 2: TRANSFER SUCCESS (Money Out) - KEPT EXACTLY THE SAME
+    // SCENARIO 2: TRANSFER SUCCESS (Money Out) 
     // ==========================================
     else if (event.event === "transfer.success") {
       const transferData = event.data;
@@ -305,7 +308,6 @@ async function sendMailjetEmail(toEmail: string, toName: string, subject: string
   }
 }
 
-// 1. Email for the Buyer (Digital)
 async function sendDigitalDownloadEmail(toEmail: string, toName: string, productTitle: string, downloadLink: string) {
   const html = `
     <div style="font-family: sans-serif; max-w: 600px; margin: 0 auto; padding: 20px;">
@@ -319,7 +321,6 @@ async function sendDigitalDownloadEmail(toEmail: string, toName: string, product
   await sendMailjetEmail(toEmail, toName, `Your Download: ${productTitle}`, html);
 }
 
-// 2. Email for the Buyer (Physical/Food)
 async function sendPhysicalOrderEmail(toEmail: string, toName: string, productTitle: string, storeName: string, type: string) {
   const isDelivery = type === "DELIVERY" || type === "SHIPPING";
   const html = `
@@ -334,8 +335,8 @@ async function sendPhysicalOrderEmail(toEmail: string, toName: string, productTi
   await sendMailjetEmail(toEmail, toName, `Order Confirmed: ${productTitle}`, html);
 }
 
-// 3. Email for the Seller (All orders)
-async function sendSellerNotificationEmail(toEmail: string, sellerName: string, productTitle: string, buyerName: string, amount: number, type: string) {
+// UPGRADE: Added the `sym` parameter to print $ or Ksh
+async function sendSellerNotificationEmail(toEmail: string, sellerName: string, productTitle: string, buyerName: string, amount: number, type: string, sym: string) {
   const html = `
     <div style="font-family: sans-serif; max-w: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
       <h2 style="color: #10B981;">Cha-Ching! New Order! 💸</h2>
@@ -343,7 +344,7 @@ async function sendSellerNotificationEmail(toEmail: string, sellerName: string, 
       <p>You just received a new order for <strong>${productTitle}</strong> from <strong>${buyerName}</strong>.</p>
       <ul style="background-color: #f8fafc; padding: 20px; border-radius: 8px; list-style: none;">
         <li><strong>Item:</strong> ${productTitle}</li>
-        <li><strong>Amount Paid:</strong> Ksh ${amount.toLocaleString()}</li>
+        <li><strong>Amount Paid:</strong> ${sym}${amount.toLocaleString()}</li>
         <li><strong>Fulfillment Method:</strong> ${type}</li>
       </ul>
       <p style="margin-top: 20px;">Log into your SokoPOS Dashboard to view the full details and manage this order.</p>
@@ -351,10 +352,8 @@ async function sendSellerNotificationEmail(toEmail: string, sellerName: string, 
     </div>
   `;
   await sendMailjetEmail(toEmail, sellerName, `New Order Received: ${productTitle}`, html);
-
 }
 
-// 4. Email for Store Owners (Platform Subscriptions)
 async function sendSubscriptionEmail(toEmail: string, toName: string, tier: string, amount: number, expiryDate: string) {
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-w: 600px; margin: 0 auto; background-color: #F8FAFC; padding: 40px 20px;">

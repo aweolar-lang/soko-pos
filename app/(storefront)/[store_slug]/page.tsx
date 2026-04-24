@@ -29,15 +29,18 @@ export default async function StorefrontPage({
     }
   );
 
-  // Added offers_delivery here
+  // UPGRADE: Added currency to the fetch list
   const { data: store, error: storeError } = await supabase
     .from("stores")
-    .select("id, name, description, logo_url, county, town, area, tier, category, owner_id, offers_delivery" )
+    .select("id, name, description, logo_url, county, town, area, tier, category, owner_id, offers_delivery, currency" )
     .eq("slug", resolvedParams.store_slug) 
     .single();
 
   if (storeError || !store) notFound(); 
 
+  // DYNAMIC CURRENCY LOGIC
+  const storeCurrency = store.currency || "KES";
+  const currencySymbol = storeCurrency === "USD" ? "$" : "Ksh ";
 
   let rawPhone = "";
   if (store.owner_id) {
@@ -51,6 +54,7 @@ export default async function StorefrontPage({
       rawPhone = profile.phone_number;
     }
   }
+  
   // Initialize the product query
   let productQuery = supabase
     .from("products")
@@ -234,9 +238,9 @@ export default async function StorefrontPage({
                         )}
                       </div>
                       
-                      {/* Price Pill */}
+                      {/* UPGRADE: Dynamic Price Pill */}
                       <span className="bg-white/95 backdrop-blur-md text-slate-900 text-xs sm:text-sm font-black px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl shadow-sm border border-white/20">
-                        Ksh {product.price.toLocaleString()}
+                        {currencySymbol}{product.price.toLocaleString()}
                       </span>
                     </div>
                   </Link>
@@ -270,7 +274,8 @@ export default async function StorefrontPage({
                         </button>
                       ) : (
                         <div className="[&>button]:w-full [&>button]:py-2.5 sm:[&>button]:py-3 [&>button]:rounded-xl [&>button]:text-sm [&>button]:font-bold [&>button]:shadow-sm [&>button:active]:scale-[0.98] [&>button]:transition-all">
-                           <OrderModal product={product} storeId={store.id} isHotel={isHotel} />
+                           {/* UPGRADE: Passing storeCurrency to the Modal! */}
+                           <OrderModal product={product} storeId={store.id} isHotel={isHotel} storeCurrency={storeCurrency} />
                         </div>
                       )}
                     </div>

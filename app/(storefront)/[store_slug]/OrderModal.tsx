@@ -18,12 +18,16 @@ interface OrderModalProps {
   product: Product;
   storeId: string;
   isHotel: boolean;
+  storeCurrency?: string; // UPGRADE: Added storeCurrency prop
 }
 
-export default function OrderModal({ product, storeId, isHotel }: OrderModalProps) {
+export default function OrderModal({ product, storeId, isHotel, storeCurrency = "KES" }: OrderModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+
+  // Dynamic currency logic
+  const currencySymbol = storeCurrency === "USD" ? "$" : "Ksh ";
 
   // Form State
   const [formData, setFormData] = useState({
@@ -96,7 +100,8 @@ export default function OrderModal({ product, storeId, isHotel }: OrderModalProp
               </div>
             )}
             <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-md text-slate-900 font-black px-4 py-2 rounded-full shadow-lg text-lg">
-              Ksh {product.price.toLocaleString()}
+              {/* UPGRADE: Dynamic Currency Symbol */}
+              {currencySymbol}{product.price.toLocaleString()}
             </div>
           </div>
           
@@ -129,8 +134,8 @@ export default function OrderModal({ product, storeId, isHotel }: OrderModalProp
               <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Full Name</label>
               <input 
                 type="text" required value={formData.buyerName} onChange={(e) => setFormData({...formData, buyerName: e.target.value})}
-                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white transition-all" 
-                placeholder="John Doe" 
+                className="w-full text-slate-900 px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-slate-50 focus:bg-white transition-all" 
+                placeholder="John Doe"
               />
             </div>
 
