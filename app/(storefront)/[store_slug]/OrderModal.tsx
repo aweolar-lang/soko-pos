@@ -18,7 +18,7 @@ interface OrderModalProps {
   product: Product;
   storeId: string;
   isHotel: boolean;
-  storeCurrency?: string; // UPGRADE: Added storeCurrency prop
+  storeCurrency?: string;
 }
 
 export default function OrderModal({ product, storeId, isHotel, storeCurrency = "KES" }: OrderModalProps) {
