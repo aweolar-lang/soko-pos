@@ -137,7 +137,7 @@ export default function RegisterPage() {
             <input 
               type="text" name="firstName" required
               value={formData.firstName} onChange={handleChange} onBlur={handleBlur}
-              className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${errors.firstName ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
+              className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-slate-900 text-sm ${errors.firstName ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
             />
           </div>
           {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>}
@@ -152,7 +152,7 @@ export default function RegisterPage() {
             <input 
               type="text" name="middleName" 
               value={formData.middleName} onChange={handleChange} onBlur={handleBlur}
-              className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${errors.middleName ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
+              className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-slate-900 text-sm ${errors.middleName ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
             />
           </div>
           {errors.middleName && <p className="text-red-500 text-xs mt-1">{errors.middleName}</p>}
@@ -166,7 +166,7 @@ export default function RegisterPage() {
           <input 
             type="text" name="lastName" required
             value={formData.lastName} onChange={handleChange} onBlur={handleBlur}
-            className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${errors.lastName ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
+            className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-slate-900 text-sm ${errors.lastName ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
           />
         </div>
         {errors.lastName && <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>}
@@ -180,7 +180,7 @@ export default function RegisterPage() {
             type="tel" name="phone" required
             value={formData.phone} onChange={handleChange} onBlur={handleBlur}
             placeholder="07XX XXX XXX"
-            className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${errors.phone ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
+            className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-slate-900 text-sm ${errors.phone ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
           />
         </div>
         {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
@@ -193,7 +193,7 @@ export default function RegisterPage() {
           <input 
             type="email" name="email" required
             value={formData.email} onChange={handleChange} onBlur={handleBlur}
-            className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${errors.email ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
+            className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-slate-900 text-sm ${errors.email ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
           />
         </div>
         {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
@@ -206,7 +206,7 @@ export default function RegisterPage() {
           <input 
             type="password" name="password" required
             value={formData.password} onChange={handleChange} onBlur={handleBlur}
-            className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${errors.password ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
+            className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-slate-900 text-sm ${errors.password ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
           />
         </div>
         {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
