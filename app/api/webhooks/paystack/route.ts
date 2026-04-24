@@ -244,6 +244,7 @@ export async function POST(req: Request) {
 
       if (!subaccountCode) return NextResponse.json({ received: true }, { status: 200 });
 
+      // 1. Idempotency Check (Prevent duplicate logging)
       const { data: existingPayout } = await supabaseAdmin
         .from("payouts")
         .select("id")
@@ -252,22 +253,53 @@ export async function POST(req: Request) {
 
       if (existingPayout) return NextResponse.json({ received: true }, { status: 200 });
 
+      // 2. Fetch Store Details
       const { data: store, error: storeError } = await supabaseAdmin
         .from("stores")
-        .select("id")
+        .select("id, owner_id, store_name")
         .eq("paystack_subaccount_code", subaccountCode)
         .single();
 
       if (!store || storeError) return NextResponse.json({ received: true }, { status: 200 });
 
+      // 3. Insert Payout into DB
+      // UPGRADE: Works for both KES cents and USD cents
+      const settledAmount = transferData.amount / 100;
+      const currency = transferData.currency || "KES";
+
       await supabaseAdmin
         .from("payouts")
         .insert({
           store_id: store.id,
-          amount_paid: transferData.amount / 100, 
+          amount_paid: settledAmount, 
           paystack_reference: transferData.reference,
           status: "COMPLETED"
         });
+
+      // 4. Fetch Owner's Email and Send Notification via Helper
+      const { data: storeOwner } = await supabaseAdmin
+        .from("users") // Ensure this matches your user table name
+        .select("email")
+        .eq("id", store.owner_id)
+        .single();
+
+      if (storeOwner?.email) {
+        try {
+          // UPGRADE: Pass the currency to correctly print $ or Ksh
+          await sendPayoutEmail(
+            storeOwner.email,
+            store.store_name || "Vendor",
+            settledAmount,
+            transferData.reference,
+            currency
+          );
+        } catch (emailError) {
+          console.error("Failed to send payout email:", emailError);
+          // Fail silently so we still return 200 OK to Paystack
+        }
+      }
+
+      return NextResponse.json({ received: true }, { status: 200 });
     }
 
     return NextResponse.json({ received: true }, { status: 200 });
@@ -306,6 +338,47 @@ async function sendMailjetEmail(toEmail: string, toName: string, subject: string
   } catch (error) {
     console.error("Mailjet Error:", error);
   }
+}
+
+// UPGRADE: Added currency parameter (defaults to KES)
+async function sendPayoutEmail(toEmail: string, toName: string, amount: number, reference: string, currency: string = "KES") {
+  // Dynamically set symbol based on the currency sent from Paystack
+  const currencySymbol = currency === "USD" ? "$" : "Ksh ";
+
+  const html = `
+    <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;">
+      <div style="text-align: center; padding-bottom: 20px; border-bottom: 2px solid #10b981;">
+        <h2 style="color: #0f172a; margin: 0; font-size: 24px;">Local<span style="color: #10b981;">Soko</span></h2>
+      </div>
+      
+      <div style="padding: 30px 0; text-align: center;">
+        <div style="background-color: #d1fae5; color: #059669; width: 60px; height: 60px; border-radius: 50%; line-height: 60px; font-size: 28px; margin: 0 auto 20px auto;">
+          🏦
+        </div>
+        <h1 style="color: #0f172a; font-size: 22px; margin-bottom: 8px;">Settlement Complete</h1>
+        <p style="color: #64748b; font-size: 16px; margin-bottom: 32px;">Your funds have been transferred to your account.</p>
+        
+        <p style="color: #334155; font-size: 16px; line-height: 1.6; text-align: left;">Hi <strong>${toName}</strong>,</p>
+        <p style="color: #334155; font-size: 16px; line-height: 1.6; text-align: left;">This is an automated notification to confirm that your payout has been successfully deposited into your registered M-Pesa Till or account.</p>
+        
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 30px 0; text-align: left;">
+          <ul style="list-style: none; padding: 0; margin: 0; color: #334155; font-size: 15px;">
+            <li style="margin-bottom: 12px;"><span style="color: #64748b;">Amount Settled:</span> <strong style="font-size: 18px; color: #10b981;">${currencySymbol}${amount.toLocaleString()}</strong></li>
+            <li style="margin-bottom: 12px;"><span style="color: #64748b;">Status:</span> <strong>Completed</strong></li>
+            <li><span style="color: #64748b;">Bank Reference:</span> <span style="font-family: monospace; color: #475569;">${reference}</span></li>
+          </ul>
+        </div>
+
+        <div style="text-align: center; margin: 40px 0;">
+          <a href="https://localsoko.com/dashboard/sales" style="background-color: #0f172a; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">View Transaction History</a>
+        </div>
+        
+        <p style="color: #94a3b8; font-size: 14px; margin-top: 40px; text-align: center;">This is an automated message. Please check your account statement to confirm receipt.</p>
+      </div>
+    </div>
+  `;
+  
+  await sendMailjetEmail(toEmail, toName, `🏦 Settlement Complete - LocalSoko`, html);
 }
 
 async function sendDigitalDownloadEmail(toEmail: string, toName: string, productTitle: string, downloadLink: string) {
