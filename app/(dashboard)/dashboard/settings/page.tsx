@@ -31,7 +31,7 @@ export default function SettingsPage() {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   
-  const [originalPaybill, setOriginalPaybill] = useState("");
+  const [originalPayoutAccount, setOriginalPayoutAccount] = useState("");
 
   const [formData, setFormData] = useState({
     storeName: "",
@@ -41,32 +41,33 @@ export default function SettingsPage() {
     county: "",
     town: "",
     area: "",
-    kra_pin: "", // NEW: KRA Pin for compliance
-    settlement_name: "", // NEW: Business/Owner Identity name
-    paybill_number: "", // M-Pesa or Bank Account
+    kra_pin: "", 
+    settlement_name: "", 
     existingLogoUrl: "", 
-    paystack_subaccount_code: "", 
     offers_delivery: false,
     currency: "KES",
-    payoutMethod: "MOBILE_MONEY", 
-    bankCode: "",
+    // New Upgraded Payout Columns
+    payout_method: "MOBILE_MONEY", 
+    payout_account_number: "", 
+    payout_bank_code: "",
+    paystack_subaccount_code: "", 
   });
 
   const [errors, setErrors] = useState({
-  storeName: "",
-  description: "",
-  kra_pin: "",
-  settlement_name: "",
-  paybill_number: "",
+    storeName: "",
+    description: "",
+    kra_pin: "",
+    settlement_name: "",
+    payout_account_number: "",
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-  const { name, value } = e.target;
-  setFormData((prev) => ({ ...prev, [name]: value }));
-  
-  if (errors[name as keyof typeof errors]) {
-    setErrors((prev) => ({ ...prev, [name]: "" }));
-  }
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    
+    if (errors[name as keyof typeof errors]) {
+      setErrors((prev) => ({ ...prev, [name]: "" }));
+    }
   };
 
   // 4. Validate Fields on Blur
@@ -74,30 +75,30 @@ export default function SettingsPage() {
     const { name, value } = e.target;
     if (!value) return; 
 
-      // Store Name Validation
+    // Store Name Validation
     if (name === "storeName" && value.trim().length < 3) {
       setErrors((prev) => ({ ...prev, storeName: "Store name must be at least 3 characters." }));
     }
 
-  // Description Validation
+    // Description Validation
     if (name === "description" && value.trim().length < 10) {
       setErrors((prev) => ({ ...prev, description: "Description must be at least 10 characters." }));
     }
   
-  // KRA PIN Validation
+    // KRA PIN Validation
     if (name === "kra_pin" && !isValidKRAPin(value)) {
       setErrors((prev) => ({ ...prev, kra_pin: "Invalid KRA PIN. Must start with P/A, have 9 digits, and end with a letter." }));
     }
 
-  // Settlement Name (Bank Account Name) Validation
+    // Settlement Name (Bank Account Name) Validation
     if (name === "settlement_name" && !isValidName(value)) {
       setErrors((prev) => ({ ...prev, settlement_name: "Please enter a valid legal name." }));
     }
 
-    // Paybill / Account Number Validation (UPDATED FOR TILLS)
-    if (name === "paybill_number") {
+    // Payout Account Number Validation (UPDATED FOR TILLS & PHONES)
+    if (name === "payout_account_number") {
       
-      if (formData.payoutMethod === 'MOBILE_MONEY') {
+      if (formData.payout_method === 'MOBILE_MONEY') {
         // 1. Remove any accidental spaces the user typed
         const cleanValue = value.replace(/\s/g, '');
 
@@ -106,7 +107,7 @@ export default function SettingsPage() {
 
         if (isTillOrPaybill) {
           // It's a Till number! Just save the clean numeric value.
-          setFormData((prev) => ({ ...prev, paybill_number: cleanValue }));
+          setFormData((prev) => ({ ...prev, payout_account_number: cleanValue }));
         } else {
           // It's NOT a Till number, so it must be a Phone Number. Run our formatter.
           const formattedPhone = formatKenyanPhone(value);
@@ -114,34 +115,33 @@ export default function SettingsPage() {
           if (!formattedPhone) {
             setErrors((prev) => ({ 
               ...prev, 
-              paybill_number: "Invalid entry. Enter a 5-8 digit Till Number OR a valid 07XX... phone number." 
+              payout_account_number: "Invalid entry. Enter a 5-8 digit Till Number OR a valid 07XX... phone number." 
             }));
           } else {
             // It's a valid phone number! Save the 254... formatted version.
-            setFormData((prev) => ({ ...prev, paybill_number: formattedPhone }));
+            setFormData((prev) => ({ ...prev, payout_account_number: formattedPhone }));
           }
         }
       } 
       
-      else if (formData.payoutMethod === 'BANK') {
+      else if (formData.payout_method === 'BANK') {
         // Basic Bank Account Validation (e.g., must be numeric and between 8-15 digits)
         const bankRegex = /^\d{8,15}$/;
         if (!bankRegex.test(value.replace(/\s/g, ''))) {
-          setErrors((prev) => ({ ...prev, paybill_number: "Invalid Bank Account Number (8-15 digits)." }));
+          setErrors((prev) => ({ ...prev, payout_account_number: "Invalid Bank Account Number (8-15 digits)." }));
         }
       }
     }
   };
 
-const isFormValid = 
-  formData.storeName.trim().length >= 3 &&
-  formData.kra_pin.trim() !== "" &&
-  formData.settlement_name.trim() !== "" &&
-  formData.paybill_number.trim() !== "" &&
-  formData.county.trim() !== "" &&
-  formData.category.trim() !== "" &&
-  !Object.values(errors).some(error => error !== "");
-
+  const isFormValid = 
+    formData.storeName.trim().length >= 3 &&
+    formData.kra_pin.trim() !== "" &&
+    formData.settlement_name.trim() !== "" &&
+    formData.payout_account_number.trim() !== "" &&
+    formData.county.trim() !== "" &&
+    formData.category.trim() !== "" &&
+    !Object.values(errors).some(error => error !== "");
 
   useEffect(() => {
     const fetchStoreDetails = async () => {
@@ -151,9 +151,10 @@ const isFormValid =
         
         setUserId(user.id);
 
+        // MAP TO NEW DB COLUMNS
         const { data: store, error } = await supabase
           .from("stores")
-          .select("id, name, slug, description, category, county, town, area, kra_pin, settlement_name, paybill_number, logo_url, paystack_subaccount_code, offers_delivery, currency")
+          .select("id, name, slug, description, category, county, town, area, kra_pin, settlement_name, payout_method, payout_account_number, payout_bank_code, logo_url, paystack_subaccount_code, offers_delivery, currency")
           .eq("owner_id", user.id)
           .single();
 
@@ -161,7 +162,7 @@ const isFormValid =
 
         if (store) {
           setStoreId(store.id);
-          setOriginalPaybill(store.paybill_number || "");
+          setOriginalPayoutAccount(store.payout_account_number || "");
           setFormData({
             storeName: store.name || "",
             storeSlug: store.slug || "",
@@ -172,13 +173,14 @@ const isFormValid =
             area: store.area || "",
             kra_pin: store.kra_pin || "",
             settlement_name: store.settlement_name || "",
-            paybill_number: store.paybill_number || "",
             existingLogoUrl: store.logo_url || "",
-            paystack_subaccount_code: store.paystack_subaccount_code || "",
             offers_delivery: store.offers_delivery || false,
             currency: store.currency || "KES",
-            payoutMethod: "MOBILE_MONEY",
-            bankCode: "", 
+            // Mapping new columns to state
+            payout_method: store.payout_method || "MOBILE_MONEY",
+            payout_account_number: store.payout_account_number || "",
+            payout_bank_code: store.payout_bank_code || "",
+            paystack_subaccount_code: store.paystack_subaccount_code || "",
           });
         }
       } catch (error: any) {
@@ -200,7 +202,7 @@ const isFormValid =
     }
   };
 
- const handleSave = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId) return toast.error("User not authenticated.");
 
@@ -210,7 +212,7 @@ const isFormValid =
     try {
       let finalLogoUrl = formData.existingLogoUrl;
 
-      // 1. Upload Logo (Unchanged)
+      // 1. Upload Logo
       if (logoFile) {
         const fileExt = logoFile.name.split('.').pop();
         const fileName = `${userId}-${Date.now()}.${fileExt}`;
@@ -234,23 +236,23 @@ const isFormValid =
       // ==========================================
       let currentSubaccountCode = formData.paystack_subaccount_code;
 
-      if (formData.paybill_number && formData.paybill_number !== originalPaybill) {
+      if (formData.payout_account_number && formData.payout_account_number !== originalPayoutAccount) {
         toast.loading("Verifying payment details...", { id: toastId });
         
         const payRes = await fetch("/api/seller/payout-setup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            payoutMethod: formData.payoutMethod,
-            accountNumber: formData.paybill_number,
-            bankCode: formData.payoutMethod === "BANK" ? formData.bankCode : undefined,
+            payoutMethod: formData.payout_method,
+            accountNumber: formData.payout_account_number,
+            bankCode: formData.payout_method === "BANK" ? formData.payout_bank_code : undefined,
             storeName: formData.storeName
           }),
         });
         
         const payData = await payRes.json();
         
-        // If Paystack fails, we STOP the whole process right here.
+        // If Paystack fails, STOP the process
         if (!payRes.ok) {
           throw new Error(payData.error || "Paystack rejected this account number.");
         }
@@ -262,6 +264,7 @@ const isFormValid =
         ? formData.storeSlug.toLowerCase().replace(/[^a-z0-9]+/g, '-')
         : formData.storeName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
+      // FULLY ALIGNED WITH YOUR NEW DATABASE SCHEMA
       const updates = {
         owner_id: userId,
         name: formData.storeName,
@@ -273,26 +276,27 @@ const isFormValid =
         area: formData.area,
         kra_pin: formData.kra_pin,
         settlement_name: formData.settlement_name,
-        paybill_number: formData.paybill_number, 
+        payout_method: formData.payout_method,
+        payout_account_number: formData.payout_account_number, 
+        payout_bank_code: formData.payout_bank_code,
+        paystack_subaccount_code: currentSubaccountCode, 
         logo_url: finalLogoUrl,
         offers_delivery: formData.offers_delivery,
         currency: formData.currency, 
-        paystack_subaccount_code: currentSubaccountCode, // Safely save the verified code!
       };
 
       if (storeId) {
         const { error } = await supabase.from('stores').update(updates).eq('id', storeId);
         if (error) throw error;
       } else {
-        // We use .select('id').single() to grab the ID immediately after creating it
         const { data: newStore, error } = await supabase.from('stores').insert([updates]).select('id').single();
         if (error) throw error;
         
-        setStoreId(newStore.id); // This instantly fixes the "Create Store" button!
+        setStoreId(newStore.id); 
       }
 
       // Update local state
-      setOriginalPaybill(formData.paybill_number);
+      setOriginalPayoutAccount(formData.payout_account_number);
       setFormData(prev => ({...prev, paystack_subaccount_code: currentSubaccountCode}));
 
       toast.success("Store profile saved successfully!", { id: toastId });
@@ -302,11 +306,9 @@ const isFormValid =
     
       let errorMessage = error.message || "An error occurred while saving.";
       
-      // Catch Database "Duplicate Key" error
       if (error.code === '23505') {
         errorMessage = "That Store URL is already taken. Please type a different URL.";
       } 
-      // Catch Paystack specific errors
       else if (errorMessage.toLowerCase().includes("paystack") || errorMessage.toLowerCase().includes("invalid")) {
         errorMessage = "Payment Setup Failed: Double check your account number and try again.";
       }
@@ -325,7 +327,6 @@ const isFormValid =
     );
   }
 
-  // NEW: Only lock if we successfully have a Paystack code
   const isFinancialsLocked = !!formData.paystack_subaccount_code;
   
   return (
@@ -521,22 +522,22 @@ const isFormValid =
           <div className="grid md:grid-cols-2 gap-5 sm:gap-6">
             {/* KRA PIN */}
             <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1">KRA PIN</label>
-               <div className="relative">
-            <FileText className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
-    <input 
-      type="text" 
-      name="kra_pin" 
-      required
-      value={formData.kra_pin} 
-      onChange={handleInputChange} 
-      onBlur={handleBlur}
-      className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm uppercase ${errors.kra_pin ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
-      placeholder="e.g. P123456789A" 
-    />
-  </div>
-  {errors.kra_pin && <p className="text-red-500 text-xs mt-1">{errors.kra_pin}</p>}
-</div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">KRA PIN</label>
+              <div className="relative">
+                <FileText className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+                <input 
+                  type="text" 
+                  name="kra_pin" 
+                  required
+                  value={formData.kra_pin} 
+                  onChange={handleInputChange} 
+                  onBlur={handleBlur}
+                  className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm uppercase ${errors.kra_pin ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
+                  placeholder="e.g. P123456789A" 
+                />
+              </div>
+              {errors.kra_pin && <p className="text-red-500 text-xs mt-1">{errors.kra_pin}</p>}
+            </div>
 
             {/* Currency Settings */}
             <div>
@@ -578,22 +579,22 @@ const isFormValid =
             
             {/* Payout Toggle */}
             <div className="flex-wrap p-4 gap-4 max-w-md mb-6">
-              <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${isFinancialsLocked ? 'cursor-not-allowed' : 'cursor-pointer'} ${formData.payoutMethod === 'MOBILE_MONEY' ? (isFinancialsLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm') : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}>
+              <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${isFinancialsLocked ? 'cursor-not-allowed' : 'cursor-pointer'} ${formData.payout_method === 'MOBILE_MONEY' ? (isFinancialsLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm') : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}>
                 <input 
-                  type="radio" name="payoutMethod" value="MOBILE_MONEY" 
+                  type="radio" name="payout_method" value="MOBILE_MONEY" 
                   disabled={isFinancialsLocked}
-                  checked={formData.payoutMethod === 'MOBILE_MONEY'}
-                  onChange={(e) => setFormData({...formData, payoutMethod: e.target.value})}
+                  checked={formData.payout_method === 'MOBILE_MONEY'}
+                  onChange={(e) => setFormData({...formData, payout_method: e.target.value})}
                   className="sr-only" 
                 />
                 <Smartphone className="h-4 w-4" /> M-Pesa
               </label>
-              <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${isFinancialsLocked ? 'cursor-not-allowed' : 'cursor-pointer'} ${formData.payoutMethod === 'BANK' ? (isFinancialsLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm') : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}>
+              <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${isFinancialsLocked ? 'cursor-not-allowed' : 'cursor-pointer'} ${formData.payout_method === 'BANK' ? (isFinancialsLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm') : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}>
                 <input 
-                  type="radio" name="payoutMethod" value="BANK" 
+                  type="radio" name="payout_method" value="BANK" 
                   disabled={isFinancialsLocked}
-                  checked={formData.payoutMethod === 'BANK'}
-                  onChange={(e) => setFormData({...formData, payoutMethod: e.target.value})}
+                  checked={formData.payout_method === 'BANK'}
+                  onChange={(e) => setFormData({...formData, payout_method: e.target.value})}
                   className="sr-only" 
                 />
                 <Landmark className="h-4 w-4" /> Bank Account
@@ -602,35 +603,35 @@ const isFormValid =
 
             <div className="grid md:grid-cols-2 gap-5 sm:gap-6">
               {/* Account Name */}
-               <div>
-  <label className="block text-sm font-bold text-slate-700 mb-1">Legal Business / Owner Name</label>
-  <div className="relative">
-    <User className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
-    <input 
-      type="text" 
-      name="settlement_name" 
-      required
-      value={formData.settlement_name} 
-      onChange={handleInputChange} 
-      onBlur={handleBlur}
-      className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${errors.settlement_name ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
-      placeholder="Name matching your KRA PIN" 
-    />
-  </div>
-  {errors.settlement_name && <p className="text-red-500 text-xs mt-1">{errors.settlement_name}</p>}
-</div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Legal Business / Owner Name</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+                  <input 
+                    type="text" 
+                    name="settlement_name" 
+                    required
+                    value={formData.settlement_name} 
+                    onChange={handleInputChange} 
+                    onBlur={handleBlur}
+                    className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${errors.settlement_name ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
+                    placeholder="Name matching your KRA PIN" 
+                  />
+                </div>
+                {errors.settlement_name && <p className="text-red-500 text-xs mt-1">{errors.settlement_name}</p>}
+              </div>
 
               {/* Conditional Bank Code Input */}
-              {formData.payoutMethod === 'BANK' && (
+              {formData.payout_method === 'BANK' && (
                 <div className="animate-in fade-in zoom-in duration-200">
                   <label className="block text-sm font-bold text-slate-700 mb-2">Bank Code</label>
                   <div className="relative">
                     <Landmark className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
                     <input 
-                      type="text" required={formData.payoutMethod === 'BANK'} 
+                      type="text" required={formData.payout_method === 'BANK'} 
                       disabled={isFinancialsLocked}
-                      value={formData.bankCode} 
-                      onChange={(e) => setFormData({ ...formData, bankCode: e.target.value })} 
+                      value={formData.payout_bank_code} 
+                      onChange={(e) => setFormData({ ...formData, payout_bank_code: e.target.value })} 
                       className={`w-full pl-11 pr-4 py-3 sm:py-3.5 border rounded-xl outline-none transition-all text-base sm:text-sm ${isFinancialsLocked ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' : 'bg-white border-slate-300 focus:ring-2 focus:ring-blue-500'}`} 
                       placeholder="e.g. 044 (Access Bank)" 
                     />
@@ -640,24 +641,24 @@ const isFormValid =
 
               {/* Account Number Input */}
               <div>
-  <label className="block text-sm font-bold text-slate-700 mb-1">
-    {formData.payoutMethod === 'MOBILE_MONEY' ? 'M-Pesa Number' : 'Bank Account Number'}
-  </label>
-  <div className="relative">
-    <Banknote className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
-    <input 
-      type="text" 
-      name="paybill_number" 
-      required
-      value={formData.paybill_number} 
-      onChange={handleInputChange} 
-      onBlur={handleBlur}
-      className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${errors.paybill_number ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
-      placeholder={formData.payoutMethod === 'MOBILE_MONEY' ? "e.g. 0712345678" : "Enter account number"} 
-    />
-  </div>
-  {errors.paybill_number && <p className="text-red-500 text-xs mt-1">{errors.paybill_number}</p>}
-</div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">
+                  {formData.payout_method === 'MOBILE_MONEY' ? 'M-Pesa Number or Till' : 'Bank Account Number'}
+                </label>
+                <div className="relative">
+                  <Banknote className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+                  <input 
+                    type="text" 
+                    name="payout_account_number" 
+                    required
+                    value={formData.payout_account_number} 
+                    onChange={handleInputChange} 
+                    onBlur={handleBlur}
+                    className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${errors.payout_account_number ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
+                    placeholder={formData.payout_method === 'MOBILE_MONEY' ? "e.g. 0712345678 or 123456" : "Enter account number"} 
+                  />
+                </div>
+                {errors.payout_account_number && <p className="text-red-500 text-xs mt-1">{errors.payout_account_number}</p>}
+              </div>
             </div>
             
             {formData.paystack_subaccount_code && (

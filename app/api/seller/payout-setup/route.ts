@@ -16,7 +16,6 @@ function normalizeMobileMoneyNumber(input: string) {
 }
 
 function normalizeBankAccountNumber(input: string) {
-  // Remove everything except digits
   return input.replace(/\D/g, "");
 }
 
@@ -28,9 +27,8 @@ function resolveMobileMoneyBankCode(accountNumber: string) {
     return { accountNumber: clean, bankCode: "MPESA" };
   }
 
-  // Till number: 5 to 8 digits
+  // Till/Paybill number: 5 to 8 digits
   if (/^\d{5,8}$/.test(clean)) {
-    // FIX 2: Paystack Kenya uses "MPESA" for both phone numbers and Paybills/Tills.
     return { accountNumber: clean, bankCode: "MPESA" };
   }
 
@@ -41,7 +39,6 @@ export async function POST(req: Request) {
   try {
     const cookieStore = await cookies();
 
-    // FIX 1: Complete Supabase SSR configuration to handle secure cookie refreshes
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -55,8 +52,8 @@ export async function POST(req: Request) {
               cookiesToSet.forEach(({ name, value, options }) => {
                 cookieStore.set(name, value, options);
               });
-            } catch (error) {
-              // Catch necessary for Next.js when modifying cookies in restricted contexts
+            } catch {
+              // Safe to ignore in restricted Next.js contexts
             }
           },
         },
@@ -108,7 +105,10 @@ export async function POST(req: Request) {
     }
 
     if (!process.env.PAYSTACK_SECRET_KEY) {
-      throw new Error("Missing Paystack Secret Key.");
+      return NextResponse.json(
+        { error: "Payment gateway configuration error." },
+        { status: 500 }
+      );
     }
 
     let finalAccountNumber = "";
@@ -121,7 +121,7 @@ export async function POST(req: Request) {
         return NextResponse.json(
           {
             error:
-              "Enter a valid 10-digit mobile number (07XXXXXXXX) or a 5–8 digit Till number.",
+              "Enter a valid 10-digit mobile number (07XXXXXXXX) or a 5–8 digit Till/Paybill number.",
           },
           { status: 400 }
         );
@@ -129,9 +129,7 @@ export async function POST(req: Request) {
 
       finalAccountNumber = resolved.accountNumber;
       paystackBankCode = resolved.bankCode;
-    }
-
-    if (payoutMethod === "BANK") {
+    } else if (payoutMethod === "BANK") {
       if (!bankCode || typeof bankCode !== "string") {
         return NextResponse.json(
           { error: "Bank code is required for bank payouts." },
@@ -162,7 +160,7 @@ export async function POST(req: Request) {
         settlement_bank: paystackBankCode,
         account_number: finalAccountNumber,
         percentage_charge: 1,
-        description: `Automated Subaccount for ${storeName}`,
+        description: `LocalSoko Subaccount for ${storeName}`,
       }),
     });
 
@@ -191,10 +189,10 @@ export async function POST(req: Request) {
     const { error: dbError } = await supabase
       .from("stores")
       .update({
-        paystack_subaccount_code: subaccountCode,
         payout_method: payoutMethod,
         payout_account_number: finalAccountNumber,
         payout_bank_code: paystackBankCode,
+        paystack_subaccount_code: subaccountCode,
       })
       .eq("owner_id", user.id);
 

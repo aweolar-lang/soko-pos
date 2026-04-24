@@ -113,7 +113,7 @@ export default function BillingPage() {
             You cannot subscribe to a premium plan because you haven't set up your store profile and payment details yet.
           </p>
           <a 
-            href="/settings" // Or whatever your store setup route is (e.g., /store-setup)
+            href="/dashboard/settings" // Or whatever your store setup route is (e.g., /store-setup)
             className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 px-8 rounded-xl transition-all active:scale-[0.98]"
           >
             <Store className="h-5 w-5" />
@@ -299,7 +299,7 @@ export default function BillingPage() {
             </li>
           </ul>
           <button 
-            onClick={() => handleSubscribe("1_YEAR", 1000)}
+            onClick={() => handleSubscribe("1_YEAR", 1)}
             disabled={isProcessing !== null}
             className="w-full py-4 sm:py-3.5 px-4 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center shadow-lg shadow-emerald-500/20"
           >
