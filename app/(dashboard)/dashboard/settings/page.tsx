@@ -552,7 +552,7 @@ const isFormValid =
             <p className="text-sm text-slate-500 mb-5 sm:mb-6">Where should we automatically send your marketplace earnings?</p>
             
             {/* Payout Toggle */}
-            <div className="flex gap-3 max-w-md mb-6">
+            <div className="flex-wrap gap-3 max-w-md mb-6">
               <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${isFinancialsLocked ? 'cursor-not-allowed' : 'cursor-pointer'} ${formData.payoutMethod === 'MOBILE_MONEY' ? (isFinancialsLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm') : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}>
                 <input 
                   type="radio" name="payoutMethod" value="MOBILE_MONEY" 

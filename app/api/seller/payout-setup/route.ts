@@ -2,75 +2,155 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
+type PayoutMethod = "MOBILE_MONEY" | "BANK";
+
+function normalizeMobileMoneyNumber(input: string) {
+  let clean = input.replace(/[\s+-]/g, "");
+
+  // Convert Kenyan international format 2547XXXXXXXX -> 07XXXXXXXX
+  if (clean.startsWith("254") && clean.length === 12) {
+    clean = "0" + clean.slice(3);
+  }
+
+  return clean;
+}
+
+function normalizeBankAccountNumber(input: string) {
+  // Remove everything except digits
+  return input.replace(/\D/g, "");
+}
+
+function resolveMobileMoneyBankCode(accountNumber: string) {
+  const clean = normalizeMobileMoneyNumber(accountNumber);
+
+  // Phone number: 10 digits, e.g. 07XXXXXXXX
+  if (/^0\d{9}$/.test(clean)) {
+    return { accountNumber: clean, bankCode: "MPESA" };
+  }
+
+  // Till number: 5 to 8 digits
+  if (/^\d{5,8}$/.test(clean)) {
+    // FIX 2: Paystack Kenya uses "MPESA" for both phone numbers and Paybills/Tills.
+    return { accountNumber: clean, bankCode: "MPESA" };
+  }
+
+  return null;
+}
+
 export async function POST(req: Request) {
   try {
     const cookieStore = await cookies();
-    
+
+    // FIX 1: Complete Supabase SSR configuration to handle secure cookie refreshes
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value;
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) => {
+                cookieStore.set(name, value, options);
+              });
+            } catch (error) {
+              // Catch necessary for Next.js when modifying cookies in restricted contexts
+            }
           },
         },
       }
     );
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Unauthorized access." },
+        { status: 401 }
+      );
     }
 
-    const body = await req.json();
-    // UPGRADE: Now accepts a payoutMethod ('MOBILE_MONEY' or 'BANK') and an optional bankCode
-    const { payoutMethod = 'MOBILE_MONEY', accountNumber, bankCode, storeName } = body;
-
-    if (!accountNumber) {
-      return NextResponse.json({ error: "Account number is required" }, { status: 400 });
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON body." },
+        { status: 400 }
+      );
     }
 
-    let finalAccountNumber = accountNumber;
-    let paystackBankCode = "";
+    const payoutMethod = (body?.payoutMethod || "MOBILE_MONEY") as PayoutMethod;
+    const accountNumber = body?.accountNumber;
+    const bankCode = body?.bankCode;
+    const storeName =
+      typeof body?.storeName === "string" && body.storeName.trim()
+        ? body.storeName.trim()
+        : "LocalSoko Vendor";
 
-    // SCENARIO 1: Local Mobile Money (M-Pesa / Till)
-    if (payoutMethod === 'MOBILE_MONEY') {
-      // Remove spaces, dashes, and plus signs
-      let cleanNumber = accountNumber.replace(/[\s+-]/g, '');
-      
-      // If it starts with 254, convert to 0
-      if (cleanNumber.startsWith('254')) {
-        cleanNumber = '0' + cleanNumber.substring(3);
-      }
+    if (!accountNumber || typeof accountNumber !== "string") {
+      return NextResponse.json(
+        { error: "Account number is required." },
+        { status: 400 }
+      );
+    }
 
-      // Smart Routing: Phone Number vs Till Number
-      if (cleanNumber.length === 10) {
-        paystackBankCode = "MPESA"; 
-      } else if (cleanNumber.length >= 5 && cleanNumber.length <= 8) {
-        paystackBankCode = "MPTILL"; 
-      } else {
-        return NextResponse.json({ 
-          error: "Please enter a valid 10-digit phone number or a 5-8 digit Till number." 
-        }, { status: 400 });
-      }
-      
-      finalAccountNumber = cleanNumber;
-    } 
-    // SCENARIO 2: Global Bank Account
-    else if (payoutMethod === 'BANK') {
-      if (!bankCode) {
-        return NextResponse.json({ error: "Bank Code is required for International Bank payouts." }, { status: 400 });
-      }
-      paystackBankCode = bankCode; // e.g., "044" for Access Bank Nigeria, or a US routing equivalent
-      finalAccountNumber = accountNumber.replace(/[\s-]/g, ''); // clean any formatting
+    if (!["MOBILE_MONEY", "BANK"].includes(payoutMethod)) {
+      return NextResponse.json(
+        { error: "Invalid payout method selected." },
+        { status: 400 }
+      );
     }
 
     if (!process.env.PAYSTACK_SECRET_KEY) {
       throw new Error("Missing Paystack Secret Key.");
     }
 
-    // Ping Paystack to create the Subaccount
+    let finalAccountNumber = "";
+    let paystackBankCode = "";
+
+    if (payoutMethod === "MOBILE_MONEY") {
+      const resolved = resolveMobileMoneyBankCode(accountNumber);
+
+      if (!resolved) {
+        return NextResponse.json(
+          {
+            error:
+              "Enter a valid 10-digit mobile number (07XXXXXXXX) or a 5–8 digit Till number.",
+          },
+          { status: 400 }
+        );
+      }
+
+      finalAccountNumber = resolved.accountNumber;
+      paystackBankCode = resolved.bankCode;
+    }
+
+    if (payoutMethod === "BANK") {
+      if (!bankCode || typeof bankCode !== "string") {
+        return NextResponse.json(
+          { error: "Bank code is required for bank payouts." },
+          { status: 400 }
+        );
+      }
+
+      finalAccountNumber = normalizeBankAccountNumber(accountNumber);
+
+      if (!finalAccountNumber || finalAccountNumber.length < 6) {
+        return NextResponse.json(
+          { error: "Enter a valid bank account number." },
+          { status: 400 }
+        );
+      }
+
+      paystackBankCode = bankCode.trim();
+    }
+
     const paystackRes = await fetch("https://api.paystack.co/subaccount", {
       method: "POST",
       headers: {
@@ -78,40 +158,63 @@ export async function POST(req: Request) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        business_name: storeName || "LocalSoko Vendor",
-        settlement_bank: paystackBankCode, 
-        account_number: finalAccountNumber, 
-        percentage_charge: 1, 
-        description: `Automated Subaccount for ${storeName}`
+        business_name: storeName,
+        settlement_bank: paystackBankCode,
+        account_number: finalAccountNumber,
+        percentage_charge: 1,
+        description: `Automated Subaccount for ${storeName}`,
       }),
     });
 
     const paystackData = await paystackRes.json();
 
-    // EXPOSE REAL ERROR
-    if (!paystackData.status) {
-      console.error("Paystack API Error:", paystackData.message);
-      return NextResponse.json({ 
-        error: `Paystack: ${paystackData.message}` 
-      }, { status: 502 });
+    if (!paystackRes.ok || !paystackData?.status) {
+      const message =
+        paystackData?.message || "Paystack rejected the subaccount request.";
+      console.error("Paystack API Error:", message);
+
+      return NextResponse.json(
+        { error: `Paystack: ${message}` },
+        { status: 502 }
+      );
     }
 
-    const subaccountCode = paystackData.data.subaccount_code;
+    const subaccountCode = paystackData?.data?.subaccount_code;
+
+    if (!subaccountCode) {
+      return NextResponse.json(
+        { error: "Subaccount was created, but no subaccount code was returned." },
+        { status: 502 }
+      );
+    }
 
     const { error: dbError } = await supabase
       .from("stores")
-      .update({ paystack_subaccount_code: subaccountCode })
-      .eq("owner_id", session.user.id);
+      .update({
+        paystack_subaccount_code: subaccountCode,
+        payout_method: payoutMethod,
+        payout_account_number: finalAccountNumber,
+        payout_bank_code: paystackBankCode,
+      })
+      .eq("owner_id", user.id);
 
-    if (dbError) throw dbError;
+    if (dbError) {
+      console.error("Database update error:", dbError);
+      return NextResponse.json(
+        { error: "Failed to save payout details." },
+        { status: 500 }
+      );
+    }
 
-    return NextResponse.json({ 
-      success: true, 
-      subaccount_code: subaccountCode 
+    return NextResponse.json({
+      success: true,
+      subaccount_code: subaccountCode,
     });
-
-  } catch (error: any) {
+  } catch (error) {
     console.error("Payout Setup Error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
   }
 }

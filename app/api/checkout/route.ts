@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase"; 
+import { createClient } from "@supabase/supabase-js";
 
 export async function POST(req: Request) {
   try {
+    // FIX 2: Instantiate the Supabase client dynamically per-request to avoid cache poisoning / state leakage
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
     const body = await req.json();
     const {
       productId,
@@ -18,7 +24,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
     }
 
-    // UPGRADE: Fetch the product, including the store's Paystack code AND the newly added currency column
+    // Fetch the product, including the store's Paystack code AND the currency column
     const { data: product, error: productError } = await supabase
       .from("products")
       .select(`
@@ -39,25 +45,22 @@ export async function POST(req: Request) {
     // @ts-ignore - Supabase join typing workaround
     const subaccountCode = product.stores?.paystack_subaccount_code;
     
-    // UPGRADE: Securely extract currency from the database (fallback to KES just in case)
+    // Securely extract currency from the database (fallback to KES just in case)
     // @ts-ignore
     const storeCurrency = product.stores?.currency || "KES";
 
-    // Hardcoded base URL
-    const baseUrl = "https://localsoko.com";
+    // Allow dynamic routing for localhost testing vs production
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://localsoko.com";
 
-    // 2. Build the Paystack Payload
+    // Build the Paystack Payload
     const paystackPayload: any = {
       email: buyerEmail,
-      amount: Math.round(product.price * 100),
-      currency: storeCurrency, // UPGRADE: Pass the dynamic currency securely to Paystack
-      callback_url: `${baseUrl}/order-success`,
-      subaccount: subaccountCode || undefined,
+      amount: Math.round(product.price * 100), 
+      currency: storeCurrency,
+      callback_url: `${appUrl}/order-success?product_id=${productId}`,
       metadata: {
-        product_id: product.id,
-        store_id: product.store_id,
-        is_digital: product.is_digital,
-        store_currency: storeCurrency, // Optional: Passing it in metadata makes viewing transaction logs easier
+        transaction_type: "marketplace_order",
+        product_id: productId,
         custom_fields: [
           { display_name: "Buyer Name", variable_name: "buyer_name", value: buyerName },
           { display_name: "Buyer Phone", variable_name: "buyer_phone", value: buyerPhone || "N/A" },
@@ -67,6 +70,11 @@ export async function POST(req: Request) {
         ],
       },
     };
+
+    if (subaccountCode && subaccountCode.trim() !== "") {
+      paystackPayload.subaccount = subaccountCode;
+      paystackPayload.bearer = "subaccount"; 
+    }
 
     if (!process.env.PAYSTACK_SECRET_KEY) throw new Error("Paystack secret key missing.");
 
