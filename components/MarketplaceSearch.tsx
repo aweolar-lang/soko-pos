@@ -1,30 +1,43 @@
 "use client";
 
-import { useState } from "react";
-import { Search, MapPin, Navigation, Loader2 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useState, type FormEvent } from "react";
+import { Search, MapPin, Navigation, Loader2, X } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 interface SearchProps {
   initialQuery: string;
   initialLocation: string;
-  initialCategory: string;
+  initialCategory?: string;
 }
 
-export default function MarketplaceSearch({ initialQuery, initialLocation, initialCategory }: SearchProps) {
+export default function MarketplaceSearch({
+  initialQuery,
+  initialLocation,
+  initialCategory = "",
+}: SearchProps) {
   const router = useRouter();
-  const [query, setQuery] = useState(initialQuery);
-  const [location, setLocation] = useState(initialLocation);
+  const pathname = usePathname();
+
+  const [query, setQuery] = useState(initialQuery ?? "");
+  const [location, setLocation] = useState(initialLocation ?? "");
   const [isLocating, setIsLocating] = useState(false);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
     const params = new URLSearchParams();
-    if (query) params.set("q", query);
-    if (location) params.set("location", location);
-    if (initialCategory) params.set("category", initialCategory);
-    
-    router.push(`/?${params.toString()}`);
+    if (query.trim()) params.set("q", query.trim());
+    if (location.trim()) params.set("location", location.trim());
+    if (initialCategory.trim()) params.set("category", initialCategory.trim());
+
+    const url = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+    router.push(url);
+  };
+
+  const clearSearch = () => {
+    setQuery("");
+    setLocation("");
   };
 
   const detectLocation = () => {
@@ -40,18 +53,35 @@ export default function MarketplaceSearch({ initialQuery, initialLocation, initi
       async (position) => {
         try {
           const { latitude, longitude } = position.coords;
-          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`);
+
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
+            {
+              headers: {
+                Accept: "application/json",
+              },
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error("Reverse geocode request failed");
+          }
+
           const data = await response.json();
-          
-          const detectedPlace = data.address.suburb || data.address.town || data.address.city || data.address.county || "";
-          
+          const detectedPlace =
+            data?.address?.suburb ||
+            data?.address?.town ||
+            data?.address?.city ||
+            data?.address?.county ||
+            "";
+
           if (detectedPlace) {
             setLocation(detectedPlace);
             toast.success(`Found you in ${detectedPlace}!`, { id: "location-toast" });
           } else {
             toast.error("Could not determine exact location.", { id: "location-toast" });
           }
-        } catch (error) {
+        } catch {
           toast.error("Failed to detect location.", { id: "location-toast" });
         } finally {
           setIsLocating(false);
@@ -65,51 +95,75 @@ export default function MarketplaceSearch({ initialQuery, initialLocation, initi
   };
 
   return (
-    <form onSubmit={handleSearch} className="z-10 w-full max-w-4xl mx-auto flex flex-col sm:flex-row bg-white rounded-3xl sm:rounded-full border border-slate-200/80 shadow-lg shadow-slate-200/50 transition-all hover:shadow-xl focus-within:ring-4 focus-within:ring-emerald-500/10 focus-within:border-emerald-500 overflow-hidden">
-      
-      {/* What to find */}
-      <div className="flex-1 flex items-center px-6 py-4 border-b sm:border-b-0 sm:border-r border-slate-100 group">
-        <Search className="h-5 w-5 text-slate-400 group-focus-within:text-emerald-600 transition-colors shrink-0" />
-        <div className="flex flex-col w-full pl-3">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Looking for</span>
-          <input 
-            type="text" 
+    <form
+      onSubmit={handleSearch}
+      className="z-10 mx-auto flex w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-lg shadow-slate-200/50 transition-all hover:shadow-xl focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-500/10 sm:flex-row sm:rounded-full"
+    >
+      <div className="group flex flex-1 items-center border-b border-slate-100 px-6 py-4 sm:border-b-0 sm:border-r">
+        <Search className="h-5 w-5 shrink-0 text-slate-400 transition-colors group-focus-within:text-emerald-600" />
+        <div className="flex w-full flex-col pl-3">
+          <span className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            Looking for
+          </span>
+          <input
+            type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Stores, products, or brands..." 
-            className="w-full bg-transparent text-slate-900 placeholder:text-slate-300 outline-none text-sm font-semibold"
+            placeholder="Stores, products, or brands..."
+            className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-300"
           />
         </div>
       </div>
 
-      {/* Where to find it */}
-      <div className="flex-1 flex items-center px-6 py-4 relative group">
-        <MapPin className="h-5 w-5 text-slate-400 group-focus-within:text-emerald-600 transition-colors shrink-0" />
-        <div className="flex flex-col w-full pl-3 pr-10">
-           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Neighborhood</span>
-          <input 
-            type="text" 
+      <div className="group relative flex flex-1 items-center px-6 py-4">
+        <MapPin className="h-5 w-5 shrink-0 text-slate-400 transition-colors group-focus-within:text-emerald-600" />
+        <div className="flex w-full flex-col pl-3 pr-10">
+          <span className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            Neighborhood
+          </span>
+          <input
+            type="text"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            placeholder="Enter town or area" 
-            className="w-full bg-transparent text-slate-900 placeholder:text-slate-300 outline-none text-sm font-semibold"
+            placeholder="Enter town or area"
+            className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-300"
           />
         </div>
-        <button 
-          type="button" 
+        <button
+          type="button"
           onClick={detectLocation}
           disabled={isLocating}
-          className="absolute right-4 p-2 bg-slate-50 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-all"
+          className="absolute right-4 rounded-full bg-slate-50 p-2 text-slate-400 transition-all hover:bg-emerald-50 hover:text-emerald-600 disabled:cursor-not-allowed"
           title="Use my current location"
         >
-          {isLocating ? <Loader2 className="h-4 w-4 animate-spin text-emerald-600" /> : <Navigation className="h-4 w-4" />}
+          {isLocating ? (
+            <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
+          ) : (
+            <Navigation className="h-4 w-4" />
+          )}
         </button>
       </div>
 
-      {/* Submit */}
-      <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 px-8 transition-all text-sm w-full sm:w-auto flex items-center justify-center gap-2 m-1.5 sm:rounded-full rounded-2xl active:scale-95">
-        <Search className="h-4 w-4" /> Search
-      </button>
+      <div className="m-1.5 flex w-full gap-2 sm:w-auto">
+        {(query || location) && (
+          <button
+            type="button"
+            onClick={clearSearch}
+            className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-semibold text-slate-600 transition-all hover:bg-slate-50 sm:rounded-full"
+          >
+            <X className="h-4 w-4" />
+            Clear
+          </button>
+        )}
+
+        <button
+          type="submit"
+          className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-8 py-4 text-sm font-bold text-white transition-all active:scale-95 hover:bg-emerald-500 sm:w-auto sm:rounded-full"
+        >
+          <Search className="h-4 w-4" />
+          Search
+        </button>
+      </div>
     </form>
   );
 }
