@@ -73,9 +73,9 @@ export default function LoginPage() {
       router.refresh(); 
 
     } catch (error: any) {
-      // ==========================================
+      // ============================================
       // SMART ERROR HANDLING: Catch Unverified Users
-      // ==========================================
+      // ============================================
       if (error.message && error.message.includes("Email not confirmed")) {
         toast.error("Please verify your email before logging in.");
         router.push("/verify-email"); // Route them to the verify page!
