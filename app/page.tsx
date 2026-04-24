@@ -50,25 +50,19 @@ interface StoreData {
 
 const normalize = (value?: string | null) => (value ?? "").trim().toLowerCase();
 
-const isHotelStore = (category?: string | null) => {
-  const c = normalize(category);
-  return c === "Food & Beverage" || c === "hotels" || c === "hospitality" || c === "lodging";
-};
+const isHotelStore = (store: StoreData) => store.category === "Food & Beverage";
 
-const isDigitalStore = (category?: string | null) => {
-  const c = normalize(category);
-  return c === "digital products" || c === "digital" || c === "downloads" || c === "software";
-};
+const isDigitalStore = (store: StoreData) => store.category === "Digital Products";
 
-const getStoreCta = (category?: string | null) => {
-  if (isHotelStore(category)) {
+const getStoreCta = (store: StoreData) => {
+  if (isHotelStore(store)) {
     return {
       label: "Make Order",
       icon: BedDouble,
     };
   }
 
-  if (isDigitalStore(category)) {
+  if (isDigitalStore(store)) {
     return {
       label: "Download",
       icon: Download,
