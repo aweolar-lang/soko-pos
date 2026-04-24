@@ -69,7 +69,7 @@ export default function RegisterPage() {
     }
   };
 
-  // Ensure form is valid (Middle name is excluded from this check because it's optional)
+  // Ensure form is valid
   const isFormValid = 
     formData.firstName.trim() !== "" && 
     formData.lastName.trim() !== "" && 
@@ -90,28 +90,27 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
+      // THE FIX: We pass the extra data securely inside 'options.data'
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
+        options: {
+          data: {
+            first_name: formData.firstName,
+            middle_name: formData.middleName,
+            last_name: formData.lastName,
+            phone_number: finalPhone,
+          }
+        }
       });
 
       if (authError) throw authError;
 
-      if (authData.user) {
-        const { error: profileError } = await supabase.from('profiles').upsert({
-          id: authData.user.id,
-          first_name: formData.firstName,
-          middle_name: formData.middleName, // Saved properly!
-          last_name: formData.lastName,
-          phone_number: finalPhone, 
-          email: formData.email,
-        });
-
-        if (profileError) throw profileError;
-      }
+      // Notice how the entire supabase.from('profiles').upsert(...) is GONE!
+      // The frontend shouldn't do this anymore. The database trigger will handle it.
 
       toast.success("Account created! Please check your email to verify.");
-      router.push("/verify-email"); // Redirect to the new verify page!
+      router.push("/verify-email");
 
     } catch (error: any) {
       console.error("Registration Error:", error);
