@@ -159,7 +159,7 @@ export async function POST(req: Request) {
         business_name: storeName,
         settlement_bank: paystackBankCode,
         account_number: finalAccountNumber,
-        percentage_charge: 1,
+        percentage_charge: 2.5,
         description: `LocalSoko Subaccount for ${storeName}`,
       }),
     });

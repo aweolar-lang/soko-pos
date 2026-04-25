@@ -75,7 +75,7 @@ export async function POST(req: Request) {
 
     if (subaccountCode && subaccountCode.trim() !== "") {
       paystackPayload.subaccount = subaccountCode;
-      paystackPayload.bearer = "subaccount"; 
+      //paystackPayload.bearer = "subaccount"; 
     }
 
     if (!process.env.PAYSTACK_SECRET_KEY) throw new Error("Paystack secret key missing.");

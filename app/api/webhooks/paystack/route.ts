@@ -33,162 +33,171 @@ export async function POST(req: Request) {
     // ==========================================
     if (event.event === "charge.success") {
       const metadata = event.data.metadata;
+      const customFields = metadata.custom_fields || [];
+      const getField = (name: string) => customFields.find((f: any) => f.variable_name === name)?.value;
+      const productId = metadata.product_id || getField("product_id");
 
-      // ---- SCENARIO A: Platform Subscription ----
-      if (metadata && metadata.transaction_type === "platform_subscription") {
-        const userId = metadata.owner_id;
-        const plan = metadata.plan;
-        
-        const now = new Date();
-        let addMonths = plan === "1_MONTH" ? 1 : plan === "6_MONTHS" ? 6 : 12;
-        let newTier = plan === "1_YEAR" ? 'VIP' : 'PREMIUM';
+        // ---- SCENARIO A: Platform Subscription ----
+        if (metadata && metadata.transaction_type === "platform_subscription") {
+          const userId = metadata.owner_id;
+          const plan = metadata.plan;
+          
+          const now = new Date();
+          let addMonths = plan === "1_MONTH" ? 1 : plan === "6_MONTHS" ? 6 : 12;
+          let newTier = plan === "1_YEAR" ? 'VIP' : 'PREMIUM';
 
-        const newSubEndsAt = new Date(now.setMonth(now.getMonth() + addMonths));
+          const newSubEndsAt = new Date(now.setMonth(now.getMonth() + addMonths));
 
-        const { error: subError } = await supabaseAdmin
-          .from("stores")
-          .update({
-            subscription_ends_at: newSubEndsAt.toISOString(),
-            tier: newTier,
-          })
-          .eq("owner_id", userId);
+          const { error: subError } = await supabaseAdmin
+            .from("stores")
+            .update({
+              subscription_ends_at: newSubEndsAt.toISOString(),
+              tier: newTier,
+            })
+            .eq("owner_id", userId);
 
-        if (!subError) {
-          const amountPaid = event.data.amount / 100;
-          await sendSubscriptionEmail(
-            event.data.customer.email,
-            "LocalSoko Merchant", 
-            newTier,
-            amountPaid,
-            newSubEndsAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-          );
-        }
-      }
-      
-      // ---- SCENARIO B: Customer bought a product ----
-      else if (metadata && metadata.product_id) {
-        // 1. Prevent "Double Order" Glitch (Idempotency Check)
-        const { data: existingOrder } = await supabaseAdmin
-          .from("orders")
-          .select("id")
-          .eq("paystack_reference", event.data.reference)
-          .single();
-
-        if (existingOrder) {
-          console.log("⚠️ Ignored duplicate order webhook for reference:", event.data.reference);
-          return NextResponse.json({ received: true }, { status: 200 });
-        }
-
-        const customFields = metadata.custom_fields || [];
-        const getField = (name: string) => customFields.find((f: any) => f.variable_name === name)?.value;
-
-        const buyerName = getField("buyer_name") || "Guest";
-        const buyerPhone = getField("buyer_phone") || null;
-        const fulfillmentType = getField("fulfillment_type") || "SHIPPING";
-        const rawTakeawayTime = getField("takeaway_time");
-        const customerNotes = getField("customer_notes") || "None";
-        
-        const isDigital = metadata.is_digital === true || metadata.is_digital === "true";
-        
-        // UPGRADE: Safely extract currency from metadata (fallback to KES)
-        const storeCurrency = metadata.store_currency || event.data.currency || "KES";
-        const sym = storeCurrency === "USD" ? "$" : "Ksh ";
-
-        // Safely parse time
-        let formattedTakeawayTime = null;
-        if (rawTakeawayTime && rawTakeawayTime !== "N/A") {
-          try {
-            if (rawTakeawayTime.length === 5 && rawTakeawayTime.includes(":")) {
-              const todayDate = new Date().toISOString().split('T')[0];
-              formattedTakeawayTime = new Date(`${todayDate}T${rawTakeawayTime}:00Z`).toISOString();
-            } else {
-              formattedTakeawayTime = new Date(rawTakeawayTime).toISOString();
-            }
-          } catch (e) {
-            console.error("Takeaway time parsing failed:", rawTakeawayTime);
-          }
-        }
-
-        // Insert Order
-        const { data: newOrder, error: orderError } = await supabaseAdmin
-          .from("orders")
-          .insert({
-            store_id: metadata.store_id,
-            paystack_reference: event.data.reference,
-            customer_name: buyerName,
-            customer_email: event.data.customer.email,
-            customer_phone: buyerPhone,
-            amount_paid: event.data.amount / 100, 
-            total_amount: event.data.amount / 100,
-            fulfillment_type: fulfillmentType,
-            takeaway_time: formattedTakeawayTime,
-            status: 'NEW',
-            product_id: metadata.product_id,
-            currency: storeCurrency // UPGRADE: Securely log the currency to the DB!
-          })
-          .select()
-          .single();
-
-        if (orderError) {
-          console.error("🚨 SUPABASE ORDER INSERT FAILED:", orderError);
-        }
-
-        if (!orderError && newOrder) {
-          // Insert Order Item
-          const { error: itemsError } = await supabaseAdmin
-            .from("order_items")
-            .insert({
-              order_id: newOrder.id,
-              product_id: metadata.product_id,
-              quantity: 1, 
-              price_at_time: event.data.amount / 100
-            });
-            
-          if (itemsError) console.error("🚨 SUPABASE ITEMS INSERT FAILED:", itemsError);
-
-          // FETCH PRODUCT & STORE DETAILS FOR EMAILS
-          const { data: prodData } = await supabaseAdmin
-            .from("products")
-            .select("title, file_url, stores(name, owner_id)")
-            .eq("id", metadata.product_id)
-            .single();
-
-          let sellerEmail = null;
-          let storeName = "LocalSoko Store";
-
-          // Fetch the seller's email
-          if (prodData && prodData.stores) {
-            // @ts-ignore
-            storeName = prodData.stores.name || "LocalSoko Store";
-            // @ts-ignore
-            const ownerId = prodData.stores.owner_id;
-            
-            if (ownerId) {
-              const { data: authData, error: authError } = await supabaseAdmin.auth.admin.getUserById(ownerId);
-              
-              if (authData?.user?.email) {
-                sellerEmail = authData.user.email;
-              } else {
-                console.error("🚨 Could not find seller email for owner ID:", ownerId);
-              }
-            }
-          }
-
-          // -----------------------------------------------------
-          // SEND SELLER ALERTS
-          // -----------------------------------------------------
-          if (sellerEmail && prodData) {
-            // UPGRADE: Added the dynamic symbol parameter
-            await sendSellerNotificationEmail(
-              sellerEmail, 
-              storeName, 
-              prodData.title, 
-              buyerName, 
-              event.data.amount / 100,
-              fulfillmentType,
-              sym 
+          if (!subError) {
+            const amountPaid = event.data.amount / 100;
+            await sendSubscriptionEmail(
+              event.data.customer.email,
+              "LocalSoko Merchant", 
+              newTier,
+              amountPaid,
+              newSubEndsAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
             );
           }
+        }
+        
+       // ---- SCENARIO B: Customer bought a product ----
+        else if (productId) {
+          // 1. Prevent "Double Order" Glitch (Idempotency Check)
+          const { data: existingOrder } = await supabaseAdmin
+            .from("orders")
+            .select("id")
+            .eq("paystack_reference", event.data.reference)
+            .single();
+
+          if (existingOrder) {
+            console.log("⚠️ Ignored duplicate order webhook for reference:", event.data.reference);
+            return NextResponse.json({ received: true }, { status: 200 });
+          }
+          
+          // Use our global getField helper to safely extract everything
+          const storeId = metadata.store_id || getField("store_id");
+          const buyerName = getField("buyer_name") || "Guest";
+          const buyerPhone = getField("buyer_phone") || null;
+          const fulfillmentType = getField("fulfillment_type") || "SHIPPING";
+          const rawTakeawayTime = getField("takeaway_time");
+          const customerNotes = getField("customer_notes") || "None";
+          const deliveryAddress = getField("delivery_address") || null;
+          const isPosSale = metadata.is_pos_sale === true || metadata.is_pos_sale === "true" || getField("is_pos_sale") === "true" || false;
+          // Use what you passed in metadata, OR use Paystack's exact payment channel (card, mobile_money, etc)
+          const paymentMethod = getField("payment_method") || metadata.payment_method || event.data.channel || "Online";
+          
+          // Safely check for digital
+          const isDigital = metadata.is_digital === true || metadata.is_digital === "true" || getField("is_digital") === "true";
+          
+          // UPGRADE: Safely extract currency from metadata (fallback to KES)
+          const storeCurrency = metadata.store_currency || event.data.currency || "KES";
+          const sym = storeCurrency === "USD" ? "$" : "Ksh ";
+
+          // Safely parse time
+          let formattedTakeawayTime = null;
+          if (rawTakeawayTime && rawTakeawayTime !== "N/A") {
+            try {
+              if (rawTakeawayTime.length === 5 && rawTakeawayTime.includes(":")) {
+                const todayDate = new Date().toISOString().split('T')[0];
+                formattedTakeawayTime = new Date(`${todayDate}T${rawTakeawayTime}:00Z`).toISOString();
+              } else {
+                formattedTakeawayTime = new Date(rawTakeawayTime).toISOString();
+              }
+            } catch (e) {
+              console.error("Takeaway time parsing failed:", rawTakeawayTime);
+            }
+          }
+
+          // Insert Order
+          const { data: newOrder, error: orderError } = await supabaseAdmin
+            .from("orders")
+            .insert({
+              store_id: storeId,
+              paystack_reference: event.data.reference,
+              customer_name: buyerName,
+              customer_email: event.data.customer.email,
+              customer_phone: buyerPhone,
+              amount_paid: event.data.amount / 100, 
+              total_amount: event.data.amount / 100,
+              fulfillment_type: fulfillmentType,
+              takeaway_time: formattedTakeawayTime,
+              status: 'NEW',
+              product_id: productId, 
+              currency: storeCurrency,
+              customer_notes: customerNotes,
+              delivery_address: deliveryAddress,
+              is_pos_sale: isPosSale,
+              payment_method: paymentMethod
+            })
+            .select()
+            .single();
+
+          if (orderError) {
+            console.error("🚨 SUPABASE ORDER INSERT FAILED:", orderError);
+          }
+
+          if (!orderError && newOrder) {
+            const { error: itemsError } = await supabaseAdmin
+              .from("order_items")
+              .insert({
+                order_id: newOrder.id,
+                product_id: productId, // ✅ FIXED: Using safe variable
+                quantity: 1, 
+                price_at_time: event.data.amount / 100
+              });
+              
+            if (itemsError) console.error("🚨 SUPABASE ITEMS INSERT FAILED:", itemsError);
+
+            // FETCH PRODUCT & STORE DETAILS FOR EMAILS
+            const { data: prodData } = await supabaseAdmin
+              .from("products")
+              .select("title, file_url, stores(name, owner_id)")
+              .eq("id", productId) // ✅ FIXED: Using safe variable
+              .single();
+
+            let sellerEmail = null;
+            let storeName = "LocalSoko Store";
+
+            // Fetch the seller's email
+            if (prodData && prodData.stores) {
+              // @ts-ignore
+              storeName = prodData.stores.name || "LocalSoko Store";
+              // @ts-ignore
+              const ownerId = prodData.stores.owner_id;
+              
+                if (ownerId) {
+                  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.getUserById(ownerId);
+                  
+                  if (authData?.user?.email) {
+                    sellerEmail = authData.user.email;
+                  } else {
+                    console.error("🚨 Could not find seller email for owner ID:", ownerId);
+                  }
+                }
+              }
+
+              // -----------------------------------------------------
+              // SEND SELLER ALERTS
+              // -----------------------------------------------------
+              if (sellerEmail && prodData) {
+                await sendSellerNotificationEmail(
+                  sellerEmail, 
+                  storeName, 
+                  prodData.title, 
+                  buyerName, 
+                  event.data.amount / 100,
+                  fulfillmentType,
+                  sym 
+                );
+              }
 
           // -----------------------------------------------------
           // PHYSICAL VS DIGITAL LOGIC
@@ -196,7 +205,7 @@ export async function POST(req: Request) {
           if (!isDigital) {
             // 1. Reduce Stock
             const { error: stockError } = await supabaseAdmin.rpc("decrement_stock", { 
-              row_id: metadata.product_id, 
+              row_id: productId, // ✅ FIXED: Using safe variable
               quantity: 1 
             });
             if (stockError) console.error("🚨 Failed to reduce stock:", stockError);
@@ -231,7 +240,7 @@ export async function POST(req: Request) {
           }
         }
       }
-    } 
+    }
     // ==========================================
     // SCENARIO 2: TRANSFER SUCCESS (Money Out) 
     // ==========================================
