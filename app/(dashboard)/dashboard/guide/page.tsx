@@ -11,7 +11,7 @@ import {
 
 export default function PayoutGuidePage() {
   return (
-    <div className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8 overflow-hidden relative">
+    <div className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8 max-h-screen overflow-y-auto">
       {/* Header Section */}
       <div className="mb-8 sm:mb-10 text-center sm:text-left">
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-3">
