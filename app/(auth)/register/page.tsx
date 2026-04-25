@@ -78,6 +78,7 @@ export default function RegisterPage() {
     formData.email.trim() !== "" && 
     formData.password.length >= 6 &&
     !Object.values(errors).some(error => error !== "");
+    
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
