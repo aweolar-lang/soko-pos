@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { 
   Store, Link as LinkIcon, Loader2, Save, AlertCircle, MapPin, 
   Building2, Map, ImagePlus, AlignLeft, Smartphone, Tags, Truck, 
-  Banknote, Landmark, Lock, FileText, User 
+  Banknote, Landmark, Lock, FileText, User, Mailbox 
 } from "lucide-react";
 import { toast } from "sonner";
 import { isValidName, isValidKRAPin, formatKenyanPhone } from "@/lib/validators";
@@ -28,6 +28,9 @@ export default function SettingsPage() {
   const [storeId, setStoreId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   
+  // Multi-step Wizard State
+  const [currentStep, setCurrentStep] = useState(1);
+  
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   
@@ -41,12 +44,12 @@ export default function SettingsPage() {
     county: "",
     town: "",
     area: "",
+    postal_address: "", // NEW: Postal Address
     kra_pin: "", 
     settlement_name: "", 
     existingLogoUrl: "", 
     offers_delivery: false,
     currency: "KES",
-    // New Upgraded Payout Columns
     payout_method: "MOBILE_MONEY", 
     payout_account_number: "", 
     payout_bank_code: "",
@@ -61,8 +64,21 @@ export default function SettingsPage() {
     payout_account_number: "",
   });
 
+  // REAL-TIME FORMATTING & CAPTURE
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+
+    // 1. Real-time Slug Formatting (Replace spaces with hyphens, force lowercase)
+    if (name === "storeSlug") {
+      value = value.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    }
+
+    // 2. Real-time Title Case (Capitalize first letter of every word)
+    const titleCaseFields = ["storeName", "county", "town", "area", "postal_address", "settlement_name"];
+    if (titleCaseFields.includes(name)) {
+      value = value.replace(/\b\w/g, (char) => char.toUpperCase());
+    }
+
     setFormData((prev) => ({ ...prev, [name]: value }));
     
     if (errors[name as keyof typeof errors]) {
@@ -70,62 +86,39 @@ export default function SettingsPage() {
     }
   };
 
-  // 4. Validate Fields on Blur
   const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     if (!value) return; 
 
-    // Store Name Validation
     if (name === "storeName" && value.trim().length < 3) {
       setErrors((prev) => ({ ...prev, storeName: "Store name must be at least 3 characters." }));
     }
-
-    // Description Validation
     if (name === "description" && value.trim().length < 10) {
       setErrors((prev) => ({ ...prev, description: "Description must be at least 10 characters." }));
     }
-  
-    // KRA PIN Validation
     if (name === "kra_pin" && !isValidKRAPin(value)) {
       setErrors((prev) => ({ ...prev, kra_pin: "Invalid KRA PIN. Must start with P/A, have 9 digits, and end with a letter." }));
     }
-
-    // Settlement Name (Bank Account Name) Validation
     if (name === "settlement_name" && !isValidName(value)) {
       setErrors((prev) => ({ ...prev, settlement_name: "Please enter a valid legal name." }));
     }
 
-    // Payout Account Number Validation (UPDATED FOR TILLS & PHONES)
     if (name === "payout_account_number") {
-      
       if (formData.payout_method === 'MOBILE_MONEY') {
-        // 1. Remove any accidental spaces the user typed
         const cleanValue = value.replace(/\s/g, '');
-
-        // 2. Check if it is a Till or Paybill Number (Usually 5 to 8 digits long)
         const isTillOrPaybill = /^\d{5,8}$/.test(cleanValue);
 
         if (isTillOrPaybill) {
-          // It's a Till number! Just save the clean numeric value.
           setFormData((prev) => ({ ...prev, payout_account_number: cleanValue }));
         } else {
-          // It's NOT a Till number, so it must be a Phone Number. Run our formatter.
           const formattedPhone = formatKenyanPhone(value);
-          
           if (!formattedPhone) {
-            setErrors((prev) => ({ 
-              ...prev, 
-              payout_account_number: "Invalid entry. Enter a 5-8 digit Till Number OR a valid 07XX... phone number." 
-            }));
+            setErrors((prev) => ({ ...prev, payout_account_number: "Invalid entry. Enter a 5-8 digit Till Number OR a valid 07XX... phone number." }));
           } else {
-            // It's a valid phone number! Save the 254... formatted version.
             setFormData((prev) => ({ ...prev, payout_account_number: formattedPhone }));
           }
         }
-      } 
-      
-      else if (formData.payout_method === 'BANK') {
-        // Basic Bank Account Validation (e.g., must be numeric and between 8-15 digits)
+      } else if (formData.payout_method === 'BANK') {
         const bankRegex = /^\d{8,15}$/;
         if (!bankRegex.test(value.replace(/\s/g, ''))) {
           setErrors((prev) => ({ ...prev, payout_account_number: "Invalid Bank Account Number (8-15 digits)." }));
@@ -134,27 +127,21 @@ export default function SettingsPage() {
     }
   };
 
-  const isFormValid = 
-    formData.storeName.trim().length >= 3 &&
-    formData.kra_pin.trim() !== "" &&
-    formData.settlement_name.trim() !== "" &&
-    formData.payout_account_number.trim() !== "" &&
-    formData.county.trim() !== "" &&
-    formData.category.trim() !== "" &&
-    !Object.values(errors).some(error => error !== "");
+  // Step Validation Logic
+  const isStep1Valid = formData.storeName.trim().length >= 3 && formData.category !== "";
+  const isStep2Valid = formData.county.trim() !== "" && formData.town.trim() !== "" && formData.area.trim() !== "" && formData.postal_address.trim() !== "";
+  const isStep3Valid = formData.kra_pin.trim() !== "" && formData.settlement_name.trim() !== "" && formData.payout_account_number.trim() !== "" && !Object.values(errors).some(error => error !== "");
 
   useEffect(() => {
     const fetchStoreDetails = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-        
         setUserId(user.id);
 
-        // MAP TO NEW DB COLUMNS
         const { data: store, error } = await supabase
           .from("stores")
-          .select("id, name, slug, description, category, county, town, area, kra_pin, settlement_name, payout_method, payout_account_number, payout_bank_code, logo_url, paystack_subaccount_code, offers_delivery, currency")
+          .select("id, name, slug, description, category, county, town, area, postal_address, kra_pin, settlement_name, payout_method, payout_account_number, payout_bank_code, logo_url, paystack_subaccount_code, offers_delivery, currency")
           .eq("owner_id", user.id)
           .single();
 
@@ -171,12 +158,12 @@ export default function SettingsPage() {
             county: store.county || "",
             town: store.town || "",
             area: store.area || "",
+            postal_address: store.postal_address || "", // Map postal address
             kra_pin: store.kra_pin || "",
             settlement_name: store.settlement_name || "",
             existingLogoUrl: store.logo_url || "",
             offers_delivery: store.offers_delivery || false,
             currency: store.currency || "KES",
-            // Mapping new columns to state
             payout_method: store.payout_method || "MOBILE_MONEY",
             payout_account_number: store.payout_account_number || "",
             payout_bank_code: store.payout_bank_code || "",
@@ -190,7 +177,6 @@ export default function SettingsPage() {
         setIsFetching(false);
       }
     };
-
     fetchStoreDetails();
   }, []);
 
@@ -212,28 +198,16 @@ export default function SettingsPage() {
     try {
       let finalLogoUrl = formData.existingLogoUrl;
 
-      // 1. Upload Logo
       if (logoFile) {
         const fileExt = logoFile.name.split('.').pop();
         const fileName = `${userId}-${Date.now()}.${fileExt}`;
         const filePath = `logos/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('store-assets')
-          .upload(filePath, logoFile, { upsert: true });
-
+        const { error: uploadError } = await supabase.storage.from('store-assets').upload(filePath, logoFile, { upsert: true });
         if (uploadError) throw uploadError;
-
-        const { data: publicUrlData } = supabase.storage
-          .from('store-assets')
-          .getPublicUrl(filePath);
-
+        const { data: publicUrlData } = supabase.storage.from('store-assets').getPublicUrl(filePath);
         finalLogoUrl = publicUrlData.publicUrl;
       }
 
-      // ==========================================
-      // UPGRADE 1: Verify Paystack BEFORE saving to Database
-      // ==========================================
       let currentSubaccountCode = formData.paystack_subaccount_code;
 
       if (formData.payout_account_number && formData.payout_account_number !== originalPayoutAccount) {
@@ -251,29 +225,20 @@ export default function SettingsPage() {
         });
         
         const payData = await payRes.json();
-        
-        // If Paystack fails, STOP the process
-        if (!payRes.ok) {
-          throw new Error(payData.error || "Paystack rejected this account number.");
-        }
-        
+        if (!payRes.ok) throw new Error(payData.error || "Paystack rejected this account number.");
         currentSubaccountCode = payData.subaccount_code;
       }
 
-      const slugifiedName = formData.storeSlug
-        ? formData.storeSlug.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-        : formData.storeName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-
-      // FULLY ALIGNED WITH YOUR NEW DATABASE SCHEMA
       const updates = {
         owner_id: userId,
         name: formData.storeName,
-        slug: slugifiedName,
+        slug: formData.storeSlug, // Save the dynamically formatted slug
         description: formData.description,
         category: formData.category, 
         county: formData.county,
         town: formData.town,
         area: formData.area,
+        postal_address: formData.postal_address, // Save postal address
         kra_pin: formData.kra_pin,
         settlement_name: formData.settlement_name,
         payout_method: formData.payout_method,
@@ -291,28 +256,20 @@ export default function SettingsPage() {
       } else {
         const { data: newStore, error } = await supabase.from('stores').insert([updates]).select('id').single();
         if (error) throw error;
-        
         setStoreId(newStore.id); 
       }
 
-      // Update local state
       setOriginalPayoutAccount(formData.payout_account_number);
       setFormData(prev => ({...prev, paystack_subaccount_code: currentSubaccountCode}));
-
       toast.success("Store profile saved successfully!", { id: toastId });
 
     } catch (error: any) {
       console.error("Save Error:", error);
-    
       let errorMessage = error.message || "An error occurred while saving.";
-      
-      if (error.code === '23505') {
-        errorMessage = "That Store URL is already taken. Please type a different URL.";
-      } 
+      if (error.code === '23505') errorMessage = "That Store URL is already taken. Please type a different URL.";
       else if (errorMessage.toLowerCase().includes("paystack") || errorMessage.toLowerCase().includes("invalid")) {
         errorMessage = "Payment Setup Failed: Double check your account number and try again.";
       }
-
       toast.error(errorMessage, { id: toastId });
     } finally {
       setIsLoading(false);
@@ -331,123 +288,144 @@ export default function SettingsPage() {
   
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-24 sm:pb-12">
-      <div>
+      <div className="text-center sm:text-left mb-4">
         <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Store Settings</h1>
         <p className="mt-1.5 sm:mt-2 text-sm text-slate-500">
           Manage your storefront details, location, and compliance documents.
         </p>
       </div>
 
-      <form onSubmit={handleSave} className="space-y-6 sm:space-y-8">
+      {/* STEP PROGRESS INDICATOR */}
+      <div className="mb-10">
+        <div className="flex items-center justify-between max-w-lg mx-auto relative">
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1.5 bg-slate-100 -z-10 rounded-full"></div>
+          <div 
+            className="absolute left-0 top-1/2 -translate-y-1/2 h-1.5 bg-emerald-500 -z-10 rounded-full transition-all duration-500 ease-out" 
+            style={{ width: `${((currentStep - 1) / 2) * 100}%` }}
+          ></div>
+
+          {[1, 2, 3].map(step => (
+            <div 
+              key={step} 
+              className={`h-11 w-11 rounded-full flex items-center justify-center font-bold border-4 border-white transition-all duration-300 ${currentStep >= step ? 'bg-emerald-500 text-white shadow-md scale-110' : 'bg-slate-200 text-slate-400'}`}
+            >
+              {step}
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-between max-w-lg mx-auto mt-3 text-xs sm:text-sm font-bold text-slate-400 px-1">
+          <span className={currentStep >= 1 ? 'text-emerald-700' : ''}>Storefront</span>
+          <span className={currentStep >= 2 ? 'text-emerald-700' : ''}>Location</span>
+          <span className={currentStep >= 3 ? 'text-emerald-700' : ''}>Payouts</span>
+        </div>
+      </div>
+
+      <form onSubmit={handleSave} className="space-y-6 sm:space-y-8 bg-white rounded-[2rem] border border-slate-200 shadow-sm p-6 sm:p-10">
         
         {/* ==========================================
-            SECTION 1: STOREFRONT & OPERATIONS
+            STEP 1: STOREFRONT & OPERATIONS
             ========================================== */}
-        <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-5 sm:p-8 space-y-6 sm:space-y-8">
-          <div className="border-b border-slate-100 pb-4">
-            <h2 className="text-xl font-black text-slate-900 tracking-tight">1. Storefront & Operations</h2>
-            <p className="text-sm text-slate-500 mt-1">Public details visible to your customers.</p>
-          </div>
+        {currentStep === 1 && (
+          <div className="animate-in fade-in slide-in-from-right-4 duration-300 space-y-8">
+            <div className="border-b border-slate-100 pb-4">
+              <h2 className="text-xl font-black text-slate-900 tracking-tight">1. Storefront Basics</h2>
+              <p className="text-sm text-slate-500 mt-1">Public details visible to your customers.</p>
+            </div>
 
-          {/* Logo Upload */}
-          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-center sm:items-start text-center sm:text-left">
-            <div className="relative h-24 w-24 sm:h-28 sm:w-28 rounded-3xl bg-slate-50 border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden shrink-0 group hover:border-emerald-500 transition-colors">
-              {(logoPreview || formData.existingLogoUrl) ? (
-                <img src={logoPreview || formData.existingLogoUrl} alt="Logo" className="h-full w-full object-cover" />
-              ) : (
-                <Store className="h-8 w-8 text-slate-300" />
-              )}
-              <div className="absolute inset-0 bg-slate-900/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                <ImagePlus className="h-6 w-6 text-white" />
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-center sm:items-start text-center sm:text-left">
+              <div className="relative h-24 w-24 sm:h-28 sm:w-28 rounded-3xl bg-slate-50 border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden shrink-0 group hover:border-emerald-500 transition-colors">
+                {(logoPreview || formData.existingLogoUrl) ? (
+                  <img src={logoPreview || formData.existingLogoUrl} alt="Logo" className="h-full w-full object-cover" />
+                ) : (
+                  <Store className="h-8 w-8 text-slate-300" />
+                )}
+                <div className="absolute inset-0 bg-slate-900/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                  <ImagePlus className="h-6 w-6 text-white" />
+                </div>
+                <input type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer" />
               </div>
-              <input type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer" />
-            </div>
-            <div className="mt-2 sm:mt-0">
-              <h3 className="font-bold text-slate-900 text-lg">Store Logo</h3>
-              <p className="text-sm text-slate-500 mt-1 max-w-sm">
-                Upload your brand's logo. This will be displayed on your public storefront and marketplace listings.
-              </p>
-            </div>
-          </div>
-
-          <hr className="border-slate-100" />
-
-          {/* Row 1: Store Name & Category */}
-          <div className="grid md:grid-cols-2 gap-5 sm:gap-6">
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">Store Name</label>
-              <div className="relative">
-                <Store className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
-                <input 
-                  type="text" required value={formData.storeName} 
-                  onChange={(e) => setFormData({ ...formData, storeName: e.target.value })} 
-                  className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-slate-50 focus:bg-white" 
-                  placeholder="e.g. The Coffee House" 
-                />
+              <div className="mt-2 sm:mt-0">
+                <h3 className="font-bold text-slate-900 text-lg">Store Logo</h3>
+                <p className="text-sm text-slate-500 mt-1 max-w-sm">Upload your brand's logo. This will be displayed on your public storefront and marketplace listings.</p>
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">Store Category</label>
-              <div className="relative">
-                <Tags className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
-                <select 
-                  required
-                  value={formData.category} 
-                  onChange={(e) => setFormData({...formData, category: e.target.value})}
-                  className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-slate-50 focus:bg-white appearance-none"
-                >
-                  <option value="" disabled>Select a category...</option>
-                  {STORE_CATEGORIES.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
+            <div className="grid md:grid-cols-2 gap-5 sm:gap-6">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Store Name</label>
+                <div className="relative">
+                  <Store className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
+                  <input 
+                    type="text" name="storeName" required value={formData.storeName} 
+                    onChange={handleInputChange} onBlur={handleBlur}
+                    className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-slate-50 focus:bg-white" 
+                    placeholder="e.g. The Coffee House" 
+                  />
+                </div>
               </div>
-            </div>
-          </div>
-
-          {/* Row 2: Slug & Description */}
-          <div className="grid md:grid-cols-2 gap-5 sm:gap-6">
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">Store URL (Slug)</label>
-              <div className="relative">
-                <LinkIcon className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
-                <input 
-                  type="text" value={formData.storeSlug} 
-                  onChange={(e) => setFormData({ ...formData, storeSlug: e.target.value })} 
-                  className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-slate-50 focus:bg-white" 
-                  placeholder="e.g. the-coffee-house" 
-                />
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Store Category</label>
+                <div className="relative">
+                  <Tags className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
+                  <select 
+                    name="category" required value={formData.category} 
+                    onChange={handleInputChange}
+                    className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-slate-50 focus:bg-white appearance-none"
+                  >
+                    <option value="" disabled>Select a category...</option>
+                    {STORE_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                  </select>
+                </div>
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">Store Description</label>
-              <div className="relative">
-                <AlignLeft className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
-                <textarea 
-                  rows={3} value={formData.description} 
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })} 
-                  className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-slate-50 focus:bg-white resize-none" 
-                  placeholder="Tell buyers what you sell..." 
-                />
+            <div className="grid md:grid-cols-2 gap-5 sm:gap-6">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Store URL (Slug)</label>
+                <div className="relative">
+                  <LinkIcon className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
+                  <input 
+                    type="text" name="storeSlug" value={formData.storeSlug} 
+                    onChange={handleInputChange} 
+                    className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-slate-50 focus:bg-white" 
+                    placeholder="e.g. the-coffee-house" 
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Store Description</label>
+                <div className="relative">
+                  <AlignLeft className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
+                  <textarea 
+                    name="description" rows={3} value={formData.description} 
+                    onChange={handleInputChange} onBlur={handleBlur}
+                    className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-slate-50 focus:bg-white resize-none" 
+                    placeholder="Tell buyers what you sell..." 
+                  />
+                </div>
               </div>
             </div>
           </div>
+        )}
 
-          <hr className="border-slate-100" />
+        {/* ==========================================
+            STEP 2: LOCATION & DELIVERY
+            ========================================== */}
+        {currentStep === 2 && (
+          <div className="animate-in fade-in slide-in-from-right-4 duration-300 space-y-8">
+            <div className="border-b border-slate-100 pb-4">
+              <h2 className="text-xl font-black text-slate-900 tracking-tight">2. Location & Operations</h2>
+              <p className="text-sm text-slate-500 mt-1">Where are you based and how do you operate?</p>
+            </div>
 
-          {/* Row 3: Location */}
-          <div>
-            <h3 className="text-lg font-bold text-slate-900 mb-4 sm:mb-5">Location Details</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6">
               <div>
                 <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">County</label>
                 <div className="relative">
                   <Map className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
                   <input 
-                    type="text" required value={formData.county} 
-                    onChange={(e) => setFormData({ ...formData, county: e.target.value })} 
+                    type="text" name="county" required value={formData.county} 
+                    onChange={handleInputChange} 
                     className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-slate-50 focus:bg-white" 
                     placeholder="e.g. Nairobi" 
                   />
@@ -458,230 +436,208 @@ export default function SettingsPage() {
                 <div className="relative">
                   <Building2 className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
                   <input 
-                    type="text" required value={formData.town} 
-                    onChange={(e) => setFormData({ ...formData, town: e.target.value })} 
+                    type="text" name="town" required value={formData.town} 
+                    onChange={handleInputChange} 
                     className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-slate-50 focus:bg-white" 
                     placeholder="e.g. Westlands" 
                   />
                 </div>
               </div>
-              <div className="sm:col-span-2 lg:col-span-1">
+              <div>
                 <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Specific Area</label>
                 <div className="relative">
                   <MapPin className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
                   <input 
-                    type="text" required value={formData.area} 
-                    onChange={(e) => setFormData({ ...formData, area: e.target.value })} 
+                    type="text" name="area" required value={formData.area} 
+                    onChange={handleInputChange} 
                     className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-slate-50 focus:bg-white" 
                     placeholder="e.g. Sarit Center" 
                   />
                 </div>
               </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Postal Address</label>
+                <div className="relative">
+                  <Mailbox className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
+                  <input 
+                    type="text" name="postal_address" required value={formData.postal_address} 
+                    onChange={handleInputChange} 
+                    className="w-full pl-11 pr-4 py-3 sm:py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base sm:text-sm bg-slate-50 focus:bg-white" 
+                    placeholder="e.g. P.O Box 12345-00100" 
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-blue-50/50 p-5 sm:p-6 rounded-3xl border border-blue-100">
+              <h3 className="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2"><Truck className="h-5 w-5 text-blue-600" /> Delivery Options</h3>
+              <p className="text-sm text-slate-500 mb-5">Do you offer delivery or shipping to your customers?</p>
+              <label className="flex items-center gap-3 cursor-pointer w-fit">
+                <div className="relative">
+                  <input 
+                    type="checkbox" checked={formData.offers_delivery}
+                    onChange={(e) => setFormData({...formData, offers_delivery: e.target.checked})}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </div>
+                <span className="font-bold text-slate-800 text-sm">Yes, we offer delivery services</span>
+              </label>
             </div>
           </div>
-
-          {/* Delivery Toggle */}
-          <div className="bg-blue-50/50 p-5 sm:p-6 rounded-3xl border border-blue-100">
-            <h3 className="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
-              <Truck className="h-5 w-5 text-blue-600" />
-              Delivery Options
-            </h3>
-            <p className="text-sm text-slate-500 mb-5">Do you offer delivery or shipping to your customers?</p>
-            
-            <label className="flex items-center gap-3 cursor-pointer">
-              <div className="relative">
-                <input 
-                  type="checkbox" 
-                  checked={formData.offers_delivery}
-                  onChange={(e) => setFormData({...formData, offers_delivery: e.target.checked})}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-              </div>
-              <span className="font-bold text-slate-800 text-sm">Yes, we offer delivery services</span>
-            </label>
-          </div>
-        </div>
+        )}
 
         {/* ==========================================
-            SECTION 2: COMPLIANCE & PAYOUTS
+            STEP 3: COMPLIANCE & PAYOUTS
             ========================================== */}
-        <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-5 sm:p-8 space-y-6 sm:space-y-8">
-          <div className="border-b border-slate-100 pb-4 flex justify-between items-start">
-            <div>
+        {currentStep === 3 && (
+          <div className="animate-in fade-in slide-in-from-right-4 duration-300 space-y-8">
+            <div className="border-b border-slate-100 pb-4">
               <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                2. Compliance & Payouts 
+                3. Compliance & Payouts 
                 {isFinancialsLocked && <Lock className="h-5 w-5 text-amber-500" />}
               </h2>
               <p className="text-sm text-slate-500 mt-1">
-                Required for marketplace compliance. <strong className="text-amber-600">These details cannot be changed once submitted.</strong>
+                {isFinancialsLocked ? <span className="text-amber-600 font-bold">These details are locked to protect your payouts.</span> : "Required for marketplace compliance."}
               </p>
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-5 sm:gap-6">
-            {/* KRA PIN */}
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">KRA PIN</label>
-              <div className="relative">
-                <FileText className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
-                <input 
-                  type="text" 
-                  name="kra_pin" 
-                  required
-                  value={formData.kra_pin} 
-                  onChange={handleInputChange} 
-                  onBlur={handleBlur}
-                  className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm uppercase ${errors.kra_pin ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
-                  placeholder="e.g. P123456789A" 
-                />
-              </div>
-              {errors.kra_pin && <p className="text-red-500 text-xs mt-1">{errors.kra_pin}</p>}
-            </div>
-
-            {/* Currency Settings */}
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">Store Currency</label>
-              <div className="flex-wrap p-4 gap-4">
-                <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${isFinancialsLocked ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'} ${formData.currency === 'KES' ? (isFinancialsLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-emerald-500 bg-emerald-50 text-emerald-700') : 'border-slate-200 bg-white text-slate-600'}`}>
-                  <input 
-                    type="radio" name="currency" value="KES" 
-                    disabled={isFinancialsLocked}
-                    checked={formData.currency === 'KES'}
-                    onChange={(e) => setFormData({...formData, currency: e.target.value})}
-                    className="sr-only" 
-                  />
-                  <span className="font-bold text-xl">🇰🇪</span> <span className="font-bold">KES</span>
-                </label>
-                <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${isFinancialsLocked ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'} ${formData.currency === 'USD' ? (isFinancialsLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-emerald-500 bg-emerald-50 text-emerald-700') : 'border-slate-200 bg-white text-slate-600'}`}>
-                  <input 
-                    type="radio" name="currency" value="USD" 
-                    disabled={isFinancialsLocked}
-                    checked={formData.currency === 'USD'}
-                    onChange={(e) => setFormData({...formData, currency: e.target.value})}
-                    className="sr-only" 
-                  />
-                  <span className="font-bold text-xl">🇺🇸</span> <span className="font-bold">USD</span>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <hr className="border-slate-100" />
-
-          {/* Payout Details */}
-          <div className={`p-5 sm:p-6 rounded-3xl border transition-colors ${isFinancialsLocked ? 'bg-slate-50 border-slate-200' : 'bg-blue-50/30 border-blue-100'}`}>
-            <h3 className="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
-              <Landmark className={`h-5 w-5 ${isFinancialsLocked ? 'text-slate-400' : 'text-blue-600'}`} />
-              Settlement Details
-            </h3>
-            <p className="text-sm text-slate-500 mb-5 sm:mb-6">Where should we automatically send your marketplace earnings?</p>
-            
-            {/* Payout Toggle */}
-            <div className="flex-wrap p-4 gap-4 max-w-md mb-6">
-              <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${isFinancialsLocked ? 'cursor-not-allowed' : 'cursor-pointer'} ${formData.payout_method === 'MOBILE_MONEY' ? (isFinancialsLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm') : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}>
-                <input 
-                  type="radio" name="payout_method" value="MOBILE_MONEY" 
-                  disabled={isFinancialsLocked}
-                  checked={formData.payout_method === 'MOBILE_MONEY'}
-                  onChange={(e) => setFormData({...formData, payout_method: e.target.value})}
-                  className="sr-only" 
-                />
-                <Smartphone className="h-4 w-4" /> M-Pesa
-              </label>
-              <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${isFinancialsLocked ? 'cursor-not-allowed' : 'cursor-pointer'} ${formData.payout_method === 'BANK' ? (isFinancialsLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm') : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}>
-                <input 
-                  type="radio" name="payout_method" value="BANK" 
-                  disabled={isFinancialsLocked}
-                  checked={formData.payout_method === 'BANK'}
-                  onChange={(e) => setFormData({...formData, payout_method: e.target.value})}
-                  className="sr-only" 
-                />
-                <Landmark className="h-4 w-4" /> Bank Account
-              </label>
             </div>
 
             <div className="grid md:grid-cols-2 gap-5 sm:gap-6">
-              {/* Account Name */}
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Legal Business / Owner Name</label>
+                <label className="block text-sm font-bold text-slate-700 mb-1">KRA PIN</label>
                 <div className="relative">
-                  <User className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+                  <FileText className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
                   <input 
-                    type="text" 
-                    name="settlement_name" 
-                    required
-                    value={formData.settlement_name} 
-                    onChange={handleInputChange} 
-                    onBlur={handleBlur}
-                    className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${errors.settlement_name ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
-                    placeholder="Name matching your KRA PIN" 
+                    type="text" name="kra_pin" required disabled={isFinancialsLocked}
+                    value={formData.kra_pin} onChange={handleInputChange} onBlur={handleBlur}
+                    className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm uppercase ${isFinancialsLocked ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' : errors.kra_pin ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
+                    placeholder="e.g. P123456789A" 
                   />
                 </div>
-                {errors.settlement_name && <p className="text-red-500 text-xs mt-1">{errors.settlement_name}</p>}
+                {errors.kra_pin && <p className="text-red-500 text-xs mt-1">{errors.kra_pin}</p>}
               </div>
-
-              {/* Conditional Bank Code Input */}
-              {formData.payout_method === 'BANK' && (
-                <div className="animate-in fade-in zoom-in duration-200">
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Bank Code</label>
-                  <div className="relative">
-                    <Landmark className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
-                    <input 
-                      type="text" required={formData.payout_method === 'BANK'} 
-                      disabled={isFinancialsLocked}
-                      value={formData.payout_bank_code} 
-                      onChange={(e) => setFormData({ ...formData, payout_bank_code: e.target.value })} 
-                      className={`w-full pl-11 pr-4 py-3 sm:py-3.5 border rounded-xl outline-none transition-all text-base sm:text-sm ${isFinancialsLocked ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' : 'bg-white border-slate-300 focus:ring-2 focus:ring-blue-500'}`} 
-                      placeholder="e.g. 044 (Access Bank)" 
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Account Number Input */}
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">
-                  {formData.payout_method === 'MOBILE_MONEY' ? 'M-Pesa Number or Till' : 'Bank Account Number'}
-                </label>
-                <div className="relative">
-                  <Banknote className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
-                  <input 
-                    type="text" 
-                    name="payout_account_number" 
-                    required
-                    value={formData.payout_account_number} 
-                    onChange={handleInputChange} 
-                    onBlur={handleBlur}
-                    className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${errors.payout_account_number ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
-                    placeholder={formData.payout_method === 'MOBILE_MONEY' ? "e.g. 0712345678 or 123456" : "Enter account number"} 
-                  />
+                <label className="block text-sm font-bold text-slate-700 mb-2">Store Currency</label>
+                <div className="flex gap-4">
+                  <label className={`flex-1 flex items-center justify-center gap-2 p-2.5 rounded-xl border-2 transition-all ${isFinancialsLocked ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'} ${formData.currency === 'KES' ? (isFinancialsLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-emerald-500 bg-emerald-50 text-emerald-700') : 'border-slate-200 bg-white text-slate-600'}`}>
+                    <input type="radio" name="currency" value="KES" disabled={isFinancialsLocked} checked={formData.currency === 'KES'} onChange={(e) => setFormData({...formData, currency: e.target.value})} className="sr-only" />
+                    <span className="font-bold text-xl">🇰🇪</span> <span className="font-bold">KES</span>
+                  </label>
+                  <label className={`flex-1 flex items-center justify-center gap-2 p-2.5 rounded-xl border-2 transition-all ${isFinancialsLocked ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'} ${formData.currency === 'USD' ? (isFinancialsLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-emerald-500 bg-emerald-50 text-emerald-700') : 'border-slate-200 bg-white text-slate-600'}`}>
+                    <input type="radio" name="currency" value="USD" disabled={isFinancialsLocked} checked={formData.currency === 'USD'} onChange={(e) => setFormData({...formData, currency: e.target.value})} className="sr-only" />
+                    <span className="font-bold text-xl">🇺🇸</span> <span className="font-bold">USD</span>
+                  </label>
                 </div>
-                {errors.payout_account_number && <p className="text-red-500 text-xs mt-1">{errors.payout_account_number}</p>}
               </div>
             </div>
-            
-            {formData.paystack_subaccount_code && (
-              <div className="mt-5 flex items-center gap-2 text-sm text-blue-700 bg-blue-100 px-4 py-3 sm:py-3.5 rounded-xl border border-blue-200 font-bold justify-center md:justify-start w-fit">
-                <AlertCircle className="h-5 w-5 shrink-0" />
-                Verified & Routing Active
-              </div>
-            )}
-          </div>
-        </div>
 
-        {/* Global Save Button */}
-        <div className="pt-2 flex justify-end">
-          <button 
-            type="submit" disabled={isLoading || !isFormValid} 
-            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 px-10 rounded-2xl shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+            <div className={`p-5 sm:p-6 rounded-3xl border transition-colors ${isFinancialsLocked ? 'bg-slate-50 border-slate-200' : 'bg-blue-50/30 border-blue-100'}`}>
+              <h3 className="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
+                <Landmark className={`h-5 w-5 ${isFinancialsLocked ? 'text-slate-400' : 'text-blue-600'}`} /> Settlement Details
+              </h3>
+              <p className="text-sm text-slate-500 mb-5 sm:mb-6">Where should we automatically send your marketplace earnings?</p>
+              
+              <div className="flex flex-wrap gap-4 max-w-md mb-6">
+                <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${isFinancialsLocked ? 'cursor-not-allowed' : 'cursor-pointer'} ${formData.payout_method === 'MOBILE_MONEY' ? (isFinancialsLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm') : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}>
+                  <input type="radio" name="payout_method" value="MOBILE_MONEY" disabled={isFinancialsLocked} checked={formData.payout_method === 'MOBILE_MONEY'} onChange={(e) => setFormData({...formData, payout_method: e.target.value})} className="sr-only" />
+                  <Smartphone className="h-4 w-4" /> M-Pesa
+                </label>
+                <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${isFinancialsLocked ? 'cursor-not-allowed' : 'cursor-pointer'} ${formData.payout_method === 'BANK' ? (isFinancialsLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm') : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}>
+                  <input type="radio" name="payout_method" value="BANK" disabled={isFinancialsLocked} checked={formData.payout_method === 'BANK'} onChange={(e) => setFormData({...formData, payout_method: e.target.value})} className="sr-only" />
+                  <Landmark className="h-4 w-4" /> Bank Account
+                </label>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-5 sm:gap-6">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Legal Business / Owner Name</label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+                    <input 
+                      type="text" name="settlement_name" required disabled={isFinancialsLocked}
+                      value={formData.settlement_name} onChange={handleInputChange} onBlur={handleBlur}
+                      className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${isFinancialsLocked ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' : errors.settlement_name ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
+                      placeholder="Name matching your KRA PIN" 
+                    />
+                  </div>
+                  {errors.settlement_name && <p className="text-red-500 text-xs mt-1">{errors.settlement_name}</p>}
+                </div>
+
+                {formData.payout_method === 'BANK' && (
+                  <div className="animate-in fade-in zoom-in duration-200">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Bank Code</label>
+                    <div className="relative">
+                      <Landmark className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
+                      <input 
+                        type="text" name="payout_bank_code" required={formData.payout_method === 'BANK'} 
+                        disabled={isFinancialsLocked} value={formData.payout_bank_code} 
+                        onChange={handleInputChange} 
+                        className={`w-full pl-11 pr-4 py-3 sm:py-3.5 border rounded-xl outline-none transition-all text-base sm:text-sm ${isFinancialsLocked ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' : 'bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500'}`} 
+                        placeholder="e.g. 044 (Access Bank)" 
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">
+                    {formData.payout_method === 'MOBILE_MONEY' ? 'M-Pesa Number or Till' : 'Bank Account Number'}
+                  </label>
+                  <div className="relative">
+                    <Banknote className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+                    <input 
+                      type="text" name="payout_account_number" required disabled={isFinancialsLocked}
+                      value={formData.payout_account_number} onChange={handleInputChange} onBlur={handleBlur}
+                      className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${isFinancialsLocked ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' : errors.payout_account_number ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500'}`} 
+                      placeholder={formData.payout_method === 'MOBILE_MONEY' ? "e.g. 0712345678 or 123456" : "Enter account number"} 
+                    />
+                  </div>
+                  {errors.payout_account_number && <p className="text-red-500 text-xs mt-1">{errors.payout_account_number}</p>}
+                </div>
+              </div>
+              
+              {formData.paystack_subaccount_code && (
+                <div className="mt-5 flex items-center gap-2 text-sm text-blue-700 bg-blue-100 px-4 py-3 sm:py-3.5 rounded-xl border border-blue-200 font-bold justify-center md:justify-start w-fit">
+                  <AlertCircle className="h-5 w-5 shrink-0" />
+                  Verified & Routing Active
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* STEP NAVIGATION FOOTER */}
+        <div className="flex justify-between items-center mt-8 pt-6 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={() => setCurrentStep((prev) => prev - 1)}
+            disabled={currentStep === 1 || isLoading}
+            className={`px-6 py-3 rounded-xl font-bold transition-all ${currentStep === 1 ? 'opacity-0 pointer-events-none' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 active:scale-95'}`}
           >
-            {isLoading ? (
-              <><Loader2 className="h-5 w-5 animate-spin" /><span>Processing...</span></>
-            ) : (
-              <><span>{storeId ? "Save Operations Updates" : "Create My Store"}</span><Save className="h-5 w-5" /></>
-            )}
+            Back
           </button>
+
+          {currentStep < 3 ? (
+            <button
+              type="button"
+              onClick={() => setCurrentStep((prev) => prev + 1)}
+              disabled={(currentStep === 1 && !isStep1Valid) || (currentStep === 2 && !isStep2Valid)}
+              className="px-8 py-3 rounded-xl font-bold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all"
+            >
+              Next Step
+            </button>
+          ) : (
+            <button 
+              type="submit" disabled={isLoading || !isStep3Valid} 
+              className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 px-8 rounded-xl shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? (
+                <><Loader2 className="h-5 w-5 animate-spin" /><span>Processing...</span></>
+              ) : (
+                <><span>{storeId ? "Save All Updates" : "Create My Store"}</span><Save className="h-5 w-5" /></>
+              )}
+            </button>
+          )}
         </div>
 
       </form>
