@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { Store, Mail, Lock, User, Phone, Loader2, UserPlus, Eye, EyeOff } from "lucide-react";
+import { Store, Mail, Lock, User, Phone, Loader2, UserPlus, Eye, EyeOff, Save } from "lucide-react";
 import { toast } from "sonner";
 import { isValidEmail, isValidName, formatKenyanPhone } from "@/lib/validators";
 
@@ -35,8 +35,29 @@ export default function RegisterPage() {
 
   // 3. Handle Change
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+    const { name } = e.target;
+    let value = e.target.value;
     setFormData((prev) => ({ ...prev, [name]: value }));
+
+    //trial validate
+
+    const titleCaseFields = ["firstName", "middleName", "lastName"];
+      const MAX_CHARS = 20;
+
+      if (titleCaseFields.includes(name)) {
+        if (value.length > MAX_CHARS) {
+          value = value.slice(0, MAX_CHARS);
+        }
+          value = value
+            .toLowerCase() 
+            .replace(/\b\w/g, (char) => char.toUpperCase());
+
+         // 3. Save to state
+      setFormData((prev) => ({ ...prev, [name]: value }));
+
+    }
+
+//end of trial validate
     
     if (errors[name as keyof typeof errors]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));

@@ -53,8 +53,17 @@ export default function OrderModal({ product, storeId, isHotel, storeCurrency = 
 
   // Handle Input Changes & Clear Errors
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name } = e.target;
+    let value = e.target.value;
+
+    value = value
+    .toLowerCase() 
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+    const MAX_CHARS = 20;
+    const processedValue = value.length > MAX_CHARS ? value.slice(0, MAX_CHARS) : value;
+    
+    setFormData((prev) => ({ ...prev, [name]: processedValue }));
     
     // Clear error immediately when user starts typing to fix it
     if (errors[name as keyof typeof errors]) {
