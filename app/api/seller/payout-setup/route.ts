@@ -29,7 +29,7 @@ function resolveMobileMoneyBankCode(accountNumber: string) {
 
   // Till/Paybill number: 5 to 8 digits
   if (/^\d{5,8}$/.test(clean)) {
-    return { accountNumber: clean, bankCode: "MPESA" };
+    return { accountNumber: clean, bankCode: "MPTILL" };
   }
 
   return null;
