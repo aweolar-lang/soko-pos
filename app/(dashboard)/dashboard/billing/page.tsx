@@ -200,7 +200,7 @@ export default function BillingPage() {
   const sym = isUSD ? '$' : 'Ksh ';
   
   const price1Mo = isUSD ? '4' : '350';
-  const price6Mo = isUSD ? '7' : '650';
+  const price6Mo = isUSD ? '7' : '2';
   const price1Yr = isUSD ? '10' : '1,000';
 
   return (
@@ -342,7 +342,7 @@ export default function BillingPage() {
             </li>
           </ul>
           <button 
-            onClick={() => handleSubscribe("6_MONTHS", 650)}
+            onClick={() => handleSubscribe("6_MONTHS", 2)}
             disabled={isProcessing !== null}
             className="w-full py-4 sm:py-3.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center"
           >

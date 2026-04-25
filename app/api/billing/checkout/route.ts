@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 // --- NEW FEATURE: Pricing for both currencies ---
 const PRICING = {
   "1_MONTH": { KES: 350, USD: 4 },
-  "6_MONTHS": { KES: 650, USD: 7 },
+  "6_MONTHS": { KES: 2, USD: 7 },
   "1_YEAR": { KES: 1000, USD: 10 },
 } as const;
 
