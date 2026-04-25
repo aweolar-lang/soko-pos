@@ -85,10 +85,7 @@ export default async function OrderSuccessPage({
       }
     }
 
-    // NOTICE: All Supabase INSERT logic has been removed here! 
-    // The Webhook handles database insertion securely in the background.
 
-    // Pass the formattedTotal down to the UI
     return <SuccessUI reference={reference} downloadUrl={downloadUrl} isDigital={isDigital} formattedTotal={formattedTotal} />;
 
   } catch (error: any) {

@@ -20,6 +20,7 @@ export default function BillingPage() {
     trialEnds: Date | null;
     subEnds: Date | null;
     tier: string;
+    currency: string;
   } | null>(null);
 
   // Add this new state
@@ -34,7 +35,7 @@ export default function BillingPage() {
         // Use maybeSingle() instead of single() so it doesn't throw a hard error if no store exists
         const { data: store, error } = await supabase
           .from('stores')
-          .select('trial_ends_at, subscription_ends_at, tier')
+          .select('trial_ends_at, subscription_ends_at, tier, currency')
           .eq('owner_id', user.id)
           .maybeSingle(); 
 
@@ -52,6 +53,7 @@ export default function BillingPage() {
             trialEnds,
             subEnds,
             tier: store.tier,
+            currency: store.currency || 'KES',
           });
         } else {
           // No store found for this user!
@@ -193,6 +195,14 @@ export default function BillingPage() {
   // ==========================================
   // VIEW 2 & 3: TRIAL OR EXPIRED (Shows Pricing)
   // ==========================================
+  // Dynamic Pricing Logic
+  const isUSD = storeStatus?.currency === 'USD';
+  const sym = isUSD ? '$' : 'Ksh ';
+  
+  const price1Mo = isUSD ? '4' : '350';
+  const price6Mo = isUSD ? '7' : '650';
+  const price1Yr = isUSD ? '10' : '1,000';
+
   return (
     <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8 pb-24 sm:pb-12">
       
@@ -245,7 +255,7 @@ export default function BillingPage() {
             <p className="text-sm text-slate-500 mt-2">Perfect for testing the waters.</p>
           </div>
           <div className="mb-5 sm:mb-6">
-            <span className="text-3xl sm:text-4xl font-black text-slate-900">Ksh 350</span>
+            <span className="text-3xl sm:text-4xl font-black text-slate-900">{sym}{price1Mo}</span>
             <span className="text-slate-500 font-medium">/mo</span>
           </div>
           <ul className="space-y-3 mb-8 flex-1">
@@ -281,7 +291,7 @@ export default function BillingPage() {
             <p className="text-sm text-slate-400 mt-2">Maximum savings for serious sellers.</p>
           </div>
           <div className="mb-5 sm:mb-6">
-            <span className="text-3xl sm:text-4xl font-black text-white">Ksh 1,000</span>
+            <span className="text-3xl sm:text-4xl font-black text-white">{sym}{price1Yr}</span>
             <span className="text-slate-400 font-medium">/yr</span>
           </div>
           <ul className="space-y-3 mb-8 flex-1">
@@ -317,7 +327,7 @@ export default function BillingPage() {
             <p className="text-sm text-slate-500 mt-2">A great balance of commitment and price.</p>
           </div>
           <div className="mb-5 sm:mb-6">
-            <span className="text-3xl sm:text-4xl font-black text-slate-900">Ksh 650</span>
+            <span className="text-3xl sm:text-4xl font-black text-slate-900">{sym}{price6Mo}</span>
             <span className="text-slate-500 font-medium">/6mo</span>
           </div>
           <ul className="space-y-3 mb-8 flex-1">

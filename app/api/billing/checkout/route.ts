@@ -2,18 +2,19 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-const VALID_PLANS = {
-  "1_MONTH": 350,
-  "6_MONTHS": 650,
-  "1_YEAR": 1,
+// --- NEW FEATURE: Pricing for both currencies ---
+const PRICING = {
+  "1_MONTH": { KES: 350, USD: 4 },
+  "6_MONTHS": { KES: 650, USD: 7 },
+  "1_YEAR": { KES: 1000, USD: 10 },
 } as const;
 
-type PlanKey = keyof typeof VALID_PLANS;
+type PlanKey = keyof typeof PRICING;
 
 function normalizePlan(value: unknown): PlanKey | null {
   if (typeof value !== "string") return null;
   const plan = value.trim().toUpperCase();
-  return plan in VALID_PLANS ? (plan as PlanKey) : null;
+  return plan in PRICING ? (plan as PlanKey) : null;
 }
 
 export async function POST(req: Request) {
@@ -73,7 +74,18 @@ export async function POST(req: Request) {
       );
     }
 
-    const amount = VALID_PLANS[plan];
+    // --- NEW FEATURE: Fetch the store's currency ---
+    const { data: store, error: storeError } = await supabase
+      .from("stores")
+      .select("currency")
+      .eq("owner_id", user.id)
+      .single();
+
+    // Default to KES if they don't have a currency set in the database yet
+    const storeCurrency = (store?.currency || "KES") as "KES" | "USD";
+
+    // --- NEW FEATURE: Get the dynamic amount based on plan AND currency ---
+    const amount = PRICING[plan][storeCurrency];
 
     if (!Number.isFinite(amount) || amount <= 0) {
       return NextResponse.json(
@@ -98,8 +110,8 @@ export async function POST(req: Request) {
 
     const paystackPayload = {
       email: user.email,
-      amount: Math.round(amount * 100), // FIX 2: Prevents decimal crashes
-      currency: "KES",
+      amount: Math.round(amount * 100),
+      currency: storeCurrency,          
       callback_url: `${appUrl}/payment-success`,
       metadata: {
         custom_fields: [
@@ -114,8 +126,8 @@ export async function POST(req: Request) {
             value: plan,
           },
           {
-            display_name: "Amount (KES)",
-            variable_name: "amount_kes",
+            display_name: `Amount (${storeCurrency})`,
+            variable_name: "amount_paid",
             value: amount,
           },
         ],

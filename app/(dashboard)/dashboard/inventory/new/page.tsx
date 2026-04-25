@@ -299,14 +299,23 @@ export default function AddProductPage() {
                     <>
                       <UploadCloud className="w-8 h-8 text-slate-400 mb-2" />
                       <p className="text-sm font-bold text-slate-700 mb-1">Click to upload your product file</p>
-                      <p className="text-xs text-slate-500">ZIP, PDF, DOCX, etc. (Max 50MB)</p>
+                      {/* UPDATED: Tell the user ZIP only */}
+                      <p className="text-xs text-slate-500">ZIP files only (Max 50MB)</p>
                     </>
                   )}
                 </div>
-                <input type="file" className="hidden" onChange={handleDigitalFileChange} />
+                {/* UPDATED: Added the accept attribute here */}
+                <input 
+                  type="file" 
+                  className="hidden" 
+                  accept=".zip, application/zip" 
+                  onChange={handleDigitalFileChange} 
+                />
               </label>
             </div>
           )}
+
+          <hr className="border-slate-100" />
 
           <hr className="border-slate-100" />
 

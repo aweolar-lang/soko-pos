@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { 
   Store, LayoutGrid, Package, Receipt, Wallet, 
-  Settings, LogOut, Menu, Bell, CreditCard, X, Loader2, HelpCircle 
+  Settings, LogOut, Menu, Bell, CreditCard, X, Loader2, HelpCircle, BookOpen
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
@@ -167,7 +167,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 S
               </button>
 
-              {isProfileMenuOpen && (
+             {isProfileMenuOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                   <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50">
                     <p className="text-sm font-bold text-slate-900">My Account</p>
@@ -179,6 +179,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     >
                       <Settings className="h-4 w-4" /> Settings
                     </Link>
+                    
+                    <Link 
+                      href="/dashboard/guide"
+                      className="flex items-center gap-2 px-3 py-2 text-sm font-bold text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
+                    >
+                      <BookOpen className="h-4 w-4" /> Payout Guide
+                    </Link>
+
                     <button 
                       onClick={() => alert("Support Center opening soon!")}
                       className="flex w-full items-center gap-2 px-3 py-2 text-sm font-bold text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"

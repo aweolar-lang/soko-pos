@@ -342,53 +342,82 @@ async function sendMailjetEmail(toEmail: string, toName: string, subject: string
 
 // UPGRADE: Added currency parameter (defaults to KES)
 async function sendPayoutEmail(toEmail: string, toName: string, amount: number, reference: string, currency: string = "KES") {
-  // Dynamically set symbol based on the currency sent from Paystack
   const currencySymbol = currency === "USD" ? "$" : "Ksh ";
 
   const html = `
-    <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;">
-      <div style="text-align: center; padding-bottom: 20px; border-bottom: 2px solid #10b981;">
-        <h2 style="color: #0f172a; margin: 0; font-size: 24px;">Local<span style="color: #10b981;">Soko</span></h2>
-      </div>
-      
-      <div style="padding: 30px 0; text-align: center;">
-        <div style="background-color: #d1fae5; color: #059669; width: 60px; height: 60px; border-radius: 50%; line-height: 60px; font-size: 28px; margin: 0 auto 20px auto;">
-          🏦
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; padding: 40px 20px; margin: 0;">
+      <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+        
+        <div style="text-align: center; padding: 30px 20px; border-bottom: 1px solid #f1f5f9;">
+          <img src="https://www.localsoko.com/apple-touch-icon.png" alt="LocalSoko" width="56" height="56" style="border-radius: 14px; margin-bottom: 12px; display: block; margin: 0 auto;" />
+          <h2 style="margin: 0; color: #0f172a; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">Local<span style="color: #10b981;">Soko</span></h2>
         </div>
-        <h1 style="color: #0f172a; font-size: 22px; margin-bottom: 8px;">Settlement Complete</h1>
-        <p style="color: #64748b; font-size: 16px; margin-bottom: 32px;">Your funds have been transferred to your account.</p>
         
-        <p style="color: #334155; font-size: 16px; line-height: 1.6; text-align: left;">Hi <strong>${toName}</strong>,</p>
-        <p style="color: #334155; font-size: 16px; line-height: 1.6; text-align: left;">This is an automated notification to confirm that your payout has been successfully deposited into your registered M-Pesa Till or account.</p>
-        
-        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 30px 0; text-align: left;">
-          <ul style="list-style: none; padding: 0; margin: 0; color: #334155; font-size: 15px;">
-            <li style="margin-bottom: 12px;"><span style="color: #64748b;">Amount Settled:</span> <strong style="font-size: 18px; color: #10b981;">${currencySymbol}${amount.toLocaleString()}</strong></li>
-            <li style="margin-bottom: 12px;"><span style="color: #64748b;">Status:</span> <strong>Completed</strong></li>
-            <li><span style="color: #64748b;">Bank Reference:</span> <span style="font-family: monospace; color: #475569;">${reference}</span></li>
-          </ul>
+        <div style="padding: 40px 30px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <div style="background-color: #d1fae5; display: inline-block; padding: 16px; border-radius: 50%; font-size: 32px; margin-bottom: 20px; line-height: 1;">🏦</div>
+            <h1 style="color: #0f172a; font-size: 24px; margin: 0 0 8px 0;">Settlement Complete</h1>
+            <p style="color: #64748b; font-size: 16px; margin: 0;">Your funds have been transferred to your account.</p>
+          </div>
+          
+          <p style="color: #334155; font-size: 16px; line-height: 1.6;">Hi <strong>${toName}</strong>,</p>
+          <p style="color: #334155; font-size: 16px; line-height: 1.6;">This is an automated notification to confirm that your payout has been successfully deposited into your registered M-Pesa Till or Bank account.</p>
+          
+          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin: 30px 0;">
+            <ul style="list-style: none; padding: 0; margin: 0; color: #334155; font-size: 15px;">
+              <li style="margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 16px;"><span style="color: #64748b; display: block; margin-bottom: 4px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Amount Settled</span> <strong style="font-size: 24px; color: #10b981;">${currencySymbol}${amount.toLocaleString()}</strong></li>
+              <li style="margin-bottom: 12px;"><span style="color: #64748b; display: inline-block; width: 120px;">Status:</span> <strong>Completed</strong></li>
+              <li><span style="color: #64748b; display: inline-block; width: 120px;">Bank Reference:</span> <span style="font-family: monospace; color: #475569; background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">${reference}</span></li>
+            </ul>
+          </div>
+
+          <div style="text-align: center; margin-top: 40px;">
+            <a href="https://localsoko.com/dashboard/wallet" style="background-color: #0f172a; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">View Wallet History</a>
+          </div>
         </div>
 
-        <div style="text-align: center; margin: 40px 0;">
-          <a href="https://localsoko.com/dashboard/sales" style="background-color: #0f172a; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">View Transaction History</a>
+        <div style="background-color: #f8fafc; padding: 24px; text-align: center; border-top: 1px solid #e2e8f0;">
+          <p style="margin: 0; color: #64748b; font-size: 13px;">© ${new Date().getFullYear()} LocalSoko. All rights reserved.</p>
+          <p style="margin: 8px 0 0 0; color: #94a3b8; font-size: 12px;">This is an automated message. Please check your account statement to confirm receipt.</p>
         </div>
-        
-        <p style="color: #94a3b8; font-size: 14px; margin-top: 40px; text-align: center;">This is an automated message. Please check your account statement to confirm receipt.</p>
+
       </div>
     </div>
   `;
-  
   await sendMailjetEmail(toEmail, toName, `🏦 Settlement Complete - LocalSoko`, html);
 }
 
 async function sendDigitalDownloadEmail(toEmail: string, toName: string, productTitle: string, downloadLink: string) {
   const html = `
-    <div style="font-family: sans-serif; max-w: 600px; margin: 0 auto; padding: 20px;">
-      <h2>Your Download is Ready!</h2>
-      <p>Hi ${toName},</p>
-      <p>Your payment for <strong>${productTitle}</strong> was successful. You can download your file securely below:</p>
-      <a href="${downloadLink}" style="background-color: #10B981; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block;">Download File</a>
-      <p style="font-size: 12px; color: #64748b; margin-top: 30px;">This link expires in 3 days.</p>
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; padding: 40px 20px; margin: 0;">
+      <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+        
+        <div style="text-align: center; padding: 30px 20px; border-bottom: 1px solid #f1f5f9;">
+          <img src="https://www.localsoko.com/apple-touch-icon.png" alt="LocalSoko" width="56" height="56" style="border-radius: 14px; margin-bottom: 12px; display: block; margin: 0 auto;" />
+          <h2 style="margin: 0; color: #0f172a; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">Local<span style="color: #10b981;">Soko</span></h2>
+        </div>
+        
+        <div style="padding: 40px 30px; text-align: center;">
+          <div style="background-color: #d1fae5; display: inline-block; padding: 16px; border-radius: 50%; font-size: 32px; margin-bottom: 20px; line-height: 1;">🎁</div>
+          <h1 style="color: #0f172a; font-size: 24px; margin: 0 0 8px 0;">Your Download is Ready!</h1>
+          
+          <p style="color: #334155; font-size: 16px; line-height: 1.6; margin-top: 30px; text-align: left;">Hi <strong>${toName}</strong>,</p>
+          <p style="color: #334155; font-size: 16px; line-height: 1.6; text-align: left;">Your payment for <strong>${productTitle}</strong> was successful. You can download your file securely using the button below:</p>
+          
+          <div style="margin: 40px 0;">
+            <a href="${downloadLink}" style="background-color: #10B981; color: #ffffff; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: bold; font-size: 18px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2);">Download File Now</a>
+          </div>
+          
+          <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; margin-top: 20px; text-align: center;">
+            <p style="margin: 0; color: #b91c1c; font-size: 14px; font-weight: 500;">⏳ Please note: This secure download link will expire in 3 days.</p>
+          </div>
+        </div>
+
+        <div style="background-color: #f8fafc; padding: 24px; text-align: center; border-top: 1px solid #e2e8f0;">
+          <p style="margin: 0; color: #64748b; font-size: 13px;">© ${new Date().getFullYear()} LocalSoko. All rights reserved.</p>
+          <p style="margin: 8px 0 0 0; color: #94a3b8; font-size: 12px;">Thank you for supporting independent creators.</p>
+        </div>
+      </div>
     </div>
   `;
   await sendMailjetEmail(toEmail, toName, `Your Download: ${productTitle}`, html);
@@ -396,32 +425,82 @@ async function sendDigitalDownloadEmail(toEmail: string, toName: string, product
 
 async function sendPhysicalOrderEmail(toEmail: string, toName: string, productTitle: string, storeName: string, type: string) {
   const isDelivery = type === "DELIVERY" || type === "SHIPPING";
+  
   const html = `
-    <div style="font-family: sans-serif; max-w: 600px; margin: 0 auto; padding: 20px;">
-      <h2>Order Confirmed! 🎉</h2>
-      <p>Hi ${toName},</p>
-      <p>Your order for <strong>${productTitle}</strong> has been successfully placed with <strong>${storeName}</strong>.</p>
-      <p>The seller has been notified and is currently preparing your order for <strong>${isDelivery ? "Delivery" : "Pickup/Takeaway"}</strong>.</p>
-      <p style="margin-top: 30px; font-size: 14px; color: #475569;">Thank you for supporting local businesses on LocalSoko!</p>
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; padding: 40px 20px; margin: 0;">
+      <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+        
+        <div style="text-align: center; padding: 30px 20px; border-bottom: 1px solid #f1f5f9;">
+          <img src="https://www.localsoko.com/apple-touch-icon.png" alt="LocalSoko" width="56" height="56" style="border-radius: 14px; margin-bottom: 12px; display: block; margin: 0 auto;" />
+          <h2 style="margin: 0; color: #0f172a; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">Local<span style="color: #10b981;">Soko</span></h2>
+        </div>
+        
+        <div style="padding: 40px 30px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <div style="background-color: #d1fae5; display: inline-block; padding: 16px; border-radius: 50%; font-size: 32px; margin-bottom: 20px; line-height: 1;">🎉</div>
+            <h1 style="color: #0f172a; font-size: 24px; margin: 0 0 8px 0;">Order Confirmed!</h1>
+          </div>
+          
+          <p style="color: #334155; font-size: 16px; line-height: 1.6;">Hi <strong>${toName}</strong>,</p>
+          <p style="color: #334155; font-size: 16px; line-height: 1.6;">Your order for <strong>${productTitle}</strong> has been successfully placed with <strong>${storeName}</strong>.</p>
+          
+          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin: 30px 0;">
+            <h3 style="margin: 0 0 16px 0; color: #0f172a; font-size: 16px;">Order Status Updates</h3>
+            <p style="color: #475569; font-size: 15px; margin: 0; line-height: 1.6;">The seller has been notified and is currently preparing your order for <strong style="color: #10b981;">${isDelivery ? "Delivery" : "Pickup/Takeaway"}</strong>.</p>
+          </div>
+          
+          <p style="margin-top: 30px; font-size: 15px; color: #475569; text-align: center; font-style: italic;">Thank you for supporting local businesses on LocalSoko!</p>
+        </div>
+
+        <div style="background-color: #f8fafc; padding: 24px; text-align: center; border-top: 1px solid #e2e8f0;">
+          <p style="margin: 0; color: #64748b; font-size: 13px;">© ${new Date().getFullYear()} LocalSoko. All rights reserved.</p>
+        </div>
+      </div>
     </div>
   `;
   await sendMailjetEmail(toEmail, toName, `Order Confirmed: ${productTitle}`, html);
 }
 
-// UPGRADE: Added the `sym` parameter to print $ or Ksh
 async function sendSellerNotificationEmail(toEmail: string, sellerName: string, productTitle: string, buyerName: string, amount: number, type: string, sym: string) {
   const html = `
-    <div style="font-family: sans-serif; max-w: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
-      <h2 style="color: #10B981;">Cha-Ching! New Order! 💸</h2>
-      <p>Hello ${sellerName},</p>
-      <p>You just received a new order for <strong>${productTitle}</strong> from <strong>${buyerName}</strong>.</p>
-      <ul style="background-color: #f8fafc; padding: 20px; border-radius: 8px; list-style: none;">
-        <li><strong>Item:</strong> ${productTitle}</li>
-        <li><strong>Amount Paid:</strong> ${sym}${amount.toLocaleString()}</li>
-        <li><strong>Fulfillment Method:</strong> ${type}</li>
-      </ul>
-      <p style="margin-top: 20px;">Log into your SokoPOS Dashboard to view the full details and manage this order.</p>
-      <a href="https://localsoko.com/dashboard/orders" style="background-color: #0f172a; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block;">Go to Dashboard</a>
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; padding: 40px 20px; margin: 0;">
+      <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+        
+        <div style="text-align: center; padding: 30px 20px; border-bottom: 1px solid #f1f5f9;">
+          <img src="https://www.localsoko.com/apple-touch-icon.png" alt="LocalSoko" width="56" height="56" style="border-radius: 14px; margin-bottom: 12px; display: block; margin: 0 auto;" />
+          <h2 style="margin: 0; color: #0f172a; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">Local<span style="color: #10b981;">Soko</span></h2>
+        </div>
+        
+        <div style="padding: 40px 30px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <div style="background-color: #d1fae5; display: inline-block; padding: 16px; border-radius: 50%; font-size: 32px; margin-bottom: 20px; line-height: 1;">💸</div>
+            <h1 style="color: #10B981; font-size: 24px; margin: 0 0 8px 0;">Cha-Ching! New Order!</h1>
+          </div>
+          
+          <p style="color: #334155; font-size: 16px; line-height: 1.6;">Hello <strong>${sellerName}</strong>,</p>
+          <p style="color: #334155; font-size: 16px; line-height: 1.6;">Great news! You just received a new order from <strong>${buyerName}</strong>.</p>
+          
+          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin: 30px 0;">
+            <h3 style="margin: 0 0 16px 0; color: #0f172a; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Order Details</h3>
+            <ul style="list-style: none; padding: 0; margin: 0; color: #334155; font-size: 15px;">
+              <li style="margin-bottom: 12px;"><span style="color: #64748b; display: inline-block; width: 140px;">Item:</span> <strong>${productTitle}</strong></li>
+              <li style="margin-bottom: 12px;"><span style="color: #64748b; display: inline-block; width: 140px;">Fulfillment:</span> <strong>${type}</strong></li>
+              <li style="margin-top: 16px; padding-top: 16px; border-top: 1px dashed #cbd5e1;"><span style="color: #64748b; display: inline-block; width: 140px;">Amount Paid:</span> <strong style="color: #10b981; font-size: 18px;">${sym}${amount.toLocaleString()}</strong></li>
+            </ul>
+          </div>
+          
+          <p style="color: #475569; font-size: 15px; margin-bottom: 30px; text-align: center;">Log into your SokoPOS Dashboard to view the full details, manage fulfillment, and chat with the buyer.</p>
+          
+          <div style="text-align: center;">
+            <a href="https://localsoko.com/dashboard/orders" style="background-color: #0f172a; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">Go to Dashboard</a>
+          </div>
+        </div>
+
+        <div style="background-color: #f8fafc; padding: 24px; text-align: center; border-top: 1px solid #e2e8f0;">
+          <p style="margin: 0; color: #64748b; font-size: 13px;">© ${new Date().getFullYear()} LocalSoko. All rights reserved.</p>
+          <p style="margin: 8px 0 0 0; color: #94a3b8; font-size: 12px;">This is an automated notification for sellers.</p>
+        </div>
+      </div>
     </div>
   `;
   await sendMailjetEmail(toEmail, sellerName, `New Order Received: ${productTitle}`, html);
@@ -429,31 +508,40 @@ async function sendSellerNotificationEmail(toEmail: string, sellerName: string, 
 
 async function sendSubscriptionEmail(toEmail: string, toName: string, tier: string, amount: number, expiryDate: string) {
   const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-w: 600px; margin: 0 auto; background-color: #F8FAFC; padding: 40px 20px;">
-      <div style="background-color: #FFFFFF; border-radius: 24px; padding: 40px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); border: 1px solid #E2E8F0;">
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; padding: 40px 20px; margin: 0;">
+      <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
         
-        <div style="text-align: center; margin-bottom: 30px;">
-          <span style="color: #10B981; font-size: 24px; font-weight: 900; letter-spacing: -0.5px;">LocalSoko</span>
+        <div style="text-align: center; padding: 30px 20px; border-bottom: 1px solid #f1f5f9;">
+          <img src="https://www.localsoko.com/apple-touch-icon.png" alt="LocalSoko" width="56" height="56" style="border-radius: 14px; margin-bottom: 12px; display: block; margin: 0 auto;" />
+          <h2 style="margin: 0; color: #0f172a; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">Local<span style="color: #10b981;">Soko</span></h2>
         </div>
         
-        <h1 style="color: #0F172A; font-size: 24px; font-weight: 800; text-align: center; margin-bottom: 8px;">Welcome to ${tier}! 🚀</h1>
-        <p style="color: #64748B; font-size: 16px; text-align: center; margin-bottom: 32px;">Your store has been successfully upgraded.</p>
-        
-        <p style="color: #334155; font-size: 16px; line-height: 1.6;">Hi ${toName},</p>
-        <p style="color: #334155; font-size: 16px; line-height: 1.6;">Thank you for subscribing! Your payment of <strong>Ksh ${amount.toLocaleString()}</strong> was successful. Your powerful new seller tools are now unlocked and ready to use.</p>
-        
-        <div style="background-color: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 12px; padding: 20px; margin: 30px 0;">
-          <ul style="list-style: none; padding: 0; margin: 0; color: #166534; font-size: 15px;">
-            <li style="margin-bottom: 10px;"><strong>Plan:</strong> ${tier} Tier</li>
-            <li style="margin-bottom: 10px;"><strong>Status:</strong> Active</li>
-            <li><strong>Next Billing Date:</strong> ${expiryDate}</li>
-          </ul>
+        <div style="padding: 40px 30px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <div style="background-color: #d1fae5; display: inline-block; padding: 16px; border-radius: 50%; font-size: 32px; margin-bottom: 20px; line-height: 1;">🚀</div>
+            <h1 style="color: #0F172A; font-size: 24px; margin: 0 0 8px 0;">Welcome to ${tier}!</h1>
+            <p style="color: #64748B; font-size: 16px; margin: 0;">Your store has been successfully upgraded.</p>
+          </div>
+          
+          <p style="color: #334155; font-size: 16px; line-height: 1.6;">Hi <strong>${toName}</strong>,</p>
+          <p style="color: #334155; font-size: 16px; line-height: 1.6;">Thank you for subscribing! Your payment of <strong>Ksh ${amount.toLocaleString()}</strong> was successful. Your powerful new seller tools are now unlocked and ready to use.</p>
+          
+          <div style="background-color: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 12px; padding: 24px; margin: 30px 0;">
+            <ul style="list-style: none; padding: 0; margin: 0; color: #166534; font-size: 15px;">
+              <li style="margin-bottom: 12px;"><span style="display: inline-block; width: 140px; color: #15803d;">Plan:</span> <strong style="color: #14532d;">${tier} Tier</strong></li>
+              <li style="margin-bottom: 12px;"><span style="display: inline-block; width: 140px; color: #15803d;">Status:</span> <strong style="color: #10b981;">● Active</strong></li>
+              <li style="margin-top: 16px; padding-top: 16px; border-top: 1px dashed #bbf7d0;"><span style="display: inline-block; width: 140px; color: #15803d;">Next Billing Date:</span> <strong style="color: #14532d;">${expiryDate}</strong></li>
+            </ul>
+          </div>
+
+          <div style="text-align: center; margin-top: 40px;">
+            <a href="https://localsoko.com/dashboard" style="background-color: #0F172A; color: #ffffff; padding: 14px 28px; text-decoration: none; font-weight: bold; border-radius: 8px; display: inline-block; font-size: 16px;">Go to Your Dashboard</a>
+          </div>
         </div>
 
-        <div style="text-align: center; margin: 40px 0;">
-          <a href="https://localsoko.com/dashboard" style="background-color: #0F172A; color: #ffffff; padding: 16px 32px; text-decoration: none; font-weight: bold; border-radius: 12px; display: inline-block; font-size: 16px;">
-            Go to Your Dashboard
-          </a>
+        <div style="background-color: #f8fafc; padding: 24px; text-align: center; border-top: 1px solid #e2e8f0;">
+          <p style="margin: 0; color: #64748b; font-size: 13px;">© ${new Date().getFullYear()} LocalSoko. All rights reserved.</p>
+          <p style="margin: 8px 0 0 0; color: #94a3b8; font-size: 12px;">This receipt was sent automatically for your records.</p>
         </div>
       </div>
     </div>
