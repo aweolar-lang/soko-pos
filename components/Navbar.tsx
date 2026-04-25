@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { User } from "@supabase/supabase-js"; 
-import { Store, LayoutDashboard, LogOut, LogIn, ChevronRight } from "lucide-react";
+import { Store, LayoutDashboard, LogOut, LogIn, ChevronRight, Package } from "lucide-react";
 
 export default function Navbar() {
   const router = useRouter();
@@ -56,12 +56,26 @@ export default function Navbar() {
                 <Store className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
               <span className="hidden sm:block">Local<span className="text-emerald-600">Soko</span></span>
-              {/* FIXED TYPO: "LokoSoko" to "LocalSoko" */}
               <span className="block sm:hidden">LocalSoko</span>
             </Link>
 
-            {/* Auth State Actions */}
-            <div className="flex items-center">
+            {/* Actions: Buyers & Sellers */}
+            <div className="flex items-center gap-2 sm:gap-4">
+              
+              {/* === BUYER PORTAL INTEGRATION === */}
+              {/* This is always visible so buyers can easily find where to log in or track their items */}
+              <Link
+                href="/track"
+                className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 text-xs sm:text-sm font-bold text-slate-600 hover:text-emerald-600 hover:bg-slate-50 rounded-xl transition-all"
+              >
+                <Package className="h-4 w-4" />
+                <span className="hidden sm:inline">Track Order</span>
+              </Link>
+
+              {/* Vertical Divider */}
+              <div className="w-px h-6 bg-slate-200 mx-1 hidden sm:block"></div>
+
+              {/* === SELLER AUTH STATE === */}
               {user ? (
                 <div className="flex items-center bg-slate-50 p-1.5 rounded-2xl border border-slate-100 shadow-sm">
                   <Link

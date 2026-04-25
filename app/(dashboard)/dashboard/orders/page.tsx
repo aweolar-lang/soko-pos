@@ -83,20 +83,49 @@ export default function OrdersPage() {
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     setIsUpdating(orderId);
     try {
-      const { error } = await supabase
-        .from('orders')
-        .update({ status: newStatus })
-        .eq('id', orderId);
+      
+    // --- THE NEW REFUND INTERCEPTOR ---
+      if (newStatus === 'CANCELLED') {
+        const confirmCancel = window.confirm(
+          "Are you sure you want to cancel this order? This will instantly initiate a refund to the buyer."
+        );
+        
+        if (!confirmCancel) {
+          setIsUpdating(null);
+          return;
+        }
 
-      if (error) throw error;
+        const res = await fetch('/api/orders/cancel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId })
+        });
 
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to process refund.");
+        }
+      }
+
+      else {
+        const { error } = await supabase
+          .from('orders')
+          .update({ status: newStatus })
+          .eq('id', orderId);
+
+        if (error) throw error;
+      }
+
+      // Update the UI if successful
       setOrders(orders.map(order => 
         order.id === orderId ? { ...order, status: newStatus } : order
       ));
       toast.success(`Order marked as ${newStatus.replace(/_/g, ' ')}`);
+      
     } catch (error) {
       console.error("Error updating status:", error);
-      toast.error("Failed to update order status.");
+      toast.error("Failed to update order status or process refund.");
     } finally {
       setIsUpdating(null);
     }

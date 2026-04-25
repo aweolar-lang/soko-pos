@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CheckCircle2, Receipt, Home, AlertTriangle, Download } from "lucide-react";
+import { CheckCircle2, PackageSearch, Home, AlertTriangle, Download } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +29,6 @@ export default async function OrderSuccessPage({
       cache: "no-store",
     });
 
-    // Fixed a rogue 'z' typo that was in the original file here
     const verifyData = await verifyRes.json();
 
     if (!verifyData.status) {
@@ -40,7 +39,7 @@ export default async function OrderSuccessPage({
       return <ErrorUI title="Payment Not Successful" message={`Transaction status is: ${verifyData.data.status}`} />;
     }
 
-    // --- UPGRADE: DYNAMIC CURRENCY FORMATTING ---
+    // --- DYNAMIC CURRENCY FORMATTING ---
     const rawAmount = verifyData.data.amount / 100; // Paystack sends amounts in cents
     const currency = verifyData.data.currency || "KES"; // Defaults to KES if missing
     
@@ -48,7 +47,6 @@ export default async function OrderSuccessPage({
       style: 'currency',
       currency: currency,
     }).format(rawAmount);
-    // --------------------------------------------
 
     // 3. CHECK METADATA
     const metadata = verifyData.data.metadata;
@@ -85,7 +83,6 @@ export default async function OrderSuccessPage({
       }
     }
 
-
     return <SuccessUI reference={reference} downloadUrl={downloadUrl} isDigital={isDigital} formattedTotal={formattedTotal} />;
 
   } catch (error: any) {
@@ -114,13 +111,12 @@ function ErrorUI({ title, message }: { title: string, message: string }) {
   );
 }
 
-// Added formattedTotal to the props
 function SuccessUI({ reference, downloadUrl, isDigital, formattedTotal }: { reference: string, downloadUrl?: string | null, isDigital?: boolean, formattedTotal: string }) {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="bg-white max-w-md w-full rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden text-center">
         
-        {/* UPGRADED HEADER: Now displays the actual amount paid! */}
+        {/* HEADER: Displays the actual amount paid */}
         <div className="bg-emerald-600 p-8 flex flex-col items-center justify-center relative overflow-hidden">
           <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay"></div>
           <div className="h-16 w-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center mb-4 border border-white/30 relative z-10">
@@ -131,6 +127,8 @@ function SuccessUI({ reference, downloadUrl, isDigital, formattedTotal }: { refe
         </div>
 
         <div className="p-8 space-y-6">
+          
+          {/* Transaction Ref */}
           <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Transaction Ref</p>
             <p className="font-mono text-slate-900 font-bold bg-white border border-slate-200 py-2 rounded-xl text-sm break-all">
@@ -157,12 +155,25 @@ function SuccessUI({ reference, downloadUrl, isDigital, formattedTotal }: { refe
             </p>
           )}
 
+          {/* NEW: THE AUTO-ACCOUNT HINT BOX */}
+          <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 flex gap-3 text-left">
+             <span className="text-emerald-500 text-xl leading-none">💡</span>
+             <div>
+               <h4 className="text-sm font-bold text-emerald-800 mb-1">Account Auto-Created!</h4>
+               <p className="text-[13px] text-emerald-700 font-medium leading-relaxed">
+                 You can now track your purchases. Use the first <strong className="font-extrabold text-emerald-900">6 characters of your email</strong> as your temporary password.
+               </p>
+             </div>
+          </div>
+
+          {/* ACTION BUTTONS */}
           <div className="grid grid-cols-2 gap-3 pt-2">
             <Link href="/" className="flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3.5 px-4 rounded-xl transition-all">
               <Home className="h-4 w-4" /> Home
             </Link>
-            <Link href="/dashboard" className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-md">
-              <Receipt className="h-4 w-4" /> Dashboard
+            {/* UPDATED: Now points to /track with a better icon and text */}
+            <Link href="/track" className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-md">
+              <PackageSearch className="h-4 w-4" /> Track Order
             </Link>
           </div>
 
