@@ -35,30 +35,25 @@ export default function RegisterPage() {
 
   // 3. Handle Change
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name } = e.target;
-    let value = e.target.value;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-
-    //trial validate
-
+    let { name, value } = e.target; 
+    // --- 1. FORMATTING RULES ---
     const titleCaseFields = ["firstName", "middleName", "lastName"];
-      const MAX_CHARS = 20;
+    const MAX_CHARS = 20;
 
-      if (titleCaseFields.includes(name)) {
-        if (value.length > MAX_CHARS) {
-          value = value.slice(0, MAX_CHARS);
-        }
-          value = value
-            .toLowerCase() 
-            .replace(/\b\w/g, (char) => char.toUpperCase());
-
-         // 3. Save to state
-      setFormData((prev) => ({ ...prev, [name]: value }));
-
+    if (titleCaseFields.includes(name)) {
+      // Apply character limit
+      if (value.length > MAX_CHARS) {
+        value = value.slice(0, MAX_CHARS);
+      }
+      // Apply Title Case
+      value = value
+        .toLowerCase() 
+        .replace(/\b\w/g, (char) => char.toUpperCase());
     }
 
-//end of trial validate
+    setFormData((prev) => ({ ...prev, [name]: value }));
     
+    // --- 3. CLEAR ERRORS ---
     if (errors[name as keyof typeof errors]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }

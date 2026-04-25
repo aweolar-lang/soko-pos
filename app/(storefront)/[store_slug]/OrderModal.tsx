@@ -53,19 +53,40 @@ export default function OrderModal({ product, storeId, isHotel, storeCurrency = 
 
   // Handle Input Changes & Clear Errors
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name } = e.target;
-    let value = e.target.value;
+    let { name, value } = e.target; // Use 'let' so we can modify 'value'
 
-    value = value
-    .toLowerCase() 
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+    // 1. Format Buyer Name (Title Case, Max 50 chars)
+    if (name === "buyerName") {
+      const MAX_NAME_CHARS = 50; // 50 is safer for full names
+      if (value.length > MAX_NAME_CHARS) {
+        value = value.slice(0, MAX_NAME_CHARS);
+      }
+      value = value.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+    }
 
-    const MAX_CHARS = 20;
-    const processedValue = value.length > MAX_CHARS ? value.slice(0, MAX_CHARS) : value;
+    // 2. Format Buyer Email (Force Lowercase, no spaces, Max 200 chars)
+    if (name === "buyerEmail") {
+      const MAX_EMAIL_CHARS = 200;
+      if (value.length > MAX_EMAIL_CHARS) {
+        value = value.slice(0, MAX_EMAIL_CHARS);
+      }
+      value = value.toLowerCase().replace(/\s/g, ""); // Automatically remove accidental spaces
+    }
+
+    // 3. Format Customer Notes (Just a generous length limit, no case changes)
+    if (name === "customerNotes") {
+      const MAX_NOTES_CHARS = 500;
+      if (value.length > MAX_NOTES_CHARS) {
+        value = value.slice(0, MAX_NOTES_CHARS);
+      }
+    }
+
+    // (buyerPhone and takeawayTime bypass formatting and save directly safely)
+
+    // 4. Save to State
+    setFormData((prev) => ({ ...prev, [name]: value }));
     
-    setFormData((prev) => ({ ...prev, [name]: processedValue }));
-    
-    // Clear error immediately when user starts typing to fix it
+    // 5. Clear error immediately when user starts typing
     if (errors[name as keyof typeof errors]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }

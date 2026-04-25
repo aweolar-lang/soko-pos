@@ -65,22 +65,35 @@ export default function SettingsPage() {
     postal_address: "", // <-- Added error state for postal address
   });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+ const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     let { name, value } = e.target;
 
+    // 1. Targeted formatting for Slug
     if (name === "storeSlug") {
       value = value.toLowerCase().replace(/[^a-z0-9-]/g, '-');
     }
 
+    // 2. Targeted formatting for Names & Addresses
     const titleCaseFields = ["storeName", "county", "town", "area", "postal_address", "settlement_name"];
-    const MAX_CHARS = 20;
+    
     if (titleCaseFields.includes(name)) {
-      value = value.toLowerCase() 
-                   .replace(/\b\w/g, (char) => char.toUpperCase());
+      // ONLY fields inside the titleCaseFields array get limited
+      const MAX_CHARS = 50; // Bumped to 50 so addresses don't get cut off!
+      
+      if (value.length > MAX_CHARS) {
+        value = value.slice(0, MAX_CHARS);
+      }
+
+      // Apply the Title Casing
+      value = value.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
     }
-    if (value.length > MAX_CHARS) {
-    value = value.slice(0, MAX_CHARS);
-  }
+
+    // 3. Description bypasses the limits above and comes straight here safely!
+    if(name === "description") {
+      if (value.length > 500) {
+        value = value.slice(0, 500);
+      }
+    }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
     

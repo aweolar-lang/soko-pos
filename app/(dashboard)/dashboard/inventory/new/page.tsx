@@ -70,7 +70,32 @@ export default function AddProductPage() {
 
   // 3. Handle Input Changes & Clear Errors
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+
+    // --- TARGETED FORMATTING ---
+
+    // 1. Format the Title (Title Case + 100 Char Limit)
+    if (name === "title") {
+      const MAX_TITLE_CHARS = 100;
+      
+      if (value.length > MAX_TITLE_CHARS) {
+        value = value.slice(0, MAX_TITLE_CHARS);
+      }
+      
+      // Convert to Title Case
+      value = value.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+    }
+
+    // 2. Format the Description (No case changes + 1000 Char Limit)
+    if (name === "description") {
+      const MAX_DESC_CHARS = 1000;
+      
+      if (value.length > MAX_DESC_CHARS) {
+        value = value.slice(0, MAX_DESC_CHARS);
+      }
+    }
+
+    // --- SAVE TO STATE ---
     setFormData((prev) => ({ ...prev, [name]: value }));
     
     if (errors[name as keyof typeof errors]) {

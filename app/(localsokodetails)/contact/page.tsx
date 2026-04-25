@@ -24,12 +24,42 @@ export default function ContactPage() {
   // Submission Status State
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
 
-  // Handle Input Changes & Clear Errors
+
+ // Handle Input Changes & Clear Errors
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target; // Use 'let' so we can modify 'value'
+
+    // 1. Format First and Last Name (Title Case, Max 50 chars)
+    if (["firstName", "lastName"].includes(name)) {
+      const MAX_NAME_CHARS = 50;
+      if (value.length > MAX_NAME_CHARS) {
+        value = value.slice(0, MAX_NAME_CHARS);
+      }
+      // Apply Title Case
+      value = value.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+    }
+
+    // 2. Format Email (Force Lowercase, remove spaces, Max 100 chars)
+    if (name === "email") {
+      const MAX_EMAIL_CHARS = 100;
+      if (value.length > MAX_EMAIL_CHARS) {
+        value = value.slice(0, MAX_EMAIL_CHARS);
+      }
+      value = value.toLowerCase().replace(/\s/g, ""); // Instantly removes accidental spaces
+    }
+
+    // 3. Format Message (No case changes, Generous length limit to prevent spam/crashing)
+    if (name === "message") {
+      const MAX_MESSAGE_CHARS = 1000; // Allow a good paragraph, but block 10,000 word essays
+      if (value.length > MAX_MESSAGE_CHARS) {
+        value = value.slice(0, MAX_MESSAGE_CHARS);
+      }
+    }
+
+    // 4. Save formatted data to state
     setFormData((prev) => ({ ...prev, [name]: value }));
     
-    // Clear error immediately when user starts typing
+    // 5. Clear error immediately when user starts typing
     if (errors[name as keyof typeof errors]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }
