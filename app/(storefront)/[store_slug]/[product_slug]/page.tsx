@@ -130,7 +130,7 @@ export default async function ProductDetailsPage({
               {currencySymbol}{product.price.toLocaleString()}
             </div>
 
-            <div className="prose prose-slate mb-8 flex-1">
+            <div className="prose prose-slate mb-8">
               <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3 flex items-center gap-2">
                 Description
                 <div className="h-px flex-1 bg-slate-100"></div>

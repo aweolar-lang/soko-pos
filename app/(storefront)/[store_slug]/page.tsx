@@ -205,8 +205,7 @@ export default async function StorefrontPage({
               const isOutOfStock = !product.is_digital && product.stock_quantity <= 0;
 
               return (
-                <div key={product.id} className={`bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col group transition-all duration-300 ${isOutOfStock ? 'opacity-60 grayscale-[0.5]' : 'hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1'}`}>
-                  
+                <div key={product.id} className={`bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col h-full group transition-all duration-300 ${isOutOfStock ? 'opacity-60 grayscale-[0.5]' : 'hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1'}`}>
                   {/* Image Section */}
                   <Link href={`/${resolvedParams.store_slug}/${product.slug}`} className="relative h-40 sm:h-52 w-full bg-slate-50 overflow-hidden block shrink-0">
                     {displayImage ? (
@@ -262,12 +261,12 @@ export default async function StorefrontPage({
                       </div>
                     )}
                     
-                    <p className="text-xs sm:text-sm text-slate-500 line-clamp-2 mb-4 flex-1 leading-relaxed hidden sm:block">
+                    <p className="text-xs sm:text-sm text-slate-500 line-clamp-1 sm:line-clamp-2 mb-4 leading-relaxed">
                       {product.description || "View product details."}
                     </p>
-                    
+
                     {/* The Action Button / OrderModal */}
-                    <div className="mt-auto pt-2">
+                    <div className="mt-auto pt-2 w-full shrink-0">
                       {isOutOfStock ? (
                         <button disabled className="w-full bg-slate-100 text-slate-400 text-sm font-bold py-2.5 sm:py-3 px-4 rounded-xl text-center flex items-center justify-center gap-2 cursor-not-allowed border border-slate-200">
                           Unavailable
