@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { Store, Mail, Lock, Loader2, LogIn, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { isValidEmail } from "@/lib/validators";
-import GoogleLoginButton from "@/app/components/GoogleLoginButton";
+import GoogleLoginButton from "@/components/GoogleLoginButton";
 
 export default function LoginPage() {
   const router = useRouter();

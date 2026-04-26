@@ -7,32 +7,38 @@ export async function GET(request: Request) {
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? '/' // Default redirect
 
-  if (code) {
+ if (code) {
     const cookieStore = await cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          getAll() {
-            return cookieStore.getAll()
-          },
+          getAll() { return cookieStore.getAll() },
           setAll(cookiesToSet) {
             try {
               cookiesToSet.forEach(({ name, value, options }) =>
                 cookieStore.set(name, value, options)
               )
-            } catch {
-              // Server component cookie edge case handled here
-            }
+            } catch {}
           },
         },
       }
     )
-    // Exchanges the Google code for a secure Supabase session
+    
+    // 1. Exchange the code for a session
     await supabase.auth.exchangeCodeForSession(code)
+
+    // 2. Fetch the newly logged-in user's details
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // 3. THE ADMIN CHECK: Replace with your actual admin email
+    if (user?.email === "aweolar@gmail.com") {
+      // If it's you, force the redirect to the admin panel!
+      return NextResponse.redirect(`${origin}/admin/dashboard`) // Or whatever your admin route is
+    }
   }
 
-  // Redirect to whatever page they wanted to go to
+  // If it's NOT you (or there was no code), go to the default destination (merchant dashboard)
   return NextResponse.redirect(`${origin}${next}`)
 }
