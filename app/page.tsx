@@ -221,96 +221,96 @@ export default async function MarketplaceHome({
               {stores.map((store) => {
                 const locationText = [store.area, store.town, store.county].filter(Boolean).join(", ");
                 
-                // THE FIX: We now correctly pass the entire `store` object!
+                
                 const { label: ctaLabel, icon: CtaIcon } = getStoreCta(store);
 
                 return (
-                  <Link
-                    key={store.id}
-                    href={`/${store.slug}`}
-                    className="group flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-emerald-300 transition-all duration-300 overflow-hidden relative active:scale-[0.98] h-full"
-                  >
-                    {/* Store Cover Banner */}
-                    <div className="h-24 sm:h-28 w-full bg-gradient-to-r from-emerald-50/50 via-slate-100 to-slate-50 border-b border-slate-100 relative">
-                      <div className="absolute top-3 right-3 flex flex-col items-end gap-1.5 z-10">
-                        {store.tier === "VIP" && (
-                          <span className="bg-gradient-to-r from-yellow-400 to-amber-500 text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-sm">
-                            <Star className="w-3 h-3 fill-white text-white" /> VIP
-                          </span>
-                        )}
-                        {store.category && (
-                          <span className="bg-white/90 backdrop-blur-sm text-slate-700 border border-slate-200/50 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md shadow-sm truncate max-w-[120px]">
-                            {store.category}
-                          </span>
-                        )}
+                 <Link
+                  key={store.id}
+                  href={`/${store.slug}`}
+                  className="group flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-emerald-300 transition-all duration-300 overflow-hidden relative active:scale-[0.98] h-full"
+                >
+                  {/* 1. IMAGE AREA */}
+                  <div className="relative h-44 w-full shrink-0 bg-slate-100 overflow-hidden">
+                    {/* The Full Width Cover Image */}
+                    {store.logo_url ? (
+                      <img
+                        src={store.logo_url}
+                        alt={store.name}
+                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center bg-slate-200">
+                        <Store className="h-10 w-10 text-slate-400" />
                       </div>
+                    )}
+
+                    {/* Gradient Overlay for Text Readability */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-slate-900/40"></div>
+
+                    {/* 2. STORE NAME: Medium size, top left, inside a white span */}
+                    <div className="absolute top-3 left-3 max-w-[80%] z-10">
+                      <span className="bg-white/95 backdrop-blur-sm text-slate-900 text-sm font-black px-3 py-1.5 rounded-lg shadow-sm line-clamp-1">
+                        {store.name}
+                      </span>
                     </div>
 
-                    <div className="px-5 pb-5 pt-0 flex flex-col h-full relative">
-                      {/* Store Logo */}
-                      <div className="-mt-8 mb-3 shrink-0 relative z-20">
-                        <div className="inline-block p-1 bg-white rounded-2xl shadow-sm border border-slate-200 group-hover:border-emerald-200 transition-colors">
-                          {store.logo_url ? (
-                            <img
-                              src={store.logo_url}
-                              alt={store.name}
-                              // THE FIX: Updated to valid standard Tailwind classes
-                              className="h-16 w-16 sm:h-20 sm:w-20 rounded-xl object-cover bg-slate-50"
-                            />
-                          ) : (
-                            <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-xl bg-slate-50 flex items-center justify-center">
-                              <Store className="h-8 w-8 text-slate-300" />
-                            </div>
-                          )}
+                    {/* YOUR TIER & CATEGORY: Top Right */}
+                    <div className="absolute top-3 right-3 flex flex-col items-end gap-1.5 z-10">
+                      {store.tier === "VIP" && (
+                        <span className="bg-gradient-to-r from-yellow-400 to-amber-500 text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-sm">
+                          <Star className="w-3 h-3 fill-white text-white" /> VIP
+                        </span>
+                      )}
+                      {/*  CATEGORY */}
+                      {store.category && (
+                        <span className="bg-white/90 backdrop-blur-sm text-slate-700 border border-slate-200/50 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md shadow-sm truncate max-w-[120px]">
+                          {store.category}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* 3. REVIEW LOGIC: Left bottom, above the image */}
+                    <div className="absolute bottom-3 left-3 z-10">
+                      {(store.total_reviews && store.total_reviews > 0) ? (
+                        <div className="flex items-center gap-1.5 bg-white/95 backdrop-blur-sm text-slate-900 text-xs font-black px-2.5 py-1.5 rounded-lg shadow-sm">
+                          <Star className="w-3.5 h-3.5 fill-yellow-500 text-yellow-500" />
+                          {store.buyer_rating?.toFixed(1) || "5.0"}
+                          <span className="text-slate-500 font-bold ml-0.5">
+                            ({store.total_reviews})
+                          </span>
                         </div>
-                      </div>
-
-                      {/* Store Info */}
-                      {/* Store Info */}
-                      <div className="flex-1 min-w-0 flex flex-col">
-                        <h3 className="font-bold text-slate-900 text-lg leading-tight group-hover:text-emerald-600 transition-colors line-clamp-1">
-                          {store.name}
-                        </h3>
-
-                        {/* --- NEW RATING UI START --- */}
-                        <div className="flex items-center gap-2 mt-2">
-                          {(store.total_reviews && store.total_reviews > 0) ? (
-                            <div className="flex items-center gap-1.5 bg-yellow-50/80 text-yellow-700 text-xs font-bold px-2 py-0.5 rounded-md border border-yellow-200/50 w-fit">
-                              <Star className="w-3 h-3 fill-yellow-500 text-yellow-500" />
-                              {store.buyer_rating?.toFixed(1) || "5.0"}
-                              <span className="text-yellow-600/70 font-medium ml-0.5">
-                                ({store.total_reviews})
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1.5 bg-slate-50 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-md border border-slate-200 w-fit">
-                              <ShieldCheck className="w-3 h-3 text-slate-400" />
-                              New Store
-                            </div>
-                          )}
+                      ) : (
+                        <div className="flex items-center gap-1.5 bg-white/95 backdrop-blur-sm text-slate-600 text-[10px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                          New Store
                         </div>
+                      )}
+                    </div>
+                  </div>
 
-                        {locationText && (
-                          <p className="text-slate-500 text-xs font-medium mt-2 flex items-center gap-1.5 line-clamp-1">
-                            <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" /> {locationText}
-                          </p>
-                        )}
+                  {/* 4. CARD BODY: Location & Description */}
+                  <div className="p-4 sm:p-5 flex-1 flex flex-col bg-white">
+                    {locationText && (
+                      <p className="text-slate-500 text-xs font-medium mb-2 flex items-center gap-1.5 line-clamp-1">
+                        <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" /> {locationText}
+                      </p>
+                    )}
 
-                        <p className="text-sm text-slate-600 mt-3 line-clamp-2 leading-relaxed">
-                          {store.description || "Discover great products from this local seller."}
-                        </p>
-                      </div>
+                    <p className="text-sm text-slate-600 mb-4 line-clamp-2 leading-relaxed">
+                      {store.description || "Discover great products from this local seller."}
+                    </p>
 
-                      {/* CTA */}
-                      <div className="mt-auto pt-4 w-full shrink-0">
-                        <div className="w-full flex items-center justify-center gap-2 bg-slate-50 text-slate-700 font-bold px-4 py-3 rounded-xl border border-slate-200 group-hover:bg-emerald-600 group-hover:text-white group-hover:border-emerald-600 transition-all duration-300">
-                          <CtaIcon className="h-4 w-4" />
-                          <span className="text-sm">{ctaLabel}</span>
-                          <ChevronRight className="h-4 w-4 opacity-70 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                        </div>
+                    {/* 5. CALL TO ACTION BUTTON */}
+                    <div className="mt-auto pt-4 w-full shrink-0">
+                      <div className="w-full flex items-center justify-center gap-2 bg-slate-50 text-slate-700 font-bold px-4 py-3 rounded-xl border border-slate-200 group-hover:bg-emerald-600 group-hover:text-white group-hover:border-emerald-600 transition-all duration-300">
+                        <CtaIcon className="h-4 w-4" />
+                        <span className="text-sm">{ctaLabel}</span>
+                        <ChevronRight className="h-4 w-4 opacity-70 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                       </div>
                     </div>
-                  </Link>
+                  </div>
+                </Link>
                 );
               })}
             </div>
