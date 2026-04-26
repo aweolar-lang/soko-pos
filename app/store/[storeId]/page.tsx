@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { Star, ShieldCheck, MessageCircle, PackageOpen, Store } from "lucide-react";
+import { Metadata } from "next"; // NEW: For SEO
 
 export const dynamic = "force-dynamic";
 
@@ -8,19 +9,46 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// 1. ADD THIS TYPE: Tells TypeScript exactly what the joined data looks like
 type StoreReview = {
   rating: number;
   comment: string | null;
   created_at: string;
-  buyers: { name: string } | { name: string }[] | null; // Safely handle objects or arrays
+  buyers: { name: string } | { name: string }[] | null;
 };
 
-export default async function StoreProfilePage({ params }: { params: { storeId: string } }) {
+// NEW: This automatically creates the WhatsApp/Twitter preview links!
+export async function generateMetadata({ params }: { params: Promise<{ storeId: string }> }): Promise<Metadata> {
+  const resolvedParams = await params;
+  const { data: store } = await supabase
+    .from("stores")
+    .select("name, description")
+    .eq("id", resolvedParams.storeId)
+    .single();
+
+  if (!store) {
+    return { title: "Store Not Found | LocalSoko" };
+  }
+
+  return {
+    title: `${store.name} | LocalSoko`,
+    description: store.description || `Shop with ${store.name} on LocalSoko.`,
+    openGraph: {
+      title: store.name,
+      description: store.description || `Shop with ${store.name} on LocalSoko.`,
+      siteName: "LocalSoko",
+    },
+  };
+}
+
+export default async function StoreProfilePage({ params }: { params: Promise<{ storeId: string }> }) {
+  // NEW: Await the params to prevent Next.js warnings
+  const resolvedParams = await params;
+  const storeId = resolvedParams.storeId;
+
   const { data: store } = await supabase
     .from("stores")
     .select("name, description, overall_score, total_reviews, success_rate")
-    .eq("id", params.storeId)
+    .eq("id", storeId)
     .single();
 
   if (!store) {
@@ -38,10 +66,9 @@ export default async function StoreProfilePage({ params }: { params: { storeId: 
   const { data: reviews } = await supabase
     .from("reviews")
     .select("rating, comment, created_at, buyers(name)")
-    .eq("store_id", params.storeId)
+    .eq("store_id", storeId)
     .order("created_at", { ascending: false });
 
-  // 2. CAST THE REVIEWS: Apply our new type to the Supabase data
   const safeReviews = (reviews as unknown as StoreReview[]) || [];
 
   return (
@@ -104,9 +131,7 @@ export default async function StoreProfilePage({ params }: { params: { storeId: 
            </div>
         ) : (
           <div className="grid gap-4">
-            {/* 3. USE safeReviews HERE INSTEAD OF reviews */}
             {safeReviews.map((review, i) => {
-              // Extract the buyer's name safely using our new TS rules
               const buyerName = Array.isArray(review.buyers) 
                 ? review.buyers[0]?.name 
                 : review.buyers?.name || "Verified Buyer";

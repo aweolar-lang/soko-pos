@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { 
   Store, LayoutGrid, Package, Receipt, Wallet, 
-  Settings, LogOut, Menu, Bell, CreditCard, X, Loader2, HelpCircle, BookOpen
+  Settings, LogOut, Menu, Bell, CreditCard, X, Loader2, HelpCircle, BookOpen, Clock, CheckCircle2
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
@@ -24,28 +24,70 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  // Dropdown states
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  
+  // Notification states
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+  const [pendingOrders, setPendingOrders] = useState<any[]>([]);
+  
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
+  const notifDropdownRef = useRef<HTMLDivElement>(null);
 
-  // UPGRADE: Close profile dropdown if clicked outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
         setIsProfileMenuOpen(false);
+      }
+      if (notifDropdownRef.current && !notifDropdownRef.current.contains(event.target as Node)) {
+        setIsNotificationsOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Close menus automatically when the route changes
+  // Close menus on navigation
   useEffect(() => {
     setIsMobileMenuOpen(false);
     setIsProfileMenuOpen(false);
+    setIsNotificationsOpen(false);
   }, [pathname]);
 
-  // UPGRADE: Safe logout with loading state
+  // Fetch Pending Orders for the Bell Icon & Dropdown
+  useEffect(() => {
+    async function fetchAlerts() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: store } = await supabase
+        .from('stores')
+        .select('id')
+        .eq('owner_id', user.id)
+        .single();
+
+      if (store) {
+        // Fetch count AND the top 5 actual orders
+        const { data: orders, count } = await supabase
+          .from('orders')
+          .select('id, amount, created_at', { count: 'exact' })
+          .eq('store_id', store.id)
+          .neq('status', 'COMPLETED')
+          .neq('status', 'success')
+          .order('created_at', { ascending: false })
+          .limit(5); // Just grab the 5 most recent for the preview
+        
+        setPendingOrdersCount(count || 0);
+        setPendingOrders(orders || []);
+      }
+    }
+    
+    fetchAlerts();
+  }, [pathname]);
+
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
@@ -57,7 +99,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   };
 
-  // UPGRADE: Dynamic title for the top header
   const currentPageName = navLinks.find(link => link.href === pathname)?.name || "Dashboard";
 
   const NavContent = () => (
@@ -135,7 +176,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <header className="h-16 bg-white/80 backdrop-blur-xl border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-20 shrink-0 supports-[backdrop-filter]:bg-white/60 print:hidden">
           
           <div className="flex items-center gap-3">
-            {/* Mobile Menu Toggle */}
             <div className="flex items-center gap-3 lg:hidden">
               <button 
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
@@ -146,29 +186,100 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span className="font-black text-lg text-slate-900 tracking-tight">SokoPOS</span>
             </div>
             
-            {/* Desktop Dynamic Title */}
             <span className="font-black text-xl text-slate-900 tracking-tight hidden lg:block">
               {currentPageName}
             </span>
           </div>
 
           <div className="flex items-center gap-3 sm:gap-4 ml-auto">
-            <button className="relative p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 border-2 border-white"></span>
-            </button>
             
-            {/* UPGRADE: Avatar Dropdown */}
-            <div className="relative" ref={dropdownRef}>
+            {/* NOTIFICATIONS DROPDOWN */}
+            <div className="relative" ref={notifDropdownRef}>
               <button 
-                onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                onClick={() => {
+                  setIsNotificationsOpen(!isNotificationsOpen);
+                  setIsProfileMenuOpen(false); // Close the other dropdown just in case
+                }}
+                className="relative p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors outline-none"
+              >
+                <Bell className="h-5 w-5" />
+                {pendingOrdersCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-4 min-w-[16px] flex items-center justify-center px-1 rounded-full bg-red-500 border-2 border-white text-[9px] font-black text-white">
+                    {pendingOrdersCount > 99 ? '99+' : pendingOrdersCount}
+                  </span>
+                )}
+              </button>
+
+              {isNotificationsOpen && (
+                <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50">
+                  <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                    <p className="text-sm font-bold text-slate-900">Notifications</p>
+                    {pendingOrdersCount > 0 && (
+                      <span className="text-[10px] font-bold bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">
+                        {pendingOrdersCount} Pending
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="max-h-[300px] overflow-y-auto">
+                    {pendingOrders.length === 0 ? (
+                      <div className="p-6 text-center text-slate-500 flex flex-col items-center">
+                        <CheckCircle2 className="w-8 h-8 text-emerald-400 mb-2" />
+                        <p className="text-sm font-medium">All caught up!</p>
+                        <p className="text-xs mt-1">You have no pending orders.</p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-slate-100">
+                        {pendingOrders.map((order) => (
+                          <div key={order.id} className="p-3 hover:bg-slate-50 transition-colors flex gap-3">
+                            <div className="bg-amber-100 text-amber-600 p-2 rounded-full h-fit shrink-0">
+                              <Clock className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-slate-900">
+                                New Order Received
+                              </p>
+                              <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
+                                Order #{order.id.slice(0, 8)} needs fulfillment.
+                              </p>
+                              <p className="text-[10px] font-medium text-slate-400 mt-1">
+                                {new Date(order.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Action Footer */}
+                  <div className="p-2 border-t border-slate-100 bg-slate-50">
+                    <Link 
+                      href="/dashboard/orders"
+                      onClick={() => setIsNotificationsOpen(false)}
+                      className="block w-full py-2 text-center text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
+                    >
+                      View All Orders
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* PROFILE DROPDOWN */}
+            <div className="relative" ref={profileDropdownRef}>
+              <button 
+                onClick={() => {
+                  setIsProfileMenuOpen(!isProfileMenuOpen);
+                  setIsNotificationsOpen(false); // Close the other dropdown
+                }}
                 className="h-9 w-9 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-white font-bold text-sm shadow-sm ring-2 ring-white hover:opacity-90 transition-opacity outline-none"
               >
                 S
               </button>
 
              {isProfileMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50">
                   <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50">
                     <p className="text-sm font-bold text-slate-900">My Account</p>
                   </div>

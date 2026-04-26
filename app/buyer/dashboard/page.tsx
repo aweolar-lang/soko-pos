@@ -27,15 +27,14 @@ export default async function BuyerDashboardPage() {
     redirect("/track"); // Kick them out if they aren't logged in
   }
 
-  // 4. Fetch the Buyer's details
+  // 4. Fetch the Buyer's details (for personalized greeting and email-based order fetching)
   const { data: buyer } = await supabaseAdmin
     .from("buyers")
     .select("name, email")
     .eq("id", buyerId)
     .single();
 
-  // 5. Fetch all their orders, including the item details
-  // UPDATED: Carefully added `store_id` and `reviews` to your existing query
+  // 5. Fetch all their orders (UPDATED TO INCLUDE GUEST EMAILS)
   const { data: orders } = await supabaseAdmin
     .from("orders")
     .select(`
@@ -53,7 +52,8 @@ export default async function BuyerDashboardPage() {
         id
       )
     `)
-    .eq("buyer_id", buyerId)
+    // THE FIX IS THIS NEXT LINE:
+    .or(`buyer_id.eq.${buyerId},customer_email.eq.${buyer?.email}`) 
     .order("created_at", { ascending: false });
 
   const safeOrders = orders || [];
