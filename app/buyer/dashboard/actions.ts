@@ -19,8 +19,6 @@ export async function submitReview(formData: FormData) {
   const cookieStore = await cookies();
   const buyerId = cookieStore.get("buyer_session")?.value;
 
-   // ADD THESE LINES:
-
   if (!buyerId) {
     return { error: "You must be logged in to leave a review." };
   }
@@ -28,9 +26,9 @@ export async function submitReview(formData: FormData) {
     return { error: "Rating must be between 1 and 5 stars." };
   }
 
-
-  
- 
+  if (!orderId || orderId === "undefined") {
+    return { error: "Invalid Order ID provided." };
+  }
 
   try {
     // 2. Verify Order Eligibility 
@@ -43,8 +41,6 @@ export async function submitReview(formData: FormData) {
       .maybeSingle();
 
     if (orderError || !order) {
-      console.log("1. The Order ID from the URL is:", orderId);
-      console.log("2. The Buyer ID from the Cookie is:", buyerId);
       return { error: "Order not found." };
     }
     

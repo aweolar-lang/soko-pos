@@ -8,7 +8,9 @@ import Link from "next/link";
 
 import { submitReview } from "../../dashboard/actions";
 
-export default function ReviewPage({ params }: { params: { orderId: string } }) {
+
+export default function ReviewPage({ params }: { params: { id: string } }) {
+
   const [rating, setRating] = useState(5);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -18,7 +20,7 @@ export default function ReviewPage({ params }: { params: { orderId: string } }) 
     
     const formData = new FormData(e.currentTarget);
     formData.append("rating", rating.toString());
-    formData.append("orderId", params.orderId);
+    formData.append("orderId", params.id);
 
     startTransition(async () => {
       const result = await submitReview(formData);
