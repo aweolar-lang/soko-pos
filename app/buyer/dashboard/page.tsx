@@ -24,22 +24,23 @@ export default async function BuyerDashboardPage() {
   const buyerId = cookieStore.get("buyer_session")?.value;
 
   if (!buyerId) {
-    redirect("/track"); // Kick them out if they aren't logged in
+    redirect("/track");
   }
 
-  // 4. Fetch the Buyer's details (for personalized greeting and email-based order fetching)
+  // 4. Fetch the Buyer's details
   const { data: buyer } = await supabaseAdmin
     .from("buyers")
     .select("name, email")
     .eq("id", buyerId)
     .single();
 
-  // 5. Fetch all their orders (UPDATED TO INCLUDE GUEST EMAILS)
-  const { data: orders } = await supabaseAdmin
+  // 5. Fetch all their orders safely
+  let orderQuery = supabaseAdmin
     .from("orders")
     .select(`
       id,
       amount_paid,
+      currency,        
       status,
       created_at,
       store_id,
@@ -51,12 +52,23 @@ export default async function BuyerDashboardPage() {
       reviews (
         id
       )
-    `)
-    .or(`buyer_id.eq.${buyerId},customer_email.eq.${buyer?.email}`) 
-    .order("created_at", { ascending: false });
+    `);
+
+  // Only search for email if the buyer actually has one!
+  if (buyer?.email) {
+    orderQuery = orderQuery.or(`buyer_id.eq.${buyerId},customer_email.eq.${buyer.email}`);
+  } else {
+    orderQuery = orderQuery.eq("buyer_id", buyerId);
+  }
+
+  const { data: orders, error: ordersError } = await orderQuery.order("created_at", { ascending: false });
+
+  if (ordersError) {
+    console.error("SUPABASE FETCH ERROR:", ordersError.message);
+  }
 
   const safeOrders = orders || [];
-
+  
   return (
     <div className="min-h-screen bg-slate-50 font-sans pb-20">
       
@@ -127,7 +139,7 @@ export default async function BuyerDashboardPage() {
                       </h3>
                       <div className="flex flex-wrap items-center gap-3 mt-2 text-sm">
                         <span className="font-semibold text-slate-700 uppercase tracking-wide text-[11px]">
-                          KES {order.amount_paid.toLocaleString()}
+                          {order.currency || "KES"} {order.amount_paid?.toLocaleString()}
                         </span>
                         <span className="text-slate-300">•</span>
                         <span className="text-slate-500">
