@@ -44,7 +44,7 @@ export default async function BuyerDashboardPage() {
       status,
       created_at,
       store_id,
-      items (
+      products (
         title,
         is_digital,
         file_url
@@ -118,9 +118,9 @@ export default async function BuyerDashboardPage() {
           <div className="grid gap-4">
             {safeOrders.map((order) => {
               // Ensure we handle arrays or single item objects safely based on Supabase return type
-              const item = Array.isArray(order.items) ? order.items[0] : order.items;
+              const product = Array.isArray(order.products) ? order.products[0] : order.products;
               const isCompleted = order.status === "completed" || order.status === "success";
-              const isDigital = item?.is_digital;
+              const isDigital = product?.is_digital;
               
               // NEW: Check if this specific order has a review yet
               const hasReviewed = order.reviews && Array.isArray(order.reviews) ? order.reviews.length > 0 : !!order.reviews;
@@ -135,7 +135,7 @@ export default async function BuyerDashboardPage() {
                     </div>
                     <div>
                       <h3 className="font-bold text-slate-900 text-lg leading-tight">
-                        {item?.title || "Unknown Item"}
+                        {product?.title || "Unknown Item"}
                       </h3>
                       <div className="flex flex-wrap items-center gap-3 mt-2 text-sm">
                         <span className="font-semibold text-slate-700 uppercase tracking-wide text-[11px]">
@@ -168,7 +168,7 @@ export default async function BuyerDashboardPage() {
                     {isDigital ? (
                       isCompleted ? (
                         <a 
-                          href={item?.file_url || "#"} 
+                          href={product?.file_url || "#"} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-xl shadow-sm shadow-blue-600/20 transition-all active:scale-95"
