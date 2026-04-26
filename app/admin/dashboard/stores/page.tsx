@@ -33,7 +33,7 @@ export default async function StoresPage() {
 
   // 3. Quick calculations for header stats
   const activeStores = stores?.filter(s => s.status === 'active' || !s.status) || []; // Defaulting to active if status column isn't strict
-  const connectedStores = stores?.filter(s => s.paystack_subaccount_id) || [];
+  const connectedStores = stores?.filter(s => s.paystack_subaccount_code) || [];
 
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8">
@@ -136,13 +136,13 @@ export default async function StoresPage() {
 
                       {/* PAYOUT CONNECTION (SUBACCOUNT) */}
                       <td className="px-6 py-4">
-                        {store.paystack_subaccount_id ? (
+                        {store.paystack_subaccount_code ? (
                           <div className="flex flex-col">
                             <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600">
                               <CheckCircle2 className="h-3.5 w-3.5" /> Connected
                             </span>
                             <span className="text-[10px] font-mono text-slate-400 mt-1">
-                              {store.paystack_subaccount_id}
+                              {store.paystack_subaccount_code || "No subaccount code"}
                             </span>
                           </div>
                         ) : (
