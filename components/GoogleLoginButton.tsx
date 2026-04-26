@@ -3,6 +3,7 @@
 import { supabase } from "@/lib/supabase";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function GoogleLoginButton() {
   const [isLoading, setIsLoading] = useState(false);
@@ -19,7 +20,7 @@ export default function GoogleLoginButton() {
     });
 
     if (error) {
-      console.error("Google login failed:", error.message);
+      toast.error("Google login failed:");
       setIsLoading(false);
     }
   }
