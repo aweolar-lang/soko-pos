@@ -39,7 +39,7 @@ export default async function BuyerDashboardPage() {
     .from("orders")
     .select(`
       id,
-      amount,
+      amount_paid,
       status,
       created_at,
       store_id,
@@ -127,7 +127,7 @@ export default async function BuyerDashboardPage() {
                       </h3>
                       <div className="flex flex-wrap items-center gap-3 mt-2 text-sm">
                         <span className="font-semibold text-slate-700 uppercase tracking-wide text-[11px]">
-                          KES {order.amount.toLocaleString()}
+                          KES {order.amount_paid.toLocaleString()}
                         </span>
                         <span className="text-slate-300">•</span>
                         <span className="text-slate-500">
