@@ -311,6 +311,121 @@ export async function POST(req: Request) {
       return NextResponse.json({ received: true }, { status: 200 });
     }
 
+
+    // ==========================================
+    // SCENARIO 3: DISPUTES (Alerts & Reminders)
+    // ==========================================
+    else if (event.event.startsWith("charge.dispute.")) {
+      const disputeData = event.data;
+      const transactionRef = disputeData.transaction ? disputeData.transaction.reference : disputeData.reference || "UNKNOWN";
+      
+      const { data: linkedOrder } = await supabaseAdmin
+        .from('orders')
+        .select('id, store_id')
+        .eq('paystack_reference', transactionRef)
+        .single();
+
+      if (event.event === "charge.dispute.create") {
+        await supabaseAdmin.from('disputes').insert({
+          transaction_reference: transactionRef,
+          reason: disputeData.dispute_reason,
+          status: 'open',
+          amount: disputeData.dispute_amount / 100,
+          metadata: disputeData,
+          order_id: linkedOrder?.id || null,
+          store_id: linkedOrder?.store_id || null
+        });
+      } 
+      else if (event.event === "charge.dispute.remind") {
+        await supabaseAdmin.from('disputes')
+          .update({ status: 'needs_attention', metadata: disputeData })
+          .eq('transaction_reference', transactionRef);
+      } 
+      else if (event.event === "charge.dispute.resolve") {
+        await supabaseAdmin.from('disputes')
+          .update({ status: 'resolved', metadata: disputeData })
+          .eq('transaction_reference', transactionRef);
+      }
+      return NextResponse.json({ received: true }, { status: 200 });
+    }
+
+    // ==========================================
+    // SCENARIO 4: REFUNDS
+    // ==========================================
+    else if (event.event.startsWith("refund.")) {
+      const refundData = event.data;
+      const transactionRef = refundData.transaction_reference || (refundData.transaction ? refundData.transaction.reference : "UNKNOWN");
+      const status = event.event.replace("refund.", "");
+
+      const { data: linkedOrder } = await supabaseAdmin
+        .from('orders')
+        .select('id, store_id')
+        .eq('paystack_reference', transactionRef)
+        .single();
+
+      await supabaseAdmin.from('refunds').upsert({
+        refund_id: refundData.id.toString(),
+        transaction_reference: transactionRef,
+        amount: refundData.amount / 100,
+        status: status,
+        metadata: refundData,
+        order_id: linkedOrder?.id || null,
+        store_id: linkedOrder?.store_id || null
+      }, { onConflict: 'refund_id' });
+      
+      return NextResponse.json({ received: true }, { status: 200 });
+    }
+
+    // ==========================================
+    // SCENARIO 5: PAYMENT REQUESTS
+    // ==========================================
+    else if (event.event.startsWith("paymentrequest.")) {
+      const prData = event.data;
+      const status = event.event.replace("paymentrequest.", ""); 
+      
+      const { data: linkedOrder } = await supabaseAdmin
+        .from('orders')
+        .select('id, store_id')
+        .eq('paystack_reference', prData.request_code)
+        .single();
+
+      await supabaseAdmin.from('payment_requests').upsert({
+        request_code: prData.request_code,
+        amount: prData.amount / 100,
+        status: status,
+        metadata: prData,
+        order_id: linkedOrder?.id || null,
+        store_id: linkedOrder?.store_id || null
+      }, { onConflict: 'request_code' });
+
+      return NextResponse.json({ received: true }, { status: 200 });
+    }
+
+    // ==========================================
+    // SCENARIO 6: SUBACCOUNT INFO
+    // ==========================================
+    else if (event.event === "subaccount.create") {
+      const subData = event.data;
+
+      const { data: linkedStore } = await supabaseAdmin
+        .from('stores')
+        .select('id')
+        .eq('paystack_subaccount_code', subData.subaccount_code)
+        .single();
+
+      await supabaseAdmin.from('subaccounts_log').insert({
+        subaccount_code: subData.subaccount_code,
+        business_name: subData.business_name,
+        bank_name: subData.settlement_bank,
+        account_number: subData.account_number,
+        metadata: subData,
+        store_id: linkedStore?.id || null
+      });
+      return NextResponse.json({ received: true }, { status: 200 });
+    }
+
+
+
     return NextResponse.json({ received: true }, { status: 200 });
 
   } catch (error: any) {
