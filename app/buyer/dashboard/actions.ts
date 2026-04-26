@@ -17,7 +17,16 @@ export async function submitReview(formData: FormData) {
 
   // 1. Verify Buyer Identity via Cookies
   const cookieStore = await cookies();
-  const buyerId = cookieStore.get("buyer_session")?.value;
+  const sessionToken = cookieStore.get("buyer_session")?.value;
+
+  const { data: buyer } = await supabaseAdmin
+  .from("buyers")
+  .select("id")
+  .eq("session_token", sessionToken)
+  .maybeSingle();
+
+  const buyerId = buyer?.id;
+
 
   if (!buyerId) {
     return { error: "You must be logged in to leave a review." };
