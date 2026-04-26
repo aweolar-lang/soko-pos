@@ -52,7 +52,6 @@ export default async function BuyerDashboardPage() {
         id
       )
     `)
-    // THE FIX IS THIS NEXT LINE:
     .or(`buyer_id.eq.${buyerId},customer_email.eq.${buyer?.email}`) 
     .order("created_at", { ascending: false });
 
