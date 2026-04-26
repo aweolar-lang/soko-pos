@@ -34,10 +34,10 @@ export default function ProductGallery({ images, title }: { images: string[], ti
         {images.map((img, index) => (
           <div key={index} className="min-w-full h-full snap-center relative">
             <img 
-            src={img} 
-            alt={`${title} - Image ${index + 1}`} 
-            className="absolute inset-0 w-full h-full object-contain p-4"
-          />
+          src={img} 
+          alt={`${title} - Image ${index + 1}`} 
+          className="absolute inset-0 w-full h-full object-contain p-4"
+        />
           </div>
         ))}
       </div>
