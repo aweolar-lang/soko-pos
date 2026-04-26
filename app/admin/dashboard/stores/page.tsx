@@ -155,7 +155,7 @@ export default async function StoresPage() {
                       {/* ACTION BUTTON */}
                       <td className="px-6 py-4 text-right">
                         <Link 
-                          href={`/${store.id}`} // Links out to their public store page
+                          href={`/store/${store.id}`} // Links out to their public store page
                           target="_blank"
                           className="inline-flex items-center gap-1 text-sm font-bold text-slate-600 hover:text-emerald-600 transition-colors p-2 hover:bg-emerald-50 rounded-lg"
                         >

@@ -8,9 +8,7 @@ import Link from "next/link";
 
 import { submitReview } from "../../dashboard/actions";
 
-
 export default function ReviewPage({ params }: { params: { id: string } }) {
-
   const [rating, setRating] = useState(5);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -20,7 +18,7 @@ export default function ReviewPage({ params }: { params: { id: string } }) {
     
     const formData = new FormData(e.currentTarget);
     formData.append("rating", rating.toString());
-    formData.append("orderId", params.id);
+    formData.append("orderId", params.id);``
 
     startTransition(async () => {
       const result = await submitReview(formData);
@@ -58,22 +56,22 @@ export default function ReviewPage({ params }: { params: { id: string } }) {
             
             {/* Interactive Star Selection */}
             <div>
-              <div className="flex justify-center gap-2" role="radiogroup" aria-label="Rating">
-                {[1, 2, 3, 4, 5].map((star) => (
+              <div className="flex items-center justify-center gap-1 sm:gap-2 mb-6">
+                {[1, 2, 3, 4, 5].map((starValue) => (
                   <button
-                    key={star}
-                    type="button"
-                    onClick={() => setRating(star)}
-                    aria-label={`Rate ${star} out of 5 stars`}
-                    aria-checked={rating === star}
-                    role="radio"
-                    className={`p-2 transition-all duration-200 hover:scale-110 outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-full ${
-                      star <= rating 
-                        ? "text-amber-400 drop-shadow-sm" 
-                        : "text-slate-200 hover:text-amber-200"
-                    }`}
+                    key={starValue}
+                    type="button" 
+                    onClick={() => setRating(starValue)}
+                    // We added p-2 here to make the "invisible" clickable area much larger for fingers!
+                    className="p-2 focus:outline-none transition-transform active:scale-90 touch-manipulation"
                   >
-                    <Star className="w-10 h-10 fill-current" aria-hidden="true" />
+                    <Star
+                      className={`w-10 h-10 sm:w-12 sm:h-12 transition-colors ${
+                        starValue <= rating 
+                          ? "fill-amber-400 text-amber-400" 
+                          : "fill-transparent text-slate-300" 
+                      }`}
+                    />
                   </button>
                 ))}
               </div>
