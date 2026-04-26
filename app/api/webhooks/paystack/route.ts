@@ -149,7 +149,7 @@ export async function POST(req: Request) {
               .from("order_items")
               .insert({
                 order_id: newOrder.id,
-                product_id: productId, // ✅ FIXED: Using safe variable
+                product_id: productId,
                 quantity: 1, 
                 price_at_time: event.data.amount / 100
               });
@@ -160,7 +160,7 @@ export async function POST(req: Request) {
             const { data: prodData } = await supabaseAdmin
               .from("products")
               .select("title, file_url, stores(name, owner_id)")
-              .eq("id", productId) // ✅ FIXED: Using safe variable
+              .eq("id", productId)
               .single();
 
             let sellerEmail = null;
@@ -240,6 +240,15 @@ export async function POST(req: Request) {
           }
         }
       }
+      
+      await supabaseAdmin.from('transactions').insert({
+        reference: event.data.reference,
+        amount: event.data.amount / 100, 
+        status: 'success',
+        type: 'payment',
+        metadata: event.data, 
+      });
+     // <-- end of your existing charge.success block
     }
     // ==========================================
     // SCENARIO 2: TRANSFER SUCCESS (Money Out) 

@@ -16,7 +16,6 @@ type StoreReview = {
   buyers: { name: string } | { name: string }[] | null;
 };
 
-// NEW: This automatically creates the WhatsApp/Twitter preview links!
 export async function generateMetadata({ params }: { params: Promise<{ storeId: string }> }): Promise<Metadata> {
   const resolvedParams = await params;
   const { data: store } = await supabase
