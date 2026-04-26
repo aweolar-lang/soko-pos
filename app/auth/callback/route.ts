@@ -27,15 +27,20 @@ export async function GET(request: Request) {
     )
     
     // 1. Exchange the code for a session
-    await supabase.auth.exchangeCodeForSession(code)
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+
+    // ADD THIS: Catch the error so it doesn't fail silently!
+    if (error) {
+      console.error("Backend Auth Error:", error.message)
+      return NextResponse.redirect(`${origin}/login?error=auth_failed`)
+    }
 
     // 2. Fetch the newly logged-in user's details
     const { data: { user } } = await supabase.auth.getUser()
 
-    // 3. THE ADMIN CHECK: Replace with your actual admin email
+    // 3. THE ADMIN CHECK
     if (user?.email === "aweolar@gmail.com") {
-      // If it's you, force the redirect to the admin panel!
-      return NextResponse.redirect(`${origin}/admin/dashboard`) // Or whatever your admin route is
+      return NextResponse.redirect(`${origin}/admin/dashboard`) 
     }
   }
 

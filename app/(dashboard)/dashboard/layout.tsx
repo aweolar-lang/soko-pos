@@ -73,7 +73,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         // Fetch count AND the top 5 actual orders
         const { data: orders, count } = await supabase
           .from('orders')
-          .select('id, amount, created_at', { count: 'exact' })
+          .select('id, amount_paid, created_at', { count: 'exact' })
           .eq('store_id', store.id)
           .neq('status', 'COMPLETED')
           .neq('status', 'success')

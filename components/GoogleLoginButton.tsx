@@ -1,16 +1,12 @@
 "use client";
 
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 export default function GoogleLoginButton() {
   const [isLoading, setIsLoading] = useState(false);
+
 
   async function handleGoogleLogin() {
     setIsLoading(true);
@@ -27,6 +23,7 @@ export default function GoogleLoginButton() {
       setIsLoading(false);
     }
   }
+
 
   return (
     <button

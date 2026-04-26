@@ -94,7 +94,7 @@ export async function POST(request: Request) {
       const buyerName = Array.isArray(order.buyers) ? order.buyers[0]?.name : order.buyers?.name || "Valued Customer";
       const buyerEmail = Array.isArray(order.buyers) ? order.buyers[0]?.email : order.buyers?.email;
       const itemTitle = Array.isArray(order.items) ? order.items[0]?.title : order.items?.title || "your recent order";
-      const amount = order.amount ? `KES ${order.amount.toLocaleString()}` : "your payment";
+      const amount = order.amount_paid ? `KES ${order.amount_paid.toLocaleString()}` : "your payment";
 
       if (buyerEmail) {
         // Base64 encode the Mailjet credentials
