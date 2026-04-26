@@ -45,6 +45,8 @@ interface StoreData {
   tier: string;
   category: string;
   slug: string;
+  buyer_rating?: number; 
+  total_reviews?: number; 
 }
 
 const normalize = (value?: string | null) => (value ?? "").trim().toLowerCase();
@@ -91,7 +93,7 @@ export default async function MarketplaceHome({
       category_filter: categoryQuery,
       location_filter: locationQuery,
     })
-    .select("id, name, description, logo_url, county, town, area, tier, category, slug");
+    .select("id, name, description, logo_url, county, town, area, tier, category, slug, buyer_rating, total_reviews");
 
   if (error) console.error("Search Error:", error);
 
@@ -264,13 +266,32 @@ export default async function MarketplaceHome({
                       </div>
 
                       {/* Store Info */}
+                      {/* Store Info */}
                       <div className="flex-1 min-w-0 flex flex-col">
                         <h3 className="font-bold text-slate-900 text-lg leading-tight group-hover:text-emerald-600 transition-colors line-clamp-1">
                           {store.name}
                         </h3>
 
+                        {/* --- NEW RATING UI START --- */}
+                        <div className="flex items-center gap-2 mt-2">
+                          {(store.total_reviews && store.total_reviews > 0) ? (
+                            <div className="flex items-center gap-1.5 bg-yellow-50/80 text-yellow-700 text-xs font-bold px-2 py-0.5 rounded-md border border-yellow-200/50 w-fit">
+                              <Star className="w-3 h-3 fill-yellow-500 text-yellow-500" />
+                              {store.buyer_rating?.toFixed(1) || "5.0"}
+                              <span className="text-yellow-600/70 font-medium ml-0.5">
+                                ({store.total_reviews})
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 bg-slate-50 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-md border border-slate-200 w-fit">
+                              <ShieldCheck className="w-3 h-3 text-slate-400" />
+                              New Store
+                            </div>
+                          )}
+                        </div>
+
                         {locationText && (
-                          <p className="text-slate-500 text-xs font-medium mt-1.5 flex items-center gap-1.5 line-clamp-1">
+                          <p className="text-slate-500 text-xs font-medium mt-2 flex items-center gap-1.5 line-clamp-1">
                             <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" /> {locationText}
                           </p>
                         )}

@@ -198,7 +198,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <button 
                 onClick={() => {
                   setIsNotificationsOpen(!isNotificationsOpen);
-                  setIsProfileMenuOpen(false); // Close the other dropdown just in case
+                  setIsProfileMenuOpen(false); 
                 }}
                 className="relative p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors outline-none"
               >
