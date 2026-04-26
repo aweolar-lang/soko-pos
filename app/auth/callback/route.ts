@@ -5,9 +5,10 @@ import { cookies } from 'next/headers'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/' // Default redirect
+  
+  const next = searchParams.get('next') ?? '/' 
 
- if (code) {
+  if (code) {
     const cookieStore = await cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,7 +30,6 @@ export async function GET(request: Request) {
     // 1. Exchange the code for a session
     const { error } = await supabase.auth.exchangeCodeForSession(code)
 
-    // ADD THIS: Catch the error so it doesn't fail silently!
     if (error) {
       console.error("Backend Auth Error:", error.message)
       return NextResponse.redirect(`${origin}/login?error=auth_failed`)
@@ -42,8 +42,11 @@ export async function GET(request: Request) {
     if (user?.email === "aweolar@gmail.com") {
       return NextResponse.redirect(`${origin}/admin/dashboard`) 
     }
+
+   
+    return NextResponse.redirect(`${origin}${next}`)
   }
 
-  // If it's NOT you (or there was no code), go to the default destination (merchant dashboard)
-  return NextResponse.redirect(`${origin}${next}`)
+  // 5. IF NO CODE WAS FOUND
+  return NextResponse.redirect(`${origin}/login?error=invalid_request`)
 }
