@@ -217,7 +217,9 @@ export default async function MarketplaceHome({
           </div>
 
           {stores.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+
               {stores.map((store) => {
                 const locationText = [store.area, store.town, store.county].filter(Boolean).join(", ");
                 
@@ -231,7 +233,7 @@ export default async function MarketplaceHome({
                   className="group flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-emerald-300 transition-all duration-300 overflow-hidden relative active:scale-[0.98] h-full"
                 >
                   {/* 1. IMAGE AREA (Framed Design) */}
-                  <div className="relative h-44 w-full shrink-0 bg-white p-2 sm:p-2.5">
+                  <div className="relative h-44 w-full shrink-0 bg-slate-100 p-2 sm:p-2.5">
                     
                     <div className="relative w-full h-full rounded-2xl overflow-hidden bg-slate-100">
                       
@@ -253,7 +255,7 @@ export default async function MarketplaceHome({
 
                       {/* STORE NAME: Top Left (Now has plenty of room to breathe!) */}
                       <div className="absolute top-3 left-3 max-w-[75%] z-10">
-                        <span className="bg-white/95 backdrop-blur-sm text-slate-900 text-sm font-black px-3 py-1.5 rounded-lg shadow-sm line-clamp-1">
+                        <span className="bg-white/95 backdrop-blur-sm text-slate-900 text-xs sm:text-sm font-black px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg shadow-sm line-clamp-1">
                           {store.name}
                         </span>
                       </div>
@@ -279,8 +281,8 @@ export default async function MarketplaceHome({
 
                         {/* REVIEW LOGIC */}
                         {(store.total_reviews && store.total_reviews > 0) ? (
-                          <div className="flex items-center gap-1.5 bg-white/95 backdrop-blur-sm text-slate-900 text-xs font-black px-2.5 py-1.5 rounded-lg shadow-sm">
-                            <Star className="w-3.5 h-3.5 fill-yellow-500 text-yellow-500" />
+                          <div className="flex items-center gap-1 sm:gap-1.5 bg-white/95 backdrop-blur-sm text-slate-900 text-[10px] sm:text-xs font-black px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg shadow-sm">
+                            <Star className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-yellow-500 text-yellow-500" />
                             {store.buyer_rating?.toFixed(1) || "5.0"}
                             <span className="text-slate-500 font-bold ml-0.5">
                               ({store.total_reviews})
