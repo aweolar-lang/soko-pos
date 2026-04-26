@@ -119,7 +119,7 @@ export default async function BuyerDashboardPage() {
             {safeOrders.map((order) => {
               // Ensure we handle arrays or single item objects safely based on Supabase return type
               const product = Array.isArray(order.products) ? order.products[0] : order.products;
-              const isCompleted = order.status === "completed" || order.status === "success";
+              const isCompleted = order.status === "COMPLETED" || order.status === "SUCCESS";
               const isDigital = product?.is_digital;
               
               // NEW: Check if this specific order has a review yet
