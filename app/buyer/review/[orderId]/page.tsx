@@ -35,7 +35,7 @@ export default function ReviewPage({ params }: { params: Promise<{ orderId: stri
         toast.error(result.error);
       } else {
         toast.success("Review published successfully!");
-        router.push("/buyer");
+        router.push("/buyer/dashboard");
         router.refresh();
       }
     });
@@ -48,7 +48,7 @@ export default function ReviewPage({ params }: { params: Promise<{ orderId: stri
         
         {/* Back Button */}
         <Link 
-          href="/buyer" 
+          href="/buyer/dashboard" 
           className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 font-medium mb-6 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-slate-900 rounded-lg px-2 py-1 -ml-2"
         >
           <ArrowLeft className="w-4 h-4" /> Back to Dashboard
