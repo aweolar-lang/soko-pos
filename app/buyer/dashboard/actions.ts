@@ -20,8 +20,6 @@ export async function submitReview(formData: FormData) {
   const buyerId = cookieStore.get("buyer_session")?.value;
 
    // ADD THESE LINES:
-  console.log("1. The Order ID from the URL is:", orderId);
-  console.log("2. The Buyer ID from the Cookie is:", buyerId);
 
   if (!buyerId) {
     return { error: "You must be logged in to leave a review." };
@@ -45,6 +43,8 @@ export async function submitReview(formData: FormData) {
       .maybeSingle();
 
     if (orderError || !order) {
+      console.log("1. The Order ID from the URL is:", orderId);
+      console.log("2. The Buyer ID from the Cookie is:", buyerId);
       return { error: "Order not found." };
     }
     
