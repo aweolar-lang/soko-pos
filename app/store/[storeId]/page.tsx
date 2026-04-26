@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<{ storeId: 
     .from("stores")
     .select("name, description")
     .eq("id", resolvedParams.storeId)
-    .single();
+    .maybeSingle();
 
   if (!store) {
     return { title: "Store Not Found | LocalSoko" };
@@ -49,7 +49,7 @@ export default async function StoreProfilePage({ params }: { params: Promise<{ s
     .from("stores")
     .select("name, description, overall_score, total_reviews, success_rate")
     .eq("id", storeId)
-    .single();
+    .maybeSingle();
 
   if (!store) {
     return (

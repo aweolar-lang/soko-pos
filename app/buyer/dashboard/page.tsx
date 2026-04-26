@@ -32,7 +32,7 @@ export default async function BuyerDashboardPage() {
     .from("buyers")
     .select("name, email")
     .eq("id", buyerId)
-    .single();
+    .maybeSingle();
 
   // 5. Fetch all their orders safely
   let orderQuery = supabaseAdmin

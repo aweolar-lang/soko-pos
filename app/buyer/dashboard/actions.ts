@@ -34,7 +34,7 @@ export async function submitReview(formData: FormData) {
       .select("id, store_id, status")
       .eq("id", orderId)
       .eq("buyer_id", buyerId)
-      .single();
+      .maybeSingle();
 
     if (orderError || !order) {
       return { error: "Order not found." };
@@ -82,7 +82,7 @@ export async function submitReview(formData: FormData) {
       .from("stores")
       .select("success_rate")
       .eq("id", order.store_id)
-      .single();
+      .maybeSingle();
 
     const successRate = store?.success_rate ?? 10;
 

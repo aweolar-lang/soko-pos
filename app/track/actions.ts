@@ -25,7 +25,7 @@ export async function loginBuyer(formData: FormData) {
       .from("buyers")
       .select("*")
       .eq("email", email)
-      .single();
+      .maybeSingle();
 
     // 2. TRIGGER THE UI MODAL
     // Notice the word "find". The frontend checks for this word to trigger 
