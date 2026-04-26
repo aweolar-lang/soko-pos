@@ -33,18 +33,20 @@ export async function submitReview(formData: FormData) {
   try {
     // 2. Verify Order Eligibility 
     // (Must belong to the buyer AND be marked as completed/success)
+
     const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
       .select("id, store_id, status")
       .eq("id", orderId)
       .eq("buyer_id", buyerId)
+      .eq("status", "COMPLETED")
       .maybeSingle();
 
     if (orderError || !order) {
       return { error: "Order not found." };
     }
     
-    if (order.status !== "completed" && order.status !== "success") {
+    if (order.status !== "COMPLETED" && order.status !== "SUCCESS") {
       return { error: "You can only review completed orders." };
     }
 

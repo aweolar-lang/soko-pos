@@ -9,15 +9,15 @@ import Link from "next/link";
 
 import { submitReview } from "../../dashboard/actions";
 
-// 2. CHANGE PARAMS TO A PROMISE
-export default function ReviewPage({ params }: { params: Promise<{ id: string }> }) {
+//1,2. GRAB 'orderId' INSTEAD OF 'id'
+export default function ReviewPage({ params }: { params: Promise<{ orderId: string }> }) {
   const [rating, setRating] = useState(5);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
-  // 3. UNWRAP THE PROMISE TO GET THE REAL ID
+  // 2. GRAB 'orderId' INSTEAD OF 'id'
   const resolvedParams = use(params);
-  const realOrderId = resolvedParams.id;
+  const realOrderId = resolvedParams.orderId; 
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -25,7 +25,7 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
     const formData = new FormData(e.currentTarget);
     formData.append("rating", rating.toString());
     
-    // 4. USE THE UNWRAPPED ID HERE
+    // 3. NOW IT SENDS THE ACTUAL ID!
     formData.append("orderId", realOrderId);
 
     startTransition(async () => {
@@ -40,6 +40,7 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
       }
     });
   }
+
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 sm:p-6">
