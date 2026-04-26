@@ -17,16 +17,11 @@ export async function submitReview(formData: FormData) {
 
   // 1. Verify Buyer Identity via Cookies
   const cookieStore = await cookies();
-  const sessionToken = cookieStore.get("buyer_session")?.value;
+  const buyerId = cookieStore.get("buyer_session")?.value;
 
-  const { data: buyer } = await supabaseAdmin
-  .from("buyers")
-  .select("id")
-  .eq("session_token", sessionToken)
-  .maybeSingle();
-
-  const buyerId = buyer?.id;
-
+   // ADD THESE LINES:
+  console.log("1. The Order ID from the URL is:", orderId);
+  console.log("2. The Buyer ID from the Cookie is:", buyerId);
 
   if (!buyerId) {
     return { error: "You must be logged in to leave a review." };
@@ -34,6 +29,10 @@ export async function submitReview(formData: FormData) {
   if (!rating || rating < 1 || rating > 5) {
     return { error: "Rating must be between 1 and 5 stars." };
   }
+
+
+  
+ 
 
   try {
     // 2. Verify Order Eligibility 
