@@ -6,7 +6,8 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase"; 
 import { Store, Mail, Lock, Loader2, LogIn, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
-import { isValidEmail } from "@/lib/validators"; 
+import { isValidEmail } from "@/lib/validators";
+import GoogleLoginButton from "@/app/components/GoogleLoginButton";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -90,10 +91,21 @@ export default function LoginPage() {
   return (
     <form onSubmit={handleLogin} className="bg-white p-8 rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100 space-y-6">
       
+      
       <div className="text-center mb-8">
         <Store className="h-10 w-10 text-emerald-600 mx-auto mb-2" />
         <h1 className="text-2xl font-black text-slate-900">Welcome back</h1>
         <p className="text-slate-500 mt-2 text-sm">Sign in to manage your store and inventory.</p>
+      </div>
+
+      <div className="mb-6">
+        <GoogleLoginButton />
+      </div>
+
+      <div className="flex items-center gap-4 mb-6">
+        <div className="flex-1 h-px bg-slate-200"></div>
+        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Or continue with email</span>
+        <div className="flex-1 h-px bg-slate-200"></div>
       </div>
 
       <div>

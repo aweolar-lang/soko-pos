@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { Store, Mail, Lock, User, Phone, Loader2, UserPlus, Eye, EyeOff, Save } from "lucide-react";
 import { toast } from "sonner";
 import { isValidEmail, isValidName, formatKenyanPhone } from "@/lib/validators";
+import GoogleLoginButton from "@/app/components/GoogleLoginButton";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -149,6 +150,16 @@ export default function RegisterPage() {
         <Store className="h-10 w-10 text-emerald-600 mx-auto mb-2" />
         <h1 className="text-2xl font-black text-slate-900">Create Account</h1>
         <p className="text-slate-500 mt-2 text-sm">Join LocalSoko and start selling today.</p>
+      </div>
+
+      <div className="mb-6">
+        <GoogleLoginButton />
+      </div>
+
+      <div className="flex items-center gap-4 mb-6">
+        <div className="flex-1 h-px bg-slate-200"></div>
+        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Or continue with email</span>
+        <div className="flex-1 h-px bg-slate-200"></div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

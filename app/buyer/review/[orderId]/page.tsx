@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+// 1. ADD 'use' TO YOUR IMPORTS
+import { useState, useTransition, use } from "react";
 import { useRouter } from "next/navigation";
 import { Star, MessageSquare, Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -8,17 +9,24 @@ import Link from "next/link";
 
 import { submitReview } from "../../dashboard/actions";
 
-export default function ReviewPage({ params }: { params: { id: string } }) {
+// 2. CHANGE PARAMS TO A PROMISE
+export default function ReviewPage({ params }: { params: Promise<{ id: string }> }) {
   const [rating, setRating] = useState(5);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+
+  // 3. UNWRAP THE PROMISE TO GET THE REAL ID
+  const resolvedParams = use(params);
+  const realOrderId = resolvedParams.id;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     
     const formData = new FormData(e.currentTarget);
     formData.append("rating", rating.toString());
-    formData.append("orderId", params.id);``
+    
+    // 4. USE THE UNWRAPPED ID HERE
+    formData.append("orderId", realOrderId);
 
     startTransition(async () => {
       const result = await submitReview(formData);
@@ -27,7 +35,7 @@ export default function ReviewPage({ params }: { params: { id: string } }) {
         toast.error(result.error);
       } else {
         toast.success("Review published successfully!");
-        router.push("/buyer"); // Or wherever your buyer dashboard route is
+        router.push("/buyer");
         router.refresh();
       }
     });
@@ -62,7 +70,6 @@ export default function ReviewPage({ params }: { params: { id: string } }) {
                     key={starValue}
                     type="button" 
                     onClick={() => setRating(starValue)}
-                    // We added p-2 here to make the "invisible" clickable area much larger for fingers!
                     className="p-2 focus:outline-none transition-transform active:scale-90 touch-manipulation"
                   >
                     <Star
