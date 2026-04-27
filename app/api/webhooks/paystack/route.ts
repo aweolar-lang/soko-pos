@@ -68,8 +68,9 @@ export async function POST(req: Request) {
           }
         }
         
-       // ---- SCENARIO B: Customer bought a product ----
-        else if (productId) {
+       // ---- SCENARIO B: Customer bought a cart of products ----
+        else if (metadata && metadata.transaction_type === "marketplace_cart_order") {
+          
           // 1. Prevent "Double Order" Glitch (Idempotency Check)
           const { data: existingOrder } = await supabaseAdmin
             .from("orders")
@@ -82,24 +83,28 @@ export async function POST(req: Request) {
             return NextResponse.json({ received: true }, { status: 200 });
           }
           
-          // Use our global getField helper to safely extract everything
+          // 2. Extract Cart Metadata
           const storeId = metadata.store_id || getField("store_id");
+          const buyerId = metadata.buyer_id || null; // <--- This links the order to the buyer's dashboard!
           const buyerName = getField("buyer_name") || "Guest";
           const buyerPhone = getField("buyer_phone") || null;
           const fulfillmentType = getField("fulfillment_type") || "SHIPPING";
           const rawTakeawayTime = getField("takeaway_time");
           const customerNotes = getField("customer_notes") || "None";
-          const deliveryAddress = getField("delivery_address") || null;
-          const isPosSale = metadata.is_pos_sale === true || metadata.is_pos_sale === "true" || getField("is_pos_sale") === "true" || false;
-          // Use what you passed in metadata, OR use Paystack's exact payment channel (card, mobile_money, etc)
           const paymentMethod = getField("payment_method") || metadata.payment_method || event.data.channel || "Online";
           
-          // Safely check for digital
-          const isDigital = metadata.is_digital === true || metadata.is_digital === "true" || getField("is_digital") === "true";
-          
-          // UPGRADE: Safely extract currency from metadata (fallback to KES)
+          const hasDigital = metadata.has_digital === true || metadata.has_digital === "true";
+          const hasPhysical = metadata.has_physical === true || metadata.has_physical === "true";
           const storeCurrency = metadata.store_currency || event.data.currency || "KES";
           const sym = storeCurrency === "USD" ? "$" : "Ksh ";
+
+          // Safely parse the array of cart items we sent from checkout
+          let cartItems: any[] = [];
+          try {
+            cartItems = JSON.parse(metadata.cart_items || "[]");
+          } catch (e) {
+            console.error("Failed to parse cart items", e);
+          }
 
           // Safely parse time
           let formattedTakeawayTime = null;
@@ -111,16 +116,15 @@ export async function POST(req: Request) {
               } else {
                 formattedTakeawayTime = new Date(rawTakeawayTime).toISOString();
               }
-            } catch (e) {
-              console.error("Takeaway time parsing failed:", rawTakeawayTime);
-            }
+            } catch (e) {}
           }
 
-          // Insert Order
+          // 3. INSERT THE MAIN ORDER
           const { data: newOrder, error: orderError } = await supabaseAdmin
             .from("orders")
             .insert({
               store_id: storeId,
+              buyer_id: buyerId, // <-- Saves to their dashboard!
               paystack_reference: event.data.reference,
               customer_name: buyerName,
               customer_email: event.data.customer.email,
@@ -130,116 +134,110 @@ export async function POST(req: Request) {
               fulfillment_type: fulfillmentType,
               takeaway_time: formattedTakeawayTime,
               status: 'NEW',
-              product_id: productId, 
               currency: storeCurrency,
               customer_notes: customerNotes,
-              delivery_address: deliveryAddress,
-              is_pos_sale: isPosSale,
               payment_method: paymentMethod
             })
             .select()
             .single();
 
-          if (orderError) {
+          if (orderError || !newOrder) {
             console.error("🚨 SUPABASE ORDER INSERT FAILED:", orderError);
           }
 
-          if (!orderError && newOrder) {
-            const { error: itemsError } = await supabaseAdmin
-              .from("order_items")
-              .insert({
-                order_id: newOrder.id,
-                product_id: productId,
-                quantity: 1, 
-                price_at_time: event.data.amount / 100
-              });
-              
-            if (itemsError) console.error("🚨 SUPABASE ITEMS INSERT FAILED:", itemsError);
-
-            // FETCH PRODUCT & STORE DETAILS FOR EMAILS
-            const { data: prodData } = await supabaseAdmin
+          if (!orderError && newOrder && cartItems.length > 0) {
+            
+            // 4. FETCH ALL PRODUCT DETAILS FROM DB FOR EMAILS & DIGITAL LINKS
+            const productIds = cartItems.map((item) => item.id);
+            const { data: dbProducts } = await supabaseAdmin
               .from("products")
-              .select("title, file_url, stores(name, owner_id)")
-              .eq("id", productId)
-              .single();
+              .select("id, title, price, file_url, is_digital, stores(name, owner_id)")
+              .in("id", productIds);
 
-            let sellerEmail = null;
             let storeName = "LocalSoko Store";
+            let sellerEmail = null;
 
-            // Fetch the seller's email
-            if (prodData && prodData.stores) {
+            if (dbProducts && dbProducts.length > 0) {
               // @ts-ignore
-              storeName = prodData.stores.name || "LocalSoko Store";
+              storeName = dbProducts[0].stores?.name || "LocalSoko Store";
               // @ts-ignore
-              const ownerId = prodData.stores.owner_id;
+              const ownerId = dbProducts[0].stores?.owner_id;
               
-                if (ownerId) {
-                  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.getUserById(ownerId);
-                  
-                  if (authData?.user?.email) {
-                    sellerEmail = authData.user.email;
-                  } else {
-                    console.error("🚨 Could not find seller email for owner ID:", ownerId);
-                  }
+              if (ownerId) {
+                const { data: authData } = await supabaseAdmin.auth.admin.getUserById(ownerId);
+                if (authData?.user?.email) sellerEmail = authData.user.email;
+              }
+            }
+
+            // Create a summarized title for emails (e.g. "Burger, Fries and 2 more items")
+            const orderSummaryTitle = dbProducts && dbProducts.length > 1
+              ? `${dbProducts[0].title} and ${dbProducts.length - 1} other item(s)`
+              : (dbProducts && dbProducts.length === 1 ? dbProducts[0].title : "Your Cart Order");
+
+            // 5. LOOP THROUGH CART ITEMS TO SAVE AND UPDATE STOCK
+            for (const cartItem of cartItems) {
+              const dbProduct = dbProducts?.find(p => p.id === cartItem.id);
+              if (!dbProduct) continue;
+
+              // Insert line item
+              const { error: itemsError } = await supabaseAdmin.from("order_items").insert({
+                order_id: newOrder.id,
+                product_id: cartItem.id,
+                quantity: cartItem.q, 
+                price_at_time: dbProduct.price
+              });
+
+              if (itemsError) console.error("🚨 SUPABASE ITEMS INSERT FAILED:", itemsError);
+
+              // If physical, decrement stock
+              if (!dbProduct.is_digital) {
+                const { error: stockError } = await supabaseAdmin.rpc("decrement_stock", { 
+                  row_id: cartItem.id, 
+                  quantity: cartItem.q 
+                });
+                if (stockError) console.error(`🚨 Failed to reduce stock for ${cartItem.id}:`, stockError);
+              } 
+              // If digital, generate link and send individual email
+              else if (dbProduct.is_digital && dbProduct.file_url) {
+                const { data: signedData } = await supabaseAdmin.storage
+                  .from("digital-products")
+                  .createSignedUrl(dbProduct.file_url, 259200); // 3 days
+
+                if (signedData?.signedUrl) {
+                  await sendDigitalDownloadEmail(
+                    event.data.customer.email,
+                    buyerName,
+                    dbProduct.title,
+                    signedData.signedUrl
+                  );
                 }
               }
+            }
 
-              // -----------------------------------------------------
-              // SEND SELLER ALERTS
-              // -----------------------------------------------------
-              if (sellerEmail && prodData) {
-                await sendSellerNotificationEmail(
-                  sellerEmail, 
-                  storeName, 
-                  prodData.title, 
-                  buyerName, 
-                  event.data.amount / 100,
-                  fulfillmentType,
-                  sym 
-                );
-              }
+            // 6. SEND SUMMARY EMAILS
+            if (sellerEmail) {
+              await sendSellerNotificationEmail(
+                sellerEmail, 
+                storeName, 
+                orderSummaryTitle, 
+                buyerName, 
+                event.data.amount / 100,
+                fulfillmentType,
+                sym 
+              );
+            }
 
-          // -----------------------------------------------------
-          // PHYSICAL VS DIGITAL LOGIC
-          // -----------------------------------------------------
-          if (!isDigital) {
-            // 1. Reduce Stock
-            const { error: stockError } = await supabaseAdmin.rpc("decrement_stock", { 
-              row_id: productId, // ✅ FIXED: Using safe variable
-              quantity: 1 
-            });
-            if (stockError) console.error("🚨 Failed to reduce stock:", stockError);
-
-            // 2. Email Buyer
-            if (prodData) {
+            if (hasPhysical) {
                await sendPhysicalOrderEmail(
                  event.data.customer.email, 
                  buyerName, 
-                 prodData.title, 
+                 orderSummaryTitle, 
                  storeName, 
                  fulfillmentType
                );
             }
-
-          } else {
-            // DIGITAL: Generate URL & Email Buyer
-            if (prodData && prodData.file_url) {
-              const { data: signedData } = await supabaseAdmin.storage
-                .from("digital-products")
-                .createSignedUrl(prodData.file_url, 259200); // 3 days
-
-              if (signedData?.signedUrl) {
-                await sendDigitalDownloadEmail(
-                  event.data.customer.email,
-                  buyerName,
-                  prodData.title,
-                  signedData.signedUrl
-                );
-              }
-            }
           }
         }
-      }
       
       await supabaseAdmin.from('transactions').insert({
         reference: event.data.reference,

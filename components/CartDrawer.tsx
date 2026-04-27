@@ -141,8 +141,7 @@ export default function CartDrawer() {
           )}
         </div>
 
-        {/* Footer / Checkout Button */}
-        {/* Footer / Checkout Button */}
+        
         {items.length > 0 && (
           <div className="p-4 sm:p-6 border-t border-slate-100 bg-slate-50 shrink-0">
             <div className="flex items-center justify-between mb-4">
@@ -150,19 +149,17 @@ export default function CartDrawer() {
               <span className="text-xl font-black text-slate-900">{cartTotal.toLocaleString()}</span>
             </div>
             
-            {/* UPDATED: This now opens our new CheckoutModal! */}
             <button 
               onClick={() => setIsCheckoutModalOpen(true)}
               className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-600/20 active:scale-95"
             >
-              Proceed to Checkout
+              Proceed to Payment
               <ArrowRight className="h-5 w-5" />
             </button>
           </div>
         )}
       </div>
 
-      {/* RENDER THE MODAL ON TOP OF THE DRAWER */}
       <CheckoutModal 
         isOpen={isCheckoutModalOpen} 
         onClose={() => setIsCheckoutModalOpen(false)} 

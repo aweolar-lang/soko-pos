@@ -260,7 +260,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
             {isLoading ? (
               <><Loader2 className="h-5 w-5 animate-spin" /><span>Processing Secure Payment...</span></>
             ) : (
-              <span>Proceed to Paystack</span>
+              <span>Proceed to Payment</span>
             )}
           </button>
         </div>

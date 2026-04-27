@@ -48,7 +48,7 @@ export const useCartStore = create<CartState>()(
         const existingItem = state.items.find((i) => i.id === item.id);
         
         if (existingItem) {
-          // PRODUCTION UPGRADE 2: Prevent users from adding 10,000 items and crashing the checkout
+          
           if (existingItem.quantity >= 99) {
             return { success: false, error: "Maximum quantity reached for this item." };
           }
@@ -85,7 +85,7 @@ export const useCartStore = create<CartState>()(
       clearCart: () => set({ items: [], storeId: null }),
 
       getTotal: () => {
-        // PRODUCTION UPGRADE 3: Safe integer math rounding to prevent floating point errors (e.g. 10.999999999)
+        
         const rawTotal = get().items.reduce((total, item) => total + (item.price * item.quantity), 0);
         return Math.round(rawTotal * 100) / 100; 
       },
@@ -96,7 +96,7 @@ export const useCartStore = create<CartState>()(
     }),
     {
       name: 'localsoko-cart',
-      // This tells Zustand to flip `_hasHydrated` to true once localStorage is loaded
+     
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
       }

@@ -97,6 +97,32 @@ export default function TermsPage() {
 
         {/* Footer Contact */}
         <div className="mt-12 pt-8 border-t border-slate-200 text-center">
+          <nav className="mb-6 flex flex-wrap justify-center gap-6 text-sm font-bold text-slate-500">
+                      <a 
+                        href="/acceptable-use" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-emerald-600 hover:underline"
+                      >
+                      Acceptable Use Policy
+                      </a>
+                      <a 
+                        href="/shipping" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-emerald-600 hover:underline"
+                      >
+                      Shipping Policy
+                      </a>
+                       <a 
+                        href="/returns" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-emerald-600 hover:underline"
+                      >
+                      Returns Policy
+                      </a>
+          </nav>
           <div className="inline-flex items-center gap-2 text-slate-500 font-medium bg-slate-100 px-6 py-3 rounded-full border border-slate-200">
             <Gavel className="h-5 w-5" />
             For formal legal inquiries, please contact <a href="mailto:legal@localsoko.com" className="font-bold text-slate-900 hover:text-emerald-600 transition-colors">legal@localsoko.com</a>

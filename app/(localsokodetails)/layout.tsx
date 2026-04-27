@@ -54,7 +54,6 @@ export default function LocalSokoDetailsLayout({
       </header>
 
       {/* 2. UPGRADED MAIN CONTENT WRAPPER */}
-      {/* We removed the restrictive white box so the new SaaS pages can span properly! */}
       <main className="flex-1 w-full">
         {children}
       </main>

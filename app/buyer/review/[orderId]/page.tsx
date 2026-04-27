@@ -24,19 +24,27 @@ export default function ReviewPage({ params }: { params: Promise<{ orderId: stri
     
     const formData = new FormData(e.currentTarget);
     formData.append("rating", rating.toString());
-    
-    // 3. NOW IT SENDS THE ACTUAL ID!
     formData.append("orderId", realOrderId);
 
     startTransition(async () => {
-      const result = await submitReview(formData);
-      
-      if (result?.error) {
-        toast.error(result.error);
-      } else {
+      try {
+        const result = await submitReview(formData);
+        
+        // 1. Check for expected errors returned gracefully from the action
+        if (result?.error) {
+          toast.error(result.error);
+          return; // Exit early so we don't try to route!
+        } 
+        
+        // 2. Success path
         toast.success("Review published successfully!");
         router.push("/buyer/dashboard");
         router.refresh();
+
+      } catch (error: any) {
+        // 3. Catch unexpected crashes (e.g., Supabase throws a 500 error)
+        console.error("Review submission failed:", error);
+        toast.error("An unexpected error occurred. Please try again.");
       }
     });
   }
