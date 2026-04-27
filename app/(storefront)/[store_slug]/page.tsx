@@ -197,7 +197,7 @@ export default async function StorefrontPage({
         )}
 
         {products && products.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 bg-slate-100 hover:shadow-xl hover:border-emerald-300 transition-all duration-300">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             {products.map((product) => {
               const displayImage = product.images && product.images.length > 0 ? product.images[0] : (product.image_url || null);
               
