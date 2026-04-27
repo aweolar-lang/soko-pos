@@ -31,13 +31,13 @@ export default function CartDrawer() {
       {itemCount > 0 && (
           <button
             onClick={() => setIsOpen(true)}
-            className="relative p-2 text-slate-700 hover:bg-slate-100 hover:text-emerald-600 rounded-full transition-colors flex items-center justify-center"
+            className="relative bg-slate-900 text-white p-3.5 rounded-full shadow-lg hover:bg-slate-800 hover:scale-105 active:scale-95 transition-all flex items-center justify-center group"
           >
-            <ShoppingBag className="h-6 w-6" />
+            <ShoppingBag className="h-5 w-5" />
             
-            {/* Only show the notification badge if there are items in the cart */}
+            {/* The red/emerald notification dot */}
             {itemCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-emerald-500 text-white text-[10px] font-bold h-5 w-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+              <span className="absolute -top-1 -right-1 bg-emerald-500 text-white text-[10px] font-bold h-5 w-5 rounded-full flex items-center justify-center border-2 border-slate-900 shadow-sm">
                 {itemCount}
               </span>
             )}
