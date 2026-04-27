@@ -1,5 +1,6 @@
 import { ShoppingBag, ShieldCheck } from "lucide-react";
 import Link from "next/link";
+import CartDrawer from "@/components/CartDrawer";
 
 export default function StorefrontLayout({
   children,
@@ -13,6 +14,7 @@ export default function StorefrontLayout({
       {/* flex-1 forces the main content to take up all available space, pushing the footer down */}
       <main className="flex-1 flex flex-col w-full">
         {children}
+        <CartDrawer />
       </main>
       
       {/* GLOBAL STOREFRONT FOOTER */}

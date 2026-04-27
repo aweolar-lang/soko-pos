@@ -3,7 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { MapPin, Clock, ShoppingBag, Utensils, Star, MessageCircle, Info, Search, BadgeCheck, Phone, Truck, FileDown } from "lucide-react";
-import OrderModal from "./OrderModal";
+import AddToCartButton from "@/components/AddToCartButton";
 
 export default async function StorefrontPage({ 
   params,
@@ -273,8 +273,18 @@ export default async function StorefrontPage({
                         </button>
                       ) : (
                         <div className="[&>button]:w-full [&>button]:py-2.5 sm:[&>button]:py-3 [&>button]:rounded-xl [&>button]:text-sm [&>button]:font-bold [&>button]:shadow-sm [&>button:active]:scale-[0.98] [&>button]:transition-all">
-                           {/* UPGRADE: Passing storeCurrency to the Modal! */}
-                           <OrderModal product={product} storeId={store.id} isHotel={isHotel} storeCurrency={storeCurrency} />
+                           <AddToCartButton 
+                             product={{
+                               id: product.id,
+                               title: product.title,
+                               price: product.price,
+                               images: product.images && product.images.length > 0 
+                                 ? product.images 
+                                 : (product.image_url ? [product.image_url] : []),
+                               is_digital: product.is_digital,
+                             }} 
+                             storeId={store.id} 
+                           />
                         </div>
                       )}
                     </div>

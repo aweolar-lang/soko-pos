@@ -3,8 +3,8 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { ArrowLeft, MapPin, ShieldCheck, Truck, AlertCircle, Store, FileDown } from "lucide-react";
-import OrderModal from "../OrderModal";
 import ProductGallery from "./ProductGallery";
+import AddToCartButton from "@/components/AddToCartButton"; // <-- NEW IMPORT
 
 export default async function ProductDetailsPage({ 
   params 
@@ -26,7 +26,6 @@ export default async function ProductDetailsPage({
     }
   );
 
-  // UPGRADE: Added 'currency' to the select query
   const { data: store, error: storeError } = await supabase
     .from("stores")
     .select("id, name, description, tier, offers_delivery, category, currency")
@@ -35,7 +34,6 @@ export default async function ProductDetailsPage({
 
   if (storeError || !store) notFound();
 
-  // Selects all fields, which now naturally includes is_digital
   const { data: product, error: productError } = await supabase
     .from("products")
     .select("*")
@@ -45,23 +43,28 @@ export default async function ProductDetailsPage({
   if (productError || !product) notFound();
 
   const isHotel = store.category === "Food & Beverage";
-
-  // UPGRADE: Dynamic Currency Logic
   const storeCurrency = store.currency || "KES";
   const currencySymbol = storeCurrency === "USD" ? "$" : "Ksh ";
 
-  // MAGIC FIX: Grab the array of images, or fallback to image_url, or return an empty array.
   const imagesList: string[] = product.images && product.images.length > 0 
     ? product.images 
     : (product.image_url ? [product.image_url] : []);
 
-  // Out of Stock Check: Digital products are infinite, so they bypass this check
   const isOutOfStock = !product.is_digital && product.stock_quantity <= 0;
+
+  // Format the product for our new AddToCartButton
+  const cartProduct = {
+    id: product.id,
+    title: product.title,
+    price: product.price,
+    images: imagesList,
+    is_digital: product.is_digital,
+  };
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-24 font-sans selection:bg-emerald-500/30">
       
-      {/* 1. FROSTED GLASS NAVIGATION */}
+      {/* FROSTED GLASS NAVIGATION */}
       <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-sm supports-[backdrop-filter]:bg-white/60">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <Link 
@@ -73,7 +76,6 @@ export default async function ProductDetailsPage({
             <span className="sm:hidden">Back</span>
           </Link>
 
-          {/* Mini Store Badge for Context */}
           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
             <Store className="h-4 w-4" />
             {store.name}
@@ -82,13 +84,11 @@ export default async function ProductDetailsPage({
       </div>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 md:py-10">
-        {/* Added dynamic opacity if out of stock */}
         <div className={`bg-white rounded-[2rem] border border-slate-100/80 shadow-xl shadow-slate-200/40 overflow-hidden flex flex-col md:flex-row transition-all duration-300 ${isOutOfStock ? 'opacity-90' : ''}`}>
           
-          {/* Left Side: Image Gallery Component */}
+          {/* Left Side: Image Gallery */}
           <div className={`w-full md:w-1/2 bg-slate-50 relative border-b md:border-b-0 md:border-r border-slate-100 aspect-square md:aspect-auto ${isOutOfStock ? 'grayscale-[0.4]' : ''}`}>
              
-             {/* NEW: Digital Product Floating Badge */}
              {product.is_digital && (
                <div className="absolute top-4 left-4 z-20 bg-blue-600 text-white text-xs font-black px-3 py-1.5 rounded-lg shadow-md flex items-center gap-1.5 tracking-wider uppercase">
                  <FileDown className="h-4 w-4" /> Digital Product
@@ -97,7 +97,6 @@ export default async function ProductDetailsPage({
 
              <ProductGallery images={imagesList} title={product.title} />
              
-             {/* Large Floating Out of Stock Badge over image on mobile */}
              {isOutOfStock && (
                <div className="absolute top-4 right-4 md:hidden bg-red-500 text-white text-xs font-black px-3 py-1.5 rounded-full shadow-lg uppercase tracking-wider z-10">
                  Sold Out
@@ -105,10 +104,9 @@ export default async function ProductDetailsPage({
              )}
           </div>
 
-          {/* Right Side: Product Details & Checkout */}
+          {/* Right Side: Product Details & Cart */}
           <div className="w-full md:w-1/2 p-6 sm:p-8 md:p-12 flex flex-col">
             
-            {/* Status Badges */}
             <div className="mb-4 flex flex-wrap gap-2">
               {isOutOfStock ? (
                 <div className="inline-flex items-center gap-1.5 text-xs font-black text-red-600 bg-red-50 px-3 py-1.5 rounded-full uppercase tracking-wider border border-red-100">
@@ -125,7 +123,6 @@ export default async function ProductDetailsPage({
               {product.title}
             </h1>
             
-            {/* UPGRADE: Dynamic Currency Symbol applied here! */}
             <div className={`text-3xl sm:text-4xl font-black mb-8 ${isOutOfStock ? 'text-slate-400' : 'text-slate-900'}`}>
               {currencySymbol}{product.price.toLocaleString()}
             </div>
@@ -141,8 +138,6 @@ export default async function ProductDetailsPage({
             </div>
 
             <div className="space-y-4 mb-8 pt-6 border-t border-slate-100">
-              
-              {/* NEW: Conditional Badges based on product type and store settings */}
               {product.is_digital ? (
                 <div className="flex items-center gap-3 text-sm text-blue-700 font-medium bg-blue-50 p-3 rounded-xl border border-blue-100">
                   <FileDown className="h-5 w-5 text-blue-600 shrink-0" />
@@ -174,8 +169,8 @@ export default async function ProductDetailsPage({
                 </button>
               ) : (
                 <div className="[&>button]:w-full [&>button]:py-4 [&>button]:rounded-2xl [&>button]:text-base [&>button]:font-bold [&>button]:shadow-md [&>button:active]:scale-[0.98] [&>button]:transition-all">
-                  {/* UPGRADE: Passed storeCurrency to OrderModal */}
-                  <OrderModal product={product} storeId={store.id} isHotel={isHotel} storeCurrency={storeCurrency} />
+                  {/* NEW ADD TO CART BUTTON */}
+                  <AddToCartButton product={cartProduct} storeId={store.id} />
                 </div>
               )}
             </div>
