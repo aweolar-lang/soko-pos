@@ -4,6 +4,44 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { MapPin, Clock, ShoppingBag, Utensils, Star, MessageCircle, Info, Search, BadgeCheck, Phone, Truck, FileDown } from "lucide-react";
 import AddToCartButton from "@/components/AddToCartButton";
+import { Metadata } from "next";
+import { createClient } from "@supabase/supabase-js"; // Standard client for public SEO fetch
+import ShareStoreButton from "@/components/ShareStoreButton";
+
+export async function generateMetadata({ 
+  params 
+}: { 
+  params: Promise<{ store_slug: string }> | { store_slug: string };
+}): Promise<Metadata> {
+  const resolvedParams = await params;
+  
+  // Use a standard client for this quick public fetch
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  const { data: store } = await supabase
+    .from("stores")
+    .select("name, description, logo_url")
+    .eq("slug", resolvedParams.store_slug)
+    .single();
+
+  if (!store) return { title: "Store Not Found | LocalSoko" };
+
+  return {
+    title: `${store.name} | LocalSoko`,
+    description: store.description || `Shop the best items from ${store.name} on LocalSoko.`,
+    openGraph: {
+      title: `${store.name} on LocalSoko`,
+      description: store.description || `Check out ${store.name}'s store on LocalSoko!`,
+      images: store.logo_url ? [store.logo_url] : [], 
+      siteName: "LocalSoko",
+      type: "website",
+    },
+  };
+}
+
 
 export default async function StorefrontPage({ 
   params,
@@ -136,6 +174,7 @@ export default async function StorefrontPage({
                     <a href={`tel:${whatsappNumber}`} className="flex-1 md:flex-none flex justify-center items-center gap-1.5 bg-slate-900 hover:bg-slate-800 transition-colors px-4 py-2.5 rounded-xl text-sm font-bold text-white shadow-md">
                       <Phone className="h-4 w-4" /> Call
                     </a>
+                    <ShareStoreButton storeName={store.name} />
                   </>
                 ) : (
                   <span className="text-xs text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">No contact info</span>

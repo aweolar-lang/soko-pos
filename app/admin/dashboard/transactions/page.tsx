@@ -6,9 +6,10 @@ import {
   Filter, 
   CheckCircle2, 
   XCircle,
-  Clock
+  Clock,
+  ArrowUpRight
 } from "lucide-react";
-
+import Link from "next/link";
 // 1. Secure Server-Side Supabase Client
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -169,6 +170,15 @@ export default async function TransactionsPage() {
                             <Clock className="h-3.5 w-3.5" /> {tx.status}
                           </span>
                         )}
+                      </td>
+
+                      <td className="px-6 py-4 text-right">
+                        <Link 
+                          href={`/admin/dashboard/transactions/${tx.id}`}
+                          className="inline-flex items-center gap-1 text-sm font-bold text-emerald-600 hover:bg-emerald-50 px-3 py-2 rounded-lg transition-colors"
+                        >
+                          View <ArrowUpRight className="h-4 w-4" />
+                        </Link>
                       </td>
                     </tr>
                   );

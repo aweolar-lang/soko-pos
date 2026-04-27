@@ -29,17 +29,19 @@ export default function CartDrawer() {
     <>
       {/* 1. THE FLOATING CART BUTTON */}
       {itemCount > 0 && (
-        <button
-          onClick={() => setIsOpen(true)}
-          className="fixed bottom-24 right-4 md:bottom-8 md:right-8 z-40 bg-slate-900 text-white p-4 rounded-full shadow-2xl hover:bg-slate-800 hover:scale-105 active:scale-95 transition-all flex items-center justify-center group animate-in slide-in-from-bottom-10"
-        >
-          <div className="relative">
-            <ShoppingCart className="h-6 w-6" />
-            <span className="absolute -top-2 -right-3 bg-emerald-500 text-white text-[10px] font-black h-5 w-5 rounded-full flex items-center justify-center border-2 border-slate-900">
-              {itemCount > 99 ? '99+' : itemCount}
-            </span>
-          </div>
-        </button>
+          <button
+            onClick={() => setIsOpen(true)}
+            className="relative p-2 text-slate-700 hover:bg-slate-100 hover:text-emerald-600 rounded-full transition-colors flex items-center justify-center"
+          >
+            <ShoppingBag className="h-6 w-6" />
+            
+            {/* Only show the notification badge if there are items in the cart */}
+            {itemCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-emerald-500 text-white text-[10px] font-bold h-5 w-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                {itemCount}
+              </span>
+            )}
+          </button>
       )}
 
       {/* 2. THE BACKGROUND OVERLAY */}
