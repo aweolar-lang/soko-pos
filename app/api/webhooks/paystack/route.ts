@@ -32,6 +32,7 @@ export async function POST(req: Request) {
     // SCENARIO 1: CHARGE SUCCESS (Money In)
     // ==========================================
     if (event.event === "charge.success") {
+      let createdOrderId = null;
       const metadata = event.data.metadata;
       const customFields = metadata.custom_fields || [];
       const getField = (name: string) => customFields.find((f: any) => f.variable_name === name)?.value;
@@ -124,7 +125,7 @@ export async function POST(req: Request) {
             .from("orders")
             .insert({
               store_id: storeId,
-              buyer_id: buyerId, // <-- Saves to their dashboard!
+              buyer_id: buyerId,
               paystack_reference: event.data.reference,
               customer_name: buyerName,
               customer_email: event.data.customer.email,
@@ -144,6 +145,8 @@ export async function POST(req: Request) {
           if (orderError || !newOrder) {
             console.error("🚨 SUPABASE ORDER INSERT FAILED:", orderError);
           }
+
+          createdOrderId = newOrder.id;
 
           if (!orderError && newOrder && cartItems.length > 0) {
             
@@ -244,6 +247,8 @@ export async function POST(req: Request) {
         amount: event.data.amount / 100, 
         status: 'success',
         type: 'payment',
+        order_id: createdOrderId,
+        store_id: event.data.metadata?.store_id || null,
         metadata: event.data, 
       });
      // <-- end of your existing charge.success block

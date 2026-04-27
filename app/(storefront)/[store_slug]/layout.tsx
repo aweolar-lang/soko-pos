@@ -13,8 +13,9 @@ export default function StorefrontLayout({
       
       {/* flex-1 forces the main content to take up all available space, pushing the footer down */}
       <main className="flex-1 flex flex-col w-full">
-        {children}
         <CartDrawer />
+        {children}
+      
       </main>
       
       {/* GLOBAL STOREFRONT FOOTER */}
