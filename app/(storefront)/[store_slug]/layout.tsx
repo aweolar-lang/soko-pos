@@ -12,8 +12,14 @@ export default function StorefrontLayout({
     <div className="relative min-h-screen flex flex-col bg-[#F8FAFC] selection:bg-emerald-500/30">
       
       {/* flex-1 forces the main content to take up all available space, pushing the footer down */}
+
+      <div className="sticky top-0 z-50 w-full bg-white border-b border-slate-200 shadow-sm p-4">
+        <div className="max-w-4xl mx-auto flex justify-end items-center">
+          <CartDrawer /> {/* Float perfectly on the right side! */}
+        </div>
+      </div>
+
       <main className="flex-1 flex flex-col w-full">
-        <CartDrawer />
         {children}
       
       </main>
