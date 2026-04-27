@@ -34,7 +34,7 @@ export default async function StorefrontPage({
     .from("stores")
     .select("id, name, description, logo_url, county, town, area, tier, category, owner_id, offers_delivery, currency" )
     .eq("slug", resolvedParams.store_slug) 
-    .single();
+    .maybeSingle(); 
 
   if (storeError || !store) notFound(); 
 
@@ -205,7 +205,7 @@ export default async function StorefrontPage({
               const isOutOfStock = !product.is_digital && product.stock_quantity <= 0;
 
               return (
-                <div key={product.id} className={`bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col h-full group transition-all duration-300 ${isOutOfStock ? 'opacity-60 grayscale-[0.5]' : 'hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1'}`}>
+                <div key={product.id} className={`bg-slate-150 rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col h-full group transition-all duration-300 ${isOutOfStock ? 'opacity-60 grayscale-[0.5]' : 'hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1'}`}>
                   {/* Image Section */}
                   <Link href={`/${resolvedParams.store_slug}/${product.slug}`} className="relative h-40 sm:h-52 w-full bg-slate-50 overflow-hidden block shrink-0">
                     {displayImage ? (

@@ -49,6 +49,7 @@ export default function Navbar() {
   const handleLogout = async () => {
     setIsLoading(true); // Show loading state instantly for better UX
     await supabase.auth.signOut();
+    setUser(null);
     router.push("/");
     router.refresh(); // Force the layout to reset
   };

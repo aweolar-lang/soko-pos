@@ -300,23 +300,24 @@ export default async function MarketplaceHome({
                   </div>
 
                   {/* 4. CARD BODY: Location & Description  */}
-                  <div className="p-4 sm:p-5 flex-1 flex flex-col bg-white">
+                  <div className="p-3.5 sm:p-5 flex-1 flex flex-col bg-white">
                     {locationText && (
-                      <p className="text-slate-500 text-xs font-medium mb-2 flex items-center gap-1.5 line-clamp-1">
-                        <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" /> {locationText}
+                      <p className="text-slate-500 text-[10px] sm:text-xs font-medium mb-1.5 sm:mb-2 flex items-center gap-1.5 line-clamp-1">
+                        <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0 text-slate-400" /> {locationText}
                       </p>
                     )}
 
-                    <p className="text-sm text-slate-600 mb-4 line-clamp-2 leading-relaxed">
+                    {/* THE FIX: 1 line on mobile, 2 lines on desktop */}
+                    <p className="text-xs sm:text-sm text-slate-600 mb-3 sm:mb-4 line-clamp-1 sm:line-clamp-2 leading-relaxed">
                       {store.description || "Discover great products from this local seller."}
                     </p>
 
-                    {/* 5. BUTTON  */}
-                    <div className="mt-auto pt-4 w-full shrink-0">
-                      <div className="w-full flex items-center justify-center gap-2 bg-slate-50 text-slate-700 font-bold px-4 py-3 rounded-xl border border-slate-200 group-hover:bg-emerald-600 group-hover:text-white group-hover:border-emerald-600 transition-all duration-300">
-                        <CtaIcon className="h-4 w-4" />
-                        <span className="text-sm">{ctaLabel}</span>
-                        <ChevronRight className="h-4 w-4 opacity-70 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                    {/* 5. BUTTON (More compact on mobile) */}
+                    <div className="mt-auto pt-2 sm:pt-4 w-full shrink-0">
+                      <div className="w-full flex items-center justify-center gap-1.5 sm:gap-2 bg-slate-50 text-slate-700 font-bold px-3 py-2.5 sm:px-4 sm:py-3 rounded-xl border border-slate-200 group-hover:bg-emerald-600 group-hover:text-white group-hover:border-emerald-600 transition-all duration-300">
+                        <CtaIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <span className="text-xs sm:text-sm">{ctaLabel}</span>
+                        <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 opacity-70 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                       </div>
                     </div>
                   </div>

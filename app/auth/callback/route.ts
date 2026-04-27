@@ -39,7 +39,7 @@ export async function GET(request: Request) {
     const { data: { user } } = await supabase.auth.getUser()
 
     // 3. THE ADMIN CHECK
-    if (user?.email === "aweolar@gmail.com") {
+    if (user?.email === "aweolar@gmail.com" || user?.email === "denismutuginjagi@gmail.com") {
       return NextResponse.redirect(`${origin}/admin/dashboard`) 
     }
 

@@ -104,6 +104,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const NavContent = () => (
     <>
       <div className="h-16 flex items-center px-6 border-b border-slate-100 shrink-0 mb-2">
+        <Link href="/" className="flex items-center gap-2 text-emerald-600 font-black text-xl tracking-tight">
+           <Store className="h-6 w-6" />
+           SokoPOS
+        </Link>
         <div className="flex items-center gap-2 text-emerald-600 font-black text-xl tracking-tight">
           <Store className="h-6 w-6" />
           SokoPOS
@@ -183,7 +187,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               >
                 <Menu className="h-6 w-6" />
               </button>
-              <span className="font-black text-lg text-slate-900 tracking-tight">SokoPOS</span>
+              <Link href="/" className="font-black text-lg text-slate-900 tracking-tight">
+                SokoPOS
+              </Link>
             </div>
             
             <span className="font-black text-xl text-slate-900 tracking-tight hidden lg:block">
