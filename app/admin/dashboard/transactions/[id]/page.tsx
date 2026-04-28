@@ -18,9 +18,13 @@ const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+  // 1. Update the type to Promise<{ id: string }>
+export default async function TransactionDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+  
+  // 2. Await the params to unlock the ID!
+  const resolvedParams = await params;
 
-export default async function TransactionDetailsPage({ params }: { params: { id: string } }) {
-  // 1. Fetch the exact transaction and linked data
+  // 3. Fetch the exact transaction and linked data using the resolved ID
   const { data: transaction, error } = await supabaseAdmin
     .from('transactions')
     .select(`
@@ -28,7 +32,7 @@ export default async function TransactionDetailsPage({ params }: { params: { id:
       stores ( name, paystack_subaccount_code ),
       orders ( customer_name, customer_email )
     `)
-    .eq('id', params.id)
+    .eq('id', resolvedParams.id) // 4. Use resolvedParams.id here!
     .single();
 
   if (error || !transaction) {
