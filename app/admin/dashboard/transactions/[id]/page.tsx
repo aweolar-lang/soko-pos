@@ -49,7 +49,9 @@ export default async function TransactionDetailsPage({ params }: { params: Promi
   // 2. Prepare the Server Action for Refunding
   // We pass the transaction reference and the total amount to our secure Paystack function
   const transactionAmount = Number(transaction.amount);
-  const issueRefundAction = processRefund.bind(null, transaction.reference, transactionAmount);
+  const issueRefundAction = async (formData: FormData) => {
+    await processRefund(transaction.reference, transactionAmount);
+  };
 
   // Formatting helpers
   const tDate = new Date(transaction.created_at).toLocaleString('en-US', {
@@ -135,18 +137,13 @@ export default async function TransactionDetailsPage({ params }: { params: Promi
                 This will immediately pull <span className="font-bold text-slate-800">Ksh {transactionAmount.toLocaleString()}</span> back from the merchant and return it to the customer's original payment method. This action cannot be undone.
               </p>
               
-              <form 
-                action={async () => { 
-                  // We wrap it to ignore the return value and satisfy TS
-                  await issueRefundAction(); 
-                }}
-              >
-                <SubmitButton 
-                  text="Process Full Refund" 
-                  loadingText="Reversing Payment" 
-                  variant="secondary" 
-                />
-              </form>
+             <form action={issueRefundAction}>
+              <SubmitButton 
+                text="Process Full Refund" 
+                loadingText="Reversing Payment" 
+                variant="secondary" 
+              />
+            </form> 
             </div>
           </div>
         </div>
