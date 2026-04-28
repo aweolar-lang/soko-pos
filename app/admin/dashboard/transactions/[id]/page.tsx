@@ -50,9 +50,9 @@ export default async function TransactionDetailsPage({ params }: { params: Promi
   // We pass the transaction reference and the total amount to our secure Paystack function
   const transactionAmount = Number(transaction.amount);
   const issueRefundAction = async (formData: FormData) => {
+    "use server";
     await processRefund(transaction.reference, transactionAmount);
   };
-
   // Formatting helpers
   const tDate = new Date(transaction.created_at).toLocaleString('en-US', {
     month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit'
