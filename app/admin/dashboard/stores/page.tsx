@@ -134,7 +134,7 @@ export default async function StoresPage() {
                         <div className="flex items-center justify-end gap-2">
                           {/* 1. Public Store Link */}
                           <Link 
-                            href={`/store/${store.slug || store.id}`} 
+                            href={`/${store.slug || store.id}`} 
                             target="_blank"
                             className="inline-flex items-center gap-1 text-sm font-bold text-slate-500 hover:text-emerald-600 transition-colors p-2 hover:bg-emerald-50 rounded-lg"
                             title="View Public Store"
