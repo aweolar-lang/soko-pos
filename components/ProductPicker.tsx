@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Search, Loader2, X, Plus, Tag as TagIcon, Image as ImageIcon } from "lucide-react";
 
-// Initialize public Supabase client for searching products
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -12,10 +11,29 @@ const supabase = createClient(
 
 export interface ProductTag {
   id: string;
-  name: string;
+  title: string;       
   price: number;
-  main_image_url: string | null;
+  images: any;         
 }
+
+const getThumbnail = (imageField: any): string | null => {
+  if (!imageField) return null;
+  // If it's already an array
+  if (Array.isArray(imageField)) return imageField[0];
+  // If it's a string
+  if (typeof imageField === "string") {
+    
+    if (imageField.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(imageField);
+        return parsed[0];
+      } catch { return null; }
+    }
+   
+    return imageField.split(",")[0].trim();
+  }
+  return null;
+};
 
 interface ProductPickerProps {
   selectedProducts: ProductTag[];
@@ -27,9 +45,7 @@ export default function ProductPicker({ selectedProducts, onChange }: ProductPic
   const [searchResults, setSearchResults] = useState<ProductTag[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  // Debounced Search Effect
   useEffect(() => {
-    // Wait 300ms after the user stops typing before hitting the database
     const delayDebounceFn = setTimeout(() => {
       if (searchTerm.trim().length > 1) {
         performSearch(searchTerm);
@@ -37,7 +53,6 @@ export default function ProductPicker({ selectedProducts, onChange }: ProductPic
         setSearchResults([]);
       }
     }, 300);
-
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm]);
 
@@ -46,9 +61,9 @@ export default function ProductPicker({ selectedProducts, onChange }: ProductPic
     try {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, price, main_image_url")
-        .ilike("name", `%${term}%`) // Case-insensitive search
-        .limit(5); // Keep the UI clean by only showing top 5 matches
+        .select("id, title, price, images") 
+        .ilike("title", `%${term}%`)     
+        .limit(5);
 
       if (error) throw error;
       setSearchResults(data || []);
@@ -60,11 +75,9 @@ export default function ProductPicker({ selectedProducts, onChange }: ProductPic
   };
 
   const handleSelectProduct = (product: ProductTag) => {
-    // Prevent tagging the same product twice
     if (!selectedProducts.find((p) => p.id === product.id)) {
       onChange([...selectedProducts, product]);
     }
-    // Clear the search bar after selection
     setSearchTerm("");
     setSearchResults([]);
   };
@@ -83,39 +96,38 @@ export default function ProductPicker({ selectedProducts, onChange }: ProductPic
       {/* SELECTED PRODUCTS CHIPS */}
       {selectedProducts.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-3">
-          {selectedProducts.map((product) => (
-            <div 
-              key={product.id} 
-              className="flex items-center gap-2 bg-white border border-emerald-200 pl-2 pr-1 py-1 rounded-lg shadow-sm"
-            >
-              {product.main_image_url ? (
-                <img src={product.main_image_url} alt={product.name} className="w-6 h-6 rounded object-cover" />
-              ) : (
-                <div className="w-6 h-6 bg-slate-100 rounded flex items-center justify-center">
-                  <ImageIcon className="w-3 h-3 text-slate-400" />
-                </div>
-              )}
-              <span className="text-xs font-bold text-slate-800 max-w-[120px] truncate">{product.name}</span>
-              <button
-                type="button"
-                onClick={() => handleRemoveProduct(product.id)}
-                className="p-1 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-md transition-colors"
+          {selectedProducts.map((product) => {
+            const thumbUrl = getThumbnail(product.images); // <--- Use the helper
+            return (
+              <div 
+                key={product.id} 
+                className="flex items-center gap-2 bg-white border border-emerald-200 pl-2 pr-1 py-1 rounded-lg shadow-sm"
               >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ))}
+                {thumbUrl ? (
+                  <img src={thumbUrl} alt={product.title} className="w-6 h-6 rounded object-cover" />
+                ) : (
+                  <div className="w-6 h-6 bg-slate-100 rounded flex items-center justify-center">
+                    <ImageIcon className="w-3 h-3 text-slate-400" />
+                  </div>
+                )}
+                <span className="text-xs font-bold text-slate-800 max-w-[120px] truncate">{product.title}</span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveProduct(product.id)}
+                  className="p-1 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-md transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
 
       {/* SEARCH BAR */}
       <div className="relative">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          {isSearching ? (
-            <Loader2 className="w-4 h-4 text-emerald-500 animate-spin" />
-          ) : (
-            <Search className="w-4 h-4 text-slate-400" />
-          )}
+          {isSearching ? <Loader2 className="w-4 h-4 text-emerald-500 animate-spin" /> : <Search className="w-4 h-4 text-slate-400" />}
         </div>
         <input
           type="text"
@@ -130,6 +142,7 @@ export default function ProductPicker({ selectedProducts, onChange }: ProductPic
           <div className="absolute z-10 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
             {searchResults.map((product) => {
               const isAlreadySelected = selectedProducts.some(p => p.id === product.id);
+              const thumbUrl = getThumbnail(product.images); // <--- Use the helper
               
               return (
                 <button
@@ -142,14 +155,14 @@ export default function ProductPicker({ selectedProducts, onChange }: ProductPic
                   } border-b border-slate-100 last:border-0`}
                 >
                   <div className="w-10 h-10 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0">
-                    {product.main_image_url ? (
-                      <img src={product.main_image_url} alt={product.name} className="w-full h-full object-cover" />
+                    {thumbUrl ? (
+                      <img src={thumbUrl} alt={product.title} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-5 h-5 text-slate-300"/></div>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-slate-900 truncate">{product.name}</p>
+                    <p className="text-sm font-bold text-slate-900 truncate">{product.title}</p>
                     <p className="text-xs font-black text-emerald-600 mt-0.5">Ksh {product.price}</p>
                   </div>
                   {!isAlreadySelected && (

@@ -29,7 +29,7 @@ export default async function CommunityFeedPage() {
     .select(`
       *,
       post_product_tags (
-        products ( id, name, price, main_image_url )
+        products ( id, title, price, images )
       ),
       community_likes ( user_id ),
       community_comments ( id, author_name, content, created_at )

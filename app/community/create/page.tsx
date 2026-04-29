@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Megaphone } from "lucide-react";
 import CreatePostForm from "../../../components/CreatePostForm";
-import { toast } from "sonner";
 
 // 1. Secure Server-Side Supabase Client
 const supabase = createClient(
@@ -15,14 +14,11 @@ export default async function CreateCommunityPostPage() {
   // 2. Get the currently authenticated user
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-  // If they aren't logged in, send them to login
   if (authError || !user) {
-    //toast.error("You must be logged in to post to the community.");
-    redirect("/login");
+    redirect("/login?message=unauthorized");
   }
 
   // 3. Determine if they are a Merchant or a Buyer
-  // We check the stores table first. If they own a store, they post as a merchant.
   let authorType: "merchant" | "buyer" = "buyer";
   let authorName = user.user_metadata?.full_name || "Anonymous Buyer";
 
@@ -36,7 +32,6 @@ export default async function CreateCommunityPostPage() {
     authorType = "merchant";
     authorName = store.name;
   } else {
-    // Optional: Fetch buyer specific details if needed
     const { data: buyer } = await supabase
       .from("buyers")
       .select("name")
@@ -73,7 +68,6 @@ export default async function CreateCommunityPostPage() {
         </div>
 
         {/* RENDER THE CLIENT FORM */}
-        {/* We pass the secure server-fetched data down to the interactive client component */}
         <CreatePostForm 
           authorId={user.id} 
           authorType={authorType} 
