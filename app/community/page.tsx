@@ -9,6 +9,7 @@ import {
   TrendingUp,
   Image as ImageIcon
 } from "lucide-react";
+import PostEngagement from "@/components/PostEngagement";
 
 // UPGRADE: Cache this page at the edge for 60 seconds.
 // This makes the feed lightning-fast and saves Supabase bandwidth.
@@ -21,13 +22,17 @@ const supabase = createClient(
 
 export default async function CommunityFeedPage() {
   // Fetch posts and their deeply nested tagged products
+  const { data: { user } } = await supabase.auth.getUser();
+
   const { data: posts, error } = await supabase
     .from("community_posts")
     .select(`
       *,
       post_product_tags (
         products ( id, name, price, main_image_url )
-      )
+      ),
+      community_likes ( user_id ),
+      community_comments ( id, author_name, content, created_at )
     `)
     .order("created_at", { ascending: false });
 
@@ -147,14 +152,13 @@ export default async function CommunityFeedPage() {
               )}
 
               {/* ENGAGEMENT FOOTER */}
-              <div className="p-2 sm:p-3 flex items-center gap-2">
-                <button className="flex-1 flex items-center justify-center gap-2 text-slate-500 hover:text-red-500 hover:bg-red-50 py-2.5 rounded-xl transition-colors font-bold text-sm">
-                  <Heart className="w-5 h-5" /> Like
-                </button>
-                <button className="flex-1 flex items-center justify-center gap-2 text-slate-500 hover:text-blue-500 hover:bg-blue-50 py-2.5 rounded-xl transition-colors font-bold text-sm">
-                  <MessageCircle className="w-5 h-5" /> Comment
-                </button>
-              </div>
+              <PostEngagement 
+                postId={post.id}
+                initialLikesCount={post.community_likes?.length || 0}
+                hasLikedInitial={post.community_likes?.some((like: any) => like.user_id === user?.id) || false}
+                comments={post.community_comments || []}
+                isLoggedIn={!!user}
+              />
 
             </div>
           ))}

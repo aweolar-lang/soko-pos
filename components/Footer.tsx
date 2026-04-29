@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Camera, Mail, Heart, X, Store, ArrowRight, ShieldCheck, Zap } from "lucide-react";
+import { Camera, Mail, Heart, X, Store, ArrowRight, ShieldCheck, Zap, Users } from "lucide-react";
 
 export default function Footer() {
   return (
@@ -46,6 +46,11 @@ export default function Footer() {
               <li>
                 <Link href="/safety" className="text-sm font-medium text-slate-500 hover:text-emerald-600 transition-colors flex items-center gap-2 group">
                   <ArrowRight className="h-3 w-3 text-slate-300 group-hover:text-emerald-500 transition-colors" /> Trust & Safety
+                </Link>
+              </li>
+              <li>
+                <Link href="/community" className="text-sm font-medium text-slate-500 hover:text-emerald-600 transition-colors flex items-center gap-2 group">
+                  <Users className="h-3 w-3 text-slate-300 group-hover:text-emerald-500 transition-colors" /> Community
                 </Link>
               </li>
             </ul>

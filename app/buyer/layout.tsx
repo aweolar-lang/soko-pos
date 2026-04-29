@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Store, ShieldCheck } from "lucide-react";
+import { Store, ShieldCheck, Users } from "lucide-react";
 
 export default function BuyerLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -12,6 +12,10 @@ export default function BuyerLayout({ children }: { children: React.ReactNode })
           </div>
           Local<span className="text-slate-500">Soko</span>
         </Link>
+        <Link href="/community" className="text-sm font-medium text-slate-500 hover:text-emerald-600 transition-colors flex items-center gap-2 group">
+            <Users className="h-3 w-3 text-slate-300 group-hover:text-emerald-500 transition-colors" /> Community
+        </Link>
+        
 
         <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100">
           <ShieldCheck className="w-4 h-4" />

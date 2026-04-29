@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { 
   Store, LayoutGrid, Package, Receipt, Wallet, 
-  Settings, LogOut, Menu, Bell, CreditCard, X, Loader2, HelpCircle, BookOpen, Clock, CheckCircle2
+  Settings, LogOut, Menu, Bell, CreditCard, X, Loader2, HelpCircle, BookOpen, Clock, CheckCircle2, Users
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
@@ -16,6 +16,7 @@ const navLinks = [
   { name: "Wallet", href: "/dashboard/wallet", icon: Wallet },
   { name: "Billing", href: "/dashboard/billing", icon: CreditCard },
   { name: "Store Settings", href: "/dashboard/settings", icon: Settings },
+  { name: "Create Post", href: "/community/create", icon: Users },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
