@@ -3,6 +3,15 @@
 import { useState } from "react";
 import { Heart, MessageCircle, Send, Loader2 } from "lucide-react";
 import { toggleLike, addComment } from "../actions/engagement";
+import { createClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
+import { redirect } from "next/navigation";
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 interface Comment {
   id: string;
@@ -19,13 +28,36 @@ interface PostEngagementProps {
   isLoggedIn: boolean;
 }
 
-export default function PostEngagement({ 
+export default async function PostEngagement({ 
   postId, 
   initialLikesCount, 
   hasLikedInitial, 
   comments,
   isLoggedIn 
 }: PostEngagementProps) {
+
+  const cookieStore = await cookies();
+  
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name) {
+            return cookieStore.get(name)?.value;
+          },
+          set() {},
+          remove() {},
+        },
+      }
+    );
+  
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+  
+    if (authError || !user) {
+      isLoggedIn = false; // Override to ensure client-side knows user is not logged in
+    }
+
   // Optimistic State for Likes
   const [isLiked, setIsLiked] = useState(hasLikedInitial);
   const [likesCount, setLikesCount] = useState(initialLikesCount);

@@ -15,16 +15,16 @@ import PostEngagement from "@/components/PostEngagement";
 // This makes the feed lightning-fast and saves Supabase bandwidth.
 export const revalidate = 60; 
 
-const supabase = createClient(
+const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
 export default async function CommunityFeedPage() {
   // Fetch posts and their deeply nested tagged products
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await supabaseAdmin.auth.getUser();
 
-  const { data: posts, error } = await supabase
+  const { data: posts, error } = await supabaseAdmin
     .from("community_posts")
     .select(`
       *,

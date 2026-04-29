@@ -5,7 +5,7 @@ import { Image as ImageIcon, X, Loader2, CheckCircle2, AlertCircle } from "lucid
 import { CldUploadWidget } from 'next-cloudinary';
 // Adjust these import paths depending on your folder structure
 import { createShoppablePost } from "../actions/community"; 
-import ProductPicker, { ProductTag } from "./ProductPicker"; 
+import ProductPicker, { ProductTag } from "./ProductPicker";
 
 interface CreatePostFormProps {
   authorId: string;
