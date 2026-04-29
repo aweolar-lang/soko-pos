@@ -8,6 +8,7 @@ import {
   Clock,
   ArrowUpRight
 } from "lucide-react";
+import Link from "next/link";
 
 // 1. Secure Server-Side Supabase Client
 const supabaseAdmin = createClient(
@@ -156,10 +157,14 @@ export default async function RefundsPage() {
                       </td>
 
                       {/* ACTION BUTTON */}
+                      {/* ACTION BUTTON */}
                       <td className="px-6 py-4 text-right">
-                        <button className="inline-flex items-center gap-1 text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-colors p-2 hover:bg-emerald-50 rounded-lg">
+                        <Link 
+                          href={`/admin/dashboard/refunds/${refund.id}`}
+                          className="inline-flex items-center gap-1 text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-colors p-2 hover:bg-emerald-50 rounded-lg"
+                        >
                           View <ArrowUpRight className="h-4 w-4" />
-                        </button>
+                        </Link>
                       </td>
                     </tr>
                   );

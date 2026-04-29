@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { revalidatePath } from "next/cache";
+import { ADMIN_EMAILS } from "@/lib/constants"; // Centralize admin emails for better security and maintainability
 
 // ==========================================
 // 1. SECURITY: STRICT ADMIN VERIFICATION
@@ -23,10 +24,7 @@ async function verifyAdmin() {
 
   const { data: { user } } = await supabase.auth.getUser();
   
-  const ADMIN_EMAILS = [
-    "denismutuginjagi@gmail.com", 
-    "aweolar@gmail.com"
-  ];
+
 
   if (!user || !user.email || !ADMIN_EMAILS.includes(user.email)) {
     throw new Error("UNAUTHORIZED: Critical security violation attempt blocked.");

@@ -8,7 +8,8 @@ import {
   Link as LinkIcon,
   Unlink,
   ExternalLink,
-  Users
+  Users,
+  Settings // UPGRADE: Added Settings icon
 } from "lucide-react";
 import Link from "next/link";
 
@@ -21,10 +22,13 @@ const supabaseAdmin = createClient(
 export const revalidate = 0; // Always fetch fresh data
 
 export default async function StoresPage() {
-  // 2. Fetch all stores
+  // UPGRADE: Fetching the order count to see which stores are actively selling!
   const { data: stores, error } = await supabaseAdmin
     .from('stores')
-    .select('*')
+    .select(`
+      *,
+      orders ( id )
+    `)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -41,48 +45,35 @@ export default async function StoresPage() {
       {/* HEADER SECTION */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-900">Registered Stores</h1>
-          <p className="text-slate-500 font-medium mt-1">Manage merchants and their payout connections.</p>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Stores Directory</h1>
+          <p className="text-slate-500 font-medium mt-1">Manage merchants and their platform status.</p>
         </div>
         
-        {/* Quick Stats Mini-Cards */}
         <div className="flex gap-4">
-          <div className="bg-white px-4 py-3 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
-            <div className="p-2 bg-blue-50 rounded-lg">
-              <Store className="h-5 w-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-400 uppercase">Total Stores</p>
-              <p className="text-lg font-black text-slate-900">{stores?.length || 0}</p>
-            </div>
+          <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
+            <div className="h-2 w-2 rounded-full bg-emerald-500"></div>
+            <p className="text-sm font-bold text-slate-700">{activeStores.length} Active</p>
           </div>
-          <div className="bg-white px-4 py-3 rounded-2xl border border-emerald-200 shadow-sm flex items-center gap-3 hidden sm:flex">
-            <div className="p-2 bg-emerald-50 rounded-lg">
-              <LinkIcon className="h-5 w-5 text-emerald-600" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-emerald-600 uppercase">Ready for Payouts</p>
-              <p className="text-lg font-black text-slate-900">{connectedStores.length}</p>
-            </div>
+          <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
+            <div className="h-2 w-2 rounded-full bg-blue-500"></div>
+            <p className="text-sm font-bold text-slate-700">{connectedStores.length} Connected</p>
           </div>
         </div>
       </div>
 
-      {/* FILTERS TOOLBAR */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-center">
-        <div className="relative w-full sm:w-96">
+      {/* CONTROLS (Search & Filter) */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
           <input 
             type="text" 
             placeholder="Search stores by name..." 
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm font-medium"
+            className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all shadow-sm"
           />
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <button className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-slate-50 border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-100 transition-colors text-sm">
-            <Filter className="h-4 w-4" /> Filters
-          </button>
-        </div>
+        <button className="inline-flex items-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-700 font-bold hover:bg-slate-50 transition-colors shadow-sm">
+          <Filter className="h-5 w-5" /> Filter
+        </button>
       </div>
 
       {/* STORES TABLE */}
@@ -91,76 +82,74 @@ export default async function StoresPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Date Joined</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Store Details</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Category</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Payout Connection</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Action</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Store Info</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Location</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Gateway Status</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Orders</th>
+                <th className="px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {stores && stores.length > 0 ? (
                 stores.map((store) => {
-                  const joinDate = new Date(store.created_at).toLocaleDateString('en-US', { 
-                    month: 'short', day: 'numeric', year: 'numeric' 
-                  });
-
+                  const orderCount = store.orders ? store.orders.length : 0;
                   return (
-                    <tr key={store.id} className="hover:bg-slate-50 transition-colors group">
-                      {/* DATE */}
-                      <td className="px-6 py-4">
-                        <p className="text-sm font-bold text-slate-900">{joinDate}</p>
-                      </td>
-
-                      {/* STORE DETAILS */}
+                    <tr key={store.id} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 bg-slate-100 rounded-xl flex items-center justify-center flex-shrink-0 border border-slate-200">
-                            <Store className="h-5 w-5 text-slate-500" />
+                          <div className="h-10 w-10 bg-indigo-50 rounded-lg border border-indigo-100 flex items-center justify-center shrink-0">
+                            <Store className="h-5 w-5 text-indigo-600" />
                           </div>
                           <div>
-                            <p className="text-sm font-bold text-slate-900">{store.name}</p>
-                            <p className="text-xs text-slate-500 mt-0.5 truncate max-w-[200px]">
-                              {store.description || "No description provided."}
-                            </p>
+                            <p className="font-bold text-slate-900">{store.name}</p>
+                            <p className="text-xs text-slate-500 font-medium">Joined {new Date(store.created_at).toLocaleDateString()}</p>
                           </div>
                         </div>
                       </td>
 
-                      {/* CATEGORY */}
                       <td className="px-6 py-4">
-                        <span className="inline-flex px-2.5 py-1 rounded-md text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                          {store.category || "Uncategorized"}
-                        </span>
+                        <p className="text-sm font-bold text-slate-700">{store.county || "Online"}</p>
+                        <p className="text-xs text-slate-500">{store.town || "N/A"}</p>
                       </td>
 
-                      {/* PAYOUT CONNECTION (SUBACCOUNT) */}
                       <td className="px-6 py-4">
                         {store.paystack_subaccount_code ? (
-                          <div className="flex flex-col">
-                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600">
-                              <CheckCircle2 className="h-3.5 w-3.5" /> Connected
-                            </span>
-                            <span className="text-[10px] font-mono text-slate-400 mt-1">
-                              {store.paystack_subaccount_code || "No subaccount code"}
-                            </span>
-                          </div>
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold tracking-wide">
+                            <LinkIcon className="h-3 w-3" /> Connected
+                          </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                            <AlertCircle className="h-3.5 w-3.5" /> Pending Setup
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold tracking-wide">
+                            <Unlink className="h-3 w-3" /> Unlinked
                           </span>
                         )}
                       </td>
+                      
+                      {/* NEW COLUMN: Order Count */}
+                      <td className="px-6 py-4">
+                        <span className="text-sm font-bold text-slate-700">{orderCount}</span>
+                      </td>
 
-                      {/* ACTION BUTTON */}
+                      {/* ACTION BUTTONS */}
                       <td className="px-6 py-4 text-right">
-                        <Link 
-                          href={`/store/${store.id}`} // Links out to their public store page
-                          target="_blank"
-                          className="inline-flex items-center gap-1 text-sm font-bold text-slate-600 hover:text-emerald-600 transition-colors p-2 hover:bg-emerald-50 rounded-lg"
-                        >
-                          Visit <ExternalLink className="h-4 w-4" />
-                        </Link>
+                        <div className="flex items-center justify-end gap-2">
+                          {/* 1. Public Store Link */}
+                          <Link 
+                            href={`/store/${store.slug || store.id}`} 
+                            target="_blank"
+                            className="inline-flex items-center gap-1 text-sm font-bold text-slate-500 hover:text-emerald-600 transition-colors p-2 hover:bg-emerald-50 rounded-lg"
+                            title="View Public Store"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Link>
+                          
+                          {/* 2. Internal Admin Dashboard Manage Link */}
+                          <Link 
+                            href={`/admin/dashboard/stores/${store.id}`} 
+                            className="inline-flex items-center gap-1 text-sm font-bold text-indigo-600 hover:text-indigo-700 transition-colors p-2 hover:bg-indigo-50 rounded-lg"
+                          >
+                            Manage <Settings className="h-4 w-4" />
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   );
