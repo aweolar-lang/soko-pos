@@ -3,31 +3,33 @@ import Link from "next/link";
 import { ArrowLeft, Megaphone } from "lucide-react";
 import CreatePostForm from "../../../components/CreatePostForm";
 import { supabase } from "@/lib/supabase"; 
-export const revalidate = 0; // Always fetch fresh data on load
+
 
 export default async function CreateCommunityPostPage() {
-  
   // 2. Get the currently authenticated user
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
+  // If they aren't logged in, send them to login
   if (authError || !user) {
-    redirect("/login?message=unauthorized");
+    redirect("/login?returnTo=/community/create");
   }
 
   // 3. Determine if they are a Merchant or a Buyer
+  // We check the stores table first. If they own a store, they post as a merchant.
   let authorType: "merchant" | "buyer" = "buyer";
   let authorName = user.user_metadata?.full_name || "Anonymous Buyer";
 
   const { data: store } = await supabase
     .from("stores")
     .select("name")
-    .eq("owner_id", user.id)
+    .eq("owner_id", user.id) // Adjust 'owner_id' if your stores table uses a different column for the user ID
     .maybeSingle();
 
   if (store) {
     authorType = "merchant";
     authorName = store.name;
   } else {
+    // Optional: Fetch buyer specific details if needed
     const { data: buyer } = await supabase
       .from("buyers")
       .select("name")
@@ -64,6 +66,7 @@ export default async function CreateCommunityPostPage() {
         </div>
 
         {/* RENDER THE CLIENT FORM */}
+        {/* We pass the secure server-fetched data down to the interactive client component */}
         <CreatePostForm 
           authorId={user.id} 
           authorType={authorType} 
