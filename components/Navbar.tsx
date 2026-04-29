@@ -58,7 +58,8 @@ export default function Navbar() {
     pathname?.startsWith("/dashboard") || 
     pathname?.startsWith("/buyer") || 
     pathname?.startsWith("/store") ||
-    pathname?.startsWith("/admin")
+    pathname?.startsWith("/admin") ||
+    pathname?.startsWith("/community")
   ) {
     return null;
   }

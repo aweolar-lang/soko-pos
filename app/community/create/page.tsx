@@ -1,16 +1,17 @@
-import { createClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Megaphone } from "lucide-react";
 import CreatePostForm from "../../../components/CreatePostForm";
+import { createClient } from "@supabase/supabase-js";
 
-// 1. Secure Server-Side Supabase Client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+export const revalidate = 0; // Always fetch fresh data on load
 
 export default async function CreateCommunityPostPage() {
+  
   // 2. Get the currently authenticated user
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
