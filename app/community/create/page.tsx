@@ -17,7 +17,7 @@ export default async function CreateCommunityPostPage() {
 
   // If they aren't logged in, send them to login
   if (authError || !user) {
-    toast.error("You must be logged in to post to the community.");
+    //toast.error("You must be logged in to post to the community.");
     redirect("/login");
   }
 
