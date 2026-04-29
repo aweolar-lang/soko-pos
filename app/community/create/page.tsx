@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Megaphone } from "lucide-react";
 import CreatePostForm from "../../../components/CreatePostForm";
+import { toast } from "sonner";
 
 // 1. Secure Server-Side Supabase Client
 const supabase = createClient(
@@ -16,7 +17,8 @@ export default async function CreateCommunityPostPage() {
 
   // If they aren't logged in, send them to login
   if (authError || !user) {
-    redirect("/login?returnTo=/community/create");
+    toast.error("You must be logged in to post to the community.");
+    redirect("/login");
   }
 
   // 3. Determine if they are a Merchant or a Buyer
@@ -27,7 +29,7 @@ export default async function CreateCommunityPostPage() {
   const { data: store } = await supabase
     .from("stores")
     .select("name")
-    .eq("owner_id", user.id) // Adjust 'owner_id' if your stores table uses a different column for the user ID
+    .eq("owner_id", user.id)
     .maybeSingle();
 
   if (store) {
