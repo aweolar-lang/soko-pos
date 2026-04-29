@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Heart, MessageCircle, Send, Loader2 } from "lucide-react";
 import { toggleLike, addComment } from "../actions/engagement";
 import { createClient } from "@supabase/supabase-js";
-import { cookies } from "next/headers";
+///import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { redirect } from "next/navigation";
 
@@ -36,7 +36,7 @@ export default async function PostEngagement({
   isLoggedIn 
 }: PostEngagementProps) {
 
-  const cookieStore = await cookies();
+  //const cookieStore = await cookies();
   
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -44,7 +44,7 @@ export default async function PostEngagement({
       {
         cookies: {
           get(name) {
-            return cookieStore.get(name)?.value;
+            //return cookieStore.get(name)?.value;
           },
           set() {},
           remove() {},
