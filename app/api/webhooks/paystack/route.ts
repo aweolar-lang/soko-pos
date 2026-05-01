@@ -28,6 +28,25 @@ export async function POST(req: Request) {
 
     const event = JSON.parse(rawBody);
 
+
+    if (event.data?.metadata?.platform === "studylite") {
+      try {
+        await fetch("https://studylite.online/api/webhooks/paystack", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-paystack-signature": signature,
+          },
+          body: rawBody,
+        });
+        console.log("✅ Forwarded Studylite payment successfully.");
+        return NextResponse.json({ forwarded: true }, { status: 200 });
+      } catch (forwardError) {
+        console.error("🚨 Failed to forward to Studylite:", forwardError);
+        return NextResponse.json({ error: "Forwarding failed" }, { status: 500 });
+      }
+    }
+
     // ==========================================
     // SCENARIO 1: CHARGE SUCCESS (Money In)
     // ==========================================
