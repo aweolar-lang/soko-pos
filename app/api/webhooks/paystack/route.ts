@@ -47,6 +47,25 @@ export async function POST(req: Request) {
       }
     }
 
+    if (event.data?.metadata?.platform === "masterbuyers") {
+      try {
+        // We forward the exact rawBody and signature to your new app's server
+        await fetch("https://mahabaraha.site/api/webhooks/paystack", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-paystack-signature": signature,
+          },
+          body: rawBody,
+        });
+        console.log("✅ Forwarded Masterbuyers platform payment successfully.");
+        return NextResponse.json({ forwarded: true }, { status: 200 });
+      } catch (forwardError) {
+        console.error("🚨 Failed to forward to masterbuyers:", forwardError);
+        return NextResponse.json({ error: "Forwarding failed" }, { status: 500 });
+      }
+    }
+
     // ==========================================
     // SCENARIO 1: CHARGE SUCCESS (Money In)
     // ==========================================
