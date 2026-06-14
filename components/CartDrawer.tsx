@@ -31,7 +31,7 @@ export default function CartDrawer() {
       {itemCount > 0 && (
           <button
             onClick={() => setIsOpen(true)}
-            className="className="fixed top-4 right-4 z-[110] bg-slate-900 text-white p-3.5 rounded-full shadow-lg hover:bg-slate-800 hover:scale-105 active:scale-95 transition-all flex items-center justify-center group""
+            className="fixed top-4 right-4 z-[110] bg-slate-900 text-white p-3.5 rounded-full shadow-lg hover:bg-slate-800 hover:scale-105 active:scale-95 transition-all flex items-center justify-center group"
           >
             <ShoppingBag className="h-5 w-5" />
             
