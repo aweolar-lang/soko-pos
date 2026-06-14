@@ -70,12 +70,14 @@ export default function Navbar() {
   "/track",
 ]);
 
-const isStorefrontSlugPage =
-  pathname !== "/" &&
-  /^\/[^/]+$/.test(pathname ?? "") &&
-  !hiddenPaths.has(pathname ?? "");
+const pathnameClean = pathname ?? "";
 
-if (isStorefrontSlugPage || hiddenPaths.has(pathname ?? "")) {
+const isStorefrontSlugPage =
+  pathnameClean !== "/" &&
+  !hiddenPaths.has(pathnameClean) &&
+  /^\/[^/]+(\/[^/]+)?$/.test(pathnameClean);
+
+if (isStorefrontSlugPage) {
   return null;
 }
 
