@@ -64,7 +64,9 @@ export default function Navbar() {
     pathname?.startsWith("/contact") ||
     pathname?.startsWith("/safety") ||
    pathname?.startsWith("/privacy") ||
-    pathname?.startsWith("/terms")
+    pathname?.startsWith("/terms") ||
+   pathname?.startsWith("/register") ||
+    pathname?.startsWith("/login")
 
   ) {
     return null;
