@@ -54,24 +54,30 @@ export default function Navbar() {
     router.refresh(); // Force the layout to reset
   };
 
- if (
-    pathname?.startsWith("/dashboard") || 
-    pathname?.startsWith("/buyer") || 
-    pathname?.startsWith("/store") ||
-    pathname?.startsWith("/admin") ||
-    pathname?.startsWith("/community") ||
-    pathname?.startsWith("/about") ||
-    pathname?.startsWith("/contact") ||
-    pathname?.startsWith("/safety") ||
-   pathname?.startsWith("/privacy") ||
-    pathname?.startsWith("/terms") ||
-   pathname?.startsWith("/register") ||
-    pathname?.startsWith("/login") ||
-   pathname?.startsWith("/*")
+  const hiddenPaths = new Set([
+  "/dashboard",
+  "/buyer",
+  "/store",
+  "/admin",
+  "/community",
+  "/about",
+  "/contact",
+  "/safety",
+  "/privacy",
+  "/terms",
+  "/register",
+  "/login",
+  "/track",
+]);
 
-  ) {
-    return null;
-  }
+const isStorefrontSlugPage =
+  pathname !== "/" &&
+  /^\/[^/]+$/.test(pathname ?? "") &&
+  !hiddenPaths.has(pathname ?? "");
+
+if (isStorefrontSlugPage || hiddenPaths.has(pathname ?? "")) {
+  return null;
+}
 
   return (
     <>
