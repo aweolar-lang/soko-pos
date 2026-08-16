@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
+import { initiateB2C } from '@/lib/mpesa'; // The utility we just created
 
-// Initialize Supabase Admin client using the Service Role Key for server-to-server auth
+// Initialize Supabase Admin client with Service Role Key
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -10,11 +11,10 @@ const supabaseAdmin = createClient(
 
 export async function POST(req: Request) {
   try {
-    // 1. Get raw body text for exact signature matching. 
-    // Do NOT use req.json() here, as parsing and re-stringifying can alter the format and break the hash.
+    // 1. Get raw body for exact signature matching
     const rawBody = await req.text();
     
-    // 2. Extract Security Headers
+    // 2. Extract and Validate Security Headers
     const signature = req.headers.get('x-signature');
     const timestamp = req.headers.get('x-timestamp');
 
@@ -22,74 +22,94 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing security headers' }, { status: 401 });
     }
 
-    // 3. Replay Attack Protection (Reject requests older than 5 minutes)
+    // 3. Replay Attack Protection (5-minute window)
     const requestTime = parseInt(timestamp, 10);
-    const timeDifference = Date.now() - requestTime;
-    
-    if (timeDifference > 5 * 60 * 1000 || timeDifference < 0) {
+    if (Date.now() - requestTime > 5 * 60 * 1000 || Date.now() - requestTime < 0) {
       return NextResponse.json({ error: 'Request expired or invalid timestamp' }, { status: 401 });
     }
 
-    // 4. Verify the HMAC Signature
+    // 4. Verify HMAC Signature (Timing-safe)
     const secret = process.env.INTER_PLATFORM_SECRET!;
-    const dataToVerify = `${timestamp}.${rawBody}`;
-    
     const expectedSignature = crypto
       .createHmac('sha256', secret)
-      .update(dataToVerify)
+      .update(`${timestamp}.${rawBody}`)
       .digest('hex');
 
-    // Use crypto.timingSafeEqual to prevent timing attacks
     const isSignatureValid = crypto.timingSafeEqual(
       Buffer.from(signature),
       Buffer.from(expectedSignature)
     );
 
     if (!isSignatureValid) {
-      console.error('CRITICAL: Signature mismatch detected.');
+      console.error('CRITICAL: HMAC Signature mismatch.');
       return NextResponse.json({ error: 'Invalid signature' }, { status: 403 });
     }
 
-    // 5. Signature is valid! Safe to parse the payload
+    // 5. Parse and Validate Payload
     const payload = JSON.parse(rawBody);
-    const { secondary_tx_id, user_id, tx_type, amount } = payload;
+    const { secondary_tx_id, user_id, tx_type, amount, mpesa_number } = payload;
 
-    if (!secondary_tx_id || !user_id || !tx_type || !amount) {
-      return NextResponse.json({ error: 'Malformed payload data' }, { status: 400 });
+    if (!secondary_tx_id || !user_id || !tx_type || !amount || !mpesa_number) {
+      return NextResponse.json({ error: 'Malformed payload data. Missing required fields.' }, { status: 400 });
     }
 
-    // 6. Insert the validated request into the Shadow Ledger
+    // 6. Idempotent Database Insertion (Shadow Ledger)
     const { data: shadowData, error: dbError } = await supabaseAdmin
       .from('secondary_request_shadow')
       .insert({
-        secondary_tx_id: secondary_tx_id,
-        user_id: user_id,
-        tx_type: tx_type,
-        amount: amount,
-        payload_hash: signature, // Storing the valid signature as proof of authenticity
+        secondary_tx_id,
+        user_id,
+        tx_type,
+        amount,
+        payload_hash: signature,
         status: 'pending_mpesa'
       })
       .select('id')
       .single();
 
     if (dbError) {
-      // If the secondary_tx_id already exists, it means the Secondary platform retried a request we already have.
-      if (dbError.code === '23505') { // Postgres unique violation code
-        return NextResponse.json({ error: 'Duplicate transaction request' }, { status: 409 });
+      if (dbError.code === '23505') { 
+        // Postgres unique violation: We already received this transaction ID.
+        return NextResponse.json({ message: 'Transaction already being processed' }, { status: 409 });
       }
-      console.error('Shadow insertion error:', dbError);
-      return NextResponse.json({ error: 'Database error on main hub' }, { status: 500 });
+      throw new Error(`Database insert failed: ${dbError.message}`);
     }
 
-    // 7. Success! Acknowledge receipt to the Secondary Platform
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Payload verified and securely logged.',
-      shadow_id: shadowData.id 
-    });
+    // 7. Trigger M-Pesa B2C API
+    try {
+      // Pass the shadowData.id as the Occasion parameter so Safaricom returns it in the webhook
+      const mpesaResponse = await initiateB2C(amount, mpesa_number, shadowData.id);
+      
+      // M-Pesa accepted the request. It is now in Safaricom's queue.
+      // We will await the final status in the Webhook Receiver.
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Transaction verified and sent to M-Pesa queue.',
+        shadow_id: shadowData.id,
+        mpesa_conversation_id: mpesaResponse.ConversationID
+      });
 
-  } catch (error) {
-    console.error('Gateway Receiver Error:', error);
-    return NextResponse.json({ error: 'Internal gateway error' }, { status: 500 });
+    } catch (mpesaError: any) {
+      // 8. Handle Immediate M-Pesa Failure (e.g., Invalid Number, Insufficient Till Balance)
+      console.error('M-Pesa Initiation Failed:', mpesaError);
+
+      // Rollback the status in the shadow ledger so it doesn't stay 'pending' forever
+      await supabaseAdmin
+        .from('secondary_request_shadow')
+        .update({ 
+          status: 'failed', 
+          // Storing a custom error column if we added one, otherwise update timestamp
+        })
+        .eq('id', shadowData.id);
+
+      return NextResponse.json({ 
+        error: 'Safaricom M-Pesa API rejected the request', 
+        details: mpesaError.message 
+      }, { status: 502 });
+    }
+
+  } catch (error: any) {
+    console.error('Gateway Receiver Fatal Error:', error);
+    return NextResponse.json({ error: 'Internal gateway server error' }, { status: 500 });
   }
 }
