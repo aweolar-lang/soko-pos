@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
-import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
-import { initiateB2C } from '@/lib/mpesa'; // The utility we just created
+import { verifyPlatformBRequest } from '@/lib/security';
+import { initiateB2C } from '@/lib/mpesa';
 
-// Initialize Supabase Admin client with Service Role Key
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -11,57 +10,53 @@ const supabaseAdmin = createClient(
 
 export async function POST(req: Request) {
   try {
-    // 1. Get raw body for exact signature matching
+    // 1. Get raw body for cryptographic signature matching
     const rawBody = await req.text();
     
-    // 2. Extract and Validate Security Headers
+    // 2. Extract Security Headers
     const signature = req.headers.get('x-signature');
     const timestamp = req.headers.get('x-timestamp');
-
-    if (!signature || !timestamp) {
-      return NextResponse.json({ error: 'Missing security headers' }, { status: 401 });
-    }
-
-    // 3. Replay Attack Protection (5-minute window)
-    const requestTime = parseInt(timestamp, 10);
-    if (Date.now() - requestTime > 5 * 60 * 1000 || Date.now() - requestTime < 0) {
-      return NextResponse.json({ error: 'Request expired or invalid timestamp' }, { status: 401 });
-    }
-
-    // 4. Verify HMAC Signature (Timing-safe)
     const secret = process.env.INTER_PLATFORM_SECRET!;
-    const expectedSignature = crypto
-      .createHmac('sha256', secret)
-      .update(`${timestamp}.${rawBody}`)
-      .digest('hex');
 
-    const isSignatureValid = crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(expectedSignature)
-    );
-
-    if (!isSignatureValid) {
-      console.error('CRITICAL: HMAC Signature mismatch.');
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 403 });
+    // 3. Verify Signature & Timing
+    const securityCheck = verifyPlatformBRequest(rawBody, signature, timestamp, secret);
+    if (!securityCheck.isValid) {
+      console.error('B2C Security Check Failed:', securityCheck.error);
+      return NextResponse.json({ error: securityCheck.error }, { status: 403 });
     }
 
-    // 5. Parse and Validate Payload
+    // 4. Parse Payload
     const payload = JSON.parse(rawBody);
-    const { secondary_tx_id, user_id, tx_type, amount, mpesa_number } = payload;
+    const { 
+      secondary_tx_id, 
+      user_id, 
+      tx_type, 
+      amount, 
+      mpesa_number, 
+      callback_url,
+      metadata
+    } = payload;
 
-    if (!secondary_tx_id || !user_id || !tx_type || !amount || !mpesa_number) {
-      return NextResponse.json({ error: 'Malformed payload data. Missing required fields.' }, { status: 400 });
+    // Validate required fields explicitly
+    if (!secondary_tx_id || !user_id || !tx_type || !amount || !mpesa_number || !callback_url) {
+      return NextResponse.json({ error: 'Missing required payload fields' }, { status: 400 });
     }
 
-    // 6. Idempotent Database Insertion (Shadow Ledger)
+    if (tx_type !== 'withdrawal') {
+      return NextResponse.json({ error: 'Invalid tx_type for this endpoint' }, { status: 400 });
+    }
+
+    // 5. Idempotent Shadow Ledger Insertion
     const { data: shadowData, error: dbError } = await supabaseAdmin
       .from('secondary_request_shadow')
       .insert({
         secondary_tx_id,
-        user_id,
         tx_type,
         amount,
         payload_hash: signature,
+        callback_url,
+        // We inject the user_id into metadata so it is passed back to Platform B seamlessly
+        metadata: { ...metadata, user_id, mpesa_number },
         status: 'pending_mpesa'
       })
       .select('id')
@@ -70,46 +65,52 @@ export async function POST(req: Request) {
     if (dbError) {
       if (dbError.code === '23505') { 
         // Postgres unique violation: We already received this transaction ID.
-        return NextResponse.json({ message: 'Transaction already being processed' }, { status: 409 });
+        return NextResponse.json({ 
+          error: 'Withdrawal transaction already being processed',
+          secondary_tx_id 
+        }, { status: 409 });
       }
-      throw new Error(`Database insert failed: ${dbError.message}`);
+      throw new Error(`Shadow Ledger Insert Failed: ${dbError.message}`);
     }
 
-    // 7. Trigger M-Pesa B2C API
+    // 6. Trigger M-Pesa B2C API
     try {
       // Pass the shadowData.id as the Occasion parameter so Safaricom returns it in the webhook
       const mpesaResponse = await initiateB2C(amount, mpesa_number, shadowData.id);
       
-      // M-Pesa accepted the request. It is now in Safaricom's queue.
-      // We will await the final status in the Webhook Receiver.
-      return NextResponse.json({ 
-        success: true, 
-        message: 'Transaction verified and sent to M-Pesa queue.',
-        shadow_id: shadowData.id,
-        mpesa_conversation_id: mpesaResponse.ConversationID
-      });
-
-    } catch (mpesaError: any) {
-      // 8. Handle Immediate M-Pesa Failure (e.g., Invalid Number, Insufficient Till Balance)
-      console.error('M-Pesa Initiation Failed:', mpesaError);
-
-      // Rollback the status in the shadow ledger so it doesn't stay 'pending' forever
+      // 7. Update Shadow Ledger with Safaricom's Tracking ID
+      // B2C uses ConversationID as the primary identifier
       await supabaseAdmin
         .from('secondary_request_shadow')
         .update({ 
-          status: 'failed', 
-          // Storing a custom error column if we added one, otherwise update timestamp
+          mpesa_tracking_id: mpesaResponse.ConversationID 
         })
         .eq('id', shadowData.id);
 
+      // 8. Return success to Platform B
       return NextResponse.json({ 
-        error: 'Safaricom M-Pesa API rejected the request', 
+        success: true, 
+        message: 'Withdrawal queued successfully by M-Pesa',
+        mpesa_tracking_id: mpesaResponse.ConversationID 
+      });
+
+    } catch (mpesaError: any) {
+      // 9. Handle Immediate M-Pesa Failure (e.g., Insufficient Till Balance)
+      console.error('M-Pesa B2C Initiation Failed:', mpesaError.message);
+
+      await supabaseAdmin
+        .from('secondary_request_shadow')
+        .update({ status: 'failed' })
+        .eq('id', shadowData.id);
+
+      return NextResponse.json({ 
+        error: 'Safaricom M-Pesa API rejected the B2C request', 
         details: mpesaError.message 
       }, { status: 502 });
     }
 
   } catch (error: any) {
-    console.error('Gateway Receiver Fatal Error:', error);
+    console.error('B2C Gateway Fatal Error:', error);
     return NextResponse.json({ error: 'Internal gateway server error' }, { status: 500 });
   }
 }
