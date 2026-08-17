@@ -53,14 +53,22 @@ export async function POST(req: Request) {
     }
 
 
-      // Insert into Platform A's core wallet ledger for bookkeeping
-    await supabaseAdmin.from('core_wallet_ledger').insert({
-      user_id: shadowTx.metadata?.user_id || 'SYSTEM',
-      amount: shadowTx.amount,
-      tx_type: shadowTx.tx_type, // 'checkout', 'subscription', or 'withdrawal'
-      shadow_request_id: shadowTx.id,
-      description: `M-Pesa ${shadowTx.tx_type} settlement (${receiptNumber || 'N/A'})`
-    });
+     if (isSuccess && shadowTx.status !== 'completed') {
+      // For production safety, updating both tables should ideally be an RPC call for atomic transactions.
+      // Doing it sequentially here: Ledger first, then shadow status.
+      const { error: ledgerError } = await supabaseAdmin.from('core_wallet_ledger').insert({
+        user_id: shadowTx.metadata?.user_id || 'PLATFORM_B_SYSTEM',
+        amount: shadowTx.amount,
+        tx_type: shadowTx.tx_type, // 'checkout' or 'subscription'
+        shadow_request_id: shadowTx.id,
+        description: `M-Pesa STK Push Settlement - Ref: ${shadowTx.metadata?.account_reference || 'N/A'}`
+      });
+
+      if (ledgerError) {
+        console.error('CRITICAL: Failed to write to core_wallet_ledger:', ledgerError);
+        // We do not stop execution. We must still notify Platform B and update the shadow table.
+      }
+    }
     // 4. Update the Shadow Ledger Status
     await supabaseAdmin
       .from('secondary_request_shadow')
