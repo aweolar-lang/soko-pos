@@ -52,6 +52,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted but not found" });
     }
 
+
+      // Insert into Platform A's core wallet ledger for bookkeeping
+    await supabaseAdmin.from('core_wallet_ledger').insert({
+      user_id: shadowTx.metadata?.user_id || 'SYSTEM',
+      amount: shadowTx.amount,
+      tx_type: shadowTx.tx_type, // 'checkout', 'subscription', or 'withdrawal'
+      shadow_request_id: shadowTx.id,
+      description: `M-Pesa ${shadowTx.tx_type} settlement (${receiptNumber || 'N/A'})`
+    });
     // 4. Update the Shadow Ledger Status
     await supabaseAdmin
       .from('secondary_request_shadow')
