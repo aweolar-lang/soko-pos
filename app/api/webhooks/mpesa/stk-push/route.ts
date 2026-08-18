@@ -103,7 +103,7 @@ export async function POST(req: Request) {
       .from('secondary_request_shadow')
       .update({ 
         status: finalStatus,
-        mpesa_receipt_number: receiptNumber,
+        mpesa_receipt: receiptNumber,
         callback_synced: callbackSuccessful,
         error_log: callbackErrorLog,
         updated_at: new Date().toISOString()
