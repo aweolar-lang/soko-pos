@@ -56,6 +56,7 @@ export async function POST(req: Request) {
       .from('secondary_request_shadow')
       .insert({
         secondary_tx_id,
+        user_id: actualUserId,
         tx_type,
         amount,
         payload_hash: signature, // Storing the signature acts as an extra audit trail
