@@ -96,3 +96,4 @@ export async function POST(req: Request) {
     // Returning 500 forces Daraja to retry the timeout notification
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
+}
