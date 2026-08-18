@@ -31,6 +31,7 @@ export async function POST(req: Request) {
     const { 
       secondary_tx_id, 
       phone_number, 
+      user_id,
       amount, 
       tx_type, 
       account_reference, 
