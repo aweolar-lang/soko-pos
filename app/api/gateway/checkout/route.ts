@@ -39,6 +39,12 @@ export async function POST(req: Request) {
       metadata 
     } = payload;
 
+    const actualUserId = user_id || metadata?.user_id;
+
+    if (!actualUserId) {
+      return NextResponse.json({ error: 'Missing user_id.' }, { status: 400 });
+    }
+
     // Validate required fields explicitly
     if (!secondary_tx_id || !phone_number || !amount || !tx_type || !account_reference || !callback_url) {
       return NextResponse.json({ error: 'Missing required payload fields' }, { status: 400 });
