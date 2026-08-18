@@ -42,7 +42,7 @@ export async function POST(req: Request) {
     // We look it up using the ConversationID we saved during initiation
     const { data: shadowTx, error: fetchError } = await supabaseAdmin
       .from('secondary_request_shadow')
-      .select('id, secondary_tx_id, callback_url, metadata')
+      .select('*')
       .eq('mpesa_tracking_id', ConversationID)
       .single();
 
