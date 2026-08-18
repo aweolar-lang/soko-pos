@@ -51,6 +51,7 @@ export async function POST(req: Request) {
       .from('secondary_request_shadow')
       .insert({
         secondary_tx_id,
+        user_id,
         tx_type,
         amount,
         payload_hash: signature,
@@ -78,14 +79,19 @@ export async function POST(req: Request) {
       // Pass the shadowData.id as the Occasion parameter so Safaricom returns it in the webhook
       const mpesaResponse = await initiateB2C(amount, mpesa_number, shadowData.id);
       
-      // 7. Update Shadow Ledger with Safaricom's Tracking ID
-      // B2C uses ConversationID as the primary identifier
-      await supabaseAdmin
+        // 7. Update Shadow Ledger with Safaricom's Tracking ID
+        // B2C uses ConversationID as the primary identifier
+      const { error: updateError } = await supabaseAdmin
         .from('secondary_request_shadow')
         .update({ 
           mpesa_tracking_id: mpesaResponse.ConversationID 
         })
         .eq('id', shadowData.id);
+
+      if (updateError) {
+        // CRITICAL: M-Pesa queued the withdrawal, but DB update failed.
+        console.error(`🚨 CRITICAL B2C DESYNC: Failed to save ConversationID ${mpesaResponse.ConversationID} for Shadow ID ${shadowData.id}. Error: ${updateError.message}`);
+      }
 
       // 8. Return success to Platform B
       return NextResponse.json({ 
@@ -100,13 +106,17 @@ export async function POST(req: Request) {
 
       await supabaseAdmin
         .from('secondary_request_shadow')
-        .update({ status: 'failed' })
+        .update({ 
+          status: 'failed',
+          error_log: mpesaError.message || 'B2C rejected by Safaricom'
+        })
         .eq('id', shadowData.id);
 
       return NextResponse.json({ 
         error: 'Safaricom M-Pesa API rejected the B2C request', 
         details: mpesaError.message 
       }, { status: 502 });
+      
     }
 
   } catch (error: any) {

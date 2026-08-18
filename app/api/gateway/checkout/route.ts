@@ -81,15 +81,18 @@ export async function POST(req: Request) {
     // 6. Trigger M-Pesa STK Push
     try {
       const mpesaResponse = await initiateStkPush(amount, phone_number, account_reference);
-      
-      // 7. Update Shadow Ledger with M-Pesa Tracking ID
-      // This is crucial: We need this ID to match Safaricom's webhook later.
-      await supabaseAdmin
+
+        // 7. Update Shadow Ledger with M-Pesa Tracking ID
+      const { error: updateError } = await supabaseAdmin
         .from('secondary_request_shadow')
-        .update({ 
-          mpesa_tracking_id: mpesaResponse.CheckoutRequestID 
-        })
+        .update({ mpesa_tracking_id: mpesaResponse.CheckoutRequestID })
         .eq('id', shadowData.id);
+
+      if (updateError) {
+        // CRITICAL: The user received the STK push, but we failed to save the ID.
+        // If they pay, the webhook will orphan. Log this to a critical alerting system!
+        console.error(` CRITICAL: Failed to save CheckoutRequestID ${mpesaResponse.CheckoutRequestID} for Shadow ID ${shadowData.id}. Error: ${updateError.message}`);
+      }
 
       // 8. Return success to Platform B
       return NextResponse.json({ 
@@ -104,7 +107,11 @@ export async function POST(req: Request) {
       // Rollback the status so it doesn't stay 'pending' forever
       await supabaseAdmin
         .from('secondary_request_shadow')
-        .update({ status: 'failed' })
+        .update({ 
+          status: 'failed',
+          error_log: mpesaError.message || 'STK Push rejected'
+
+         })
         .eq('id', shadowData.id);
 
       return NextResponse.json({ 

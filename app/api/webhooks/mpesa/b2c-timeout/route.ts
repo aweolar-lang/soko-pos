@@ -25,28 +25,40 @@ export async function POST(req: Request) {
       return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted" });
     }
 
-    // 2. Locate and update transaction as failed in shadow ledger
-    const { data: shadowTx } = await supabaseAdmin
+    // 2. Locate the transaction in the shadow ledger FIRST
+    const { data: shadowTx, error: fetchError } = await supabaseAdmin
       .from('secondary_request_shadow')
-      .update({ status: 'failed', updated_at: new Date().toISOString() })
+      .select('*')
       .eq('mpesa_tracking_id', conversationId)
-      .select('secondary_tx_id, callback_url, metadata')
       .single();
 
-    // 3. Notify Platform B of the timeout so it can refund the user's balance
-    if (shadowTx) {
-      const platformBPayload = {
-        secondary_tx_id: shadowTx.secondary_tx_id,
-        status: 'failed',
-        receipt_number: null,
-        message: 'M-Pesa system timeout during withdrawal processing',
-        metadata: shadowTx.metadata
-      };
+    if (fetchError || !shadowTx) {
+      console.error(`Timeout tx not found for ConversationID: ${conversationId}`);
+      return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted but not found" });
+    }
 
-      const secret = process.env.INTER_PLATFORM_SECRET!;
-      const { signature, timestamp, stringifiedPayload } = signOutgoingPayload(platformBPayload, secret);
+    // Protection against race conditions: Don't fail an already completed/failed tx
+    if (shadowTx.status === 'completed' || shadowTx.status === 'failed') {
+      return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted" });
+    }
 
-      await fetch(shadowTx.callback_url, {
+    // 3. Notify Platform B of the timeout
+    const platformBPayload = {
+      secondary_tx_id: shadowTx.secondary_tx_id,
+      status: 'failed',
+      receipt_number: null,
+      message: 'M-Pesa system timeout during withdrawal processing',
+      metadata: shadowTx.metadata
+    };
+
+    const secret = process.env.INTER_PLATFORM_SECRET!;
+    const { signature, timestamp, stringifiedPayload } = signOutgoingPayload(platformBPayload, secret);
+
+    let callbackSuccessful = false;
+    let callbackErrorLog = null;
+
+    try {
+      const bResponse = await fetch(shadowTx.callback_url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -54,12 +66,33 @@ export async function POST(req: Request) {
           'x-timestamp': timestamp,
         },
         body: stringifiedPayload,
-      }).catch((err) => console.error('Failed notifying Platform B of timeout:', err));
+      });
+
+      if (bResponse.ok) {
+        callbackSuccessful = true;
+      } else {
+        callbackErrorLog = `Platform B returned HTTP ${bResponse.status}`;
+      }
+    } catch (bError: any) {
+      console.error(`Network error reaching Platform B for timeout sync: ${bError.message}`);
+      callbackErrorLog = bError.message;
     }
 
+    // 4. Update the shadow ledger LAST
+    // This securely records whether Platform B actually received the failure notice.
+    await supabaseAdmin
+      .from('secondary_request_shadow')
+      .update({ 
+        status: 'failed', 
+        callback_synced: callbackSuccessful,
+        error_log: callbackErrorLog || 'M-Pesa system timeout',
+        updated_at: new Date().toISOString() 
+      })
+      .eq('id', shadowTx.id);
+
     return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted" });
-  } catch (error) {
-    console.error('B2C Timeout Error:', error);
-    return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted with internal errors" });
+  } catch (error: any) {
+    console.error('B2C Timeout Webhook Fatal Error:', error);
+    // Returning 500 forces Daraja to retry the timeout notification
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
-}

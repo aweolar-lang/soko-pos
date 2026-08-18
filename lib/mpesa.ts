@@ -85,22 +85,32 @@ function generateStkPassword(timestamp: string): string {
 /**
  * Encrypts the B2C Initiator Password using Safaricom's public cert
  */
+/**
+ * Encrypts the B2C Initiator Password using Safaricom's public cert.
+ * Daraja strictly requires RSA_NO_PADDING and a 256-byte padded buffer.
+ */
 function generateB2cSecurityCredential(): string {
   const password = process.env.MPESA_INITIATOR_PASSWORD!;
   const certString = process.env.MPESA_PUBLIC_CERTIFICATE!.replace(/\\n/g, '\n'); 
   
-  const buffer = Buffer.from(password);
+  // 1. Convert password to buffer
+  const passwordBuffer = Buffer.from(password, 'utf8');
+  
+  // 2. Daraja requires a 256-byte buffer for RSA_NO_PADDING. We must pad it manually.
+  const paddedBuffer = Buffer.alloc(256);
+  passwordBuffer.copy(paddedBuffer, 256 - passwordBuffer.length); // Pad from the left
+
+  // 3. Encrypt using NO PADDING
   const encrypted = crypto.publicEncrypt(
     {
       key: certString,
-      padding: crypto.constants.RSA_PKCS1_PADDING,
+      padding: crypto.constants.RSA_NO_PADDING,
     },
-    buffer
+    paddedBuffer
   );
 
   return encrypted.toString('base64');
 }
-
 // ============================================================================
 // API INITIATORS
 // ============================================================================

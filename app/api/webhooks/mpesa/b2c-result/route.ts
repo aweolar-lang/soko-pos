@@ -69,28 +69,39 @@ export async function POST(req: Request) {
         // We do not stop execution. We must still notify Platform B and update the shadow table.
       }
     }
-    // 4. Update the Shadow Ledger Status
-    await supabaseAdmin
-      .from('secondary_request_shadow')
-      .update({ 
-        status: finalStatus,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', shadowTx.id);
+    // 4. Process Ledger Update (Must succeed before continuing)
+    if (isSuccess && shadowTx.status !== 'completed') {
+      const { error: ledgerError } = await supabaseAdmin.from('core_wallet_ledger').insert({
+        user_id: shadowTx.user_id || 'UNKNOWN_SYSTEM_ORPHAN', // Fixed column reference
+        amount: shadowTx.amount, // Ensure your DB handles this as a deduction based on tx_type='withdrawal'
+        tx_type: shadowTx.tx_type, 
+        shadow_request_id: shadowTx.id,
+        description: `M-Pesa B2C Withdrawal - Phone: ${shadowTx.metadata?.mpesa_number || 'N/A'}` // Fixed description
+      });
+
+      if (ledgerError) {
+        console.error('CRITICAL: Failed to write B2C deduction to core_wallet_ledger:', ledgerError);
+        // Throwing forces a 500 response. Daraja will keep the webhook in its retry queue.
+        throw new Error('Database transaction failed. Forcing Daraja retry.');
+      }
+    }
 
     // 5. Build and Sign the payload to send back to Platform B
     const platformBPayload = {
       secondary_tx_id: shadowTx.secondary_tx_id,
       status: finalStatus,
-      receipt_number: TransactionID || null, // TransactionID is the M-Pesa Receipt Number (e.g., QWE123RTY)
+      receipt_number: TransactionID || null, // e.g., QWE123RTY
       message: ResultDesc,
-      metadata: shadowTx.metadata // Includes the user_id and mpesa_number we injected earlier
+      metadata: shadowTx.metadata 
     };
 
     const secret = process.env.INTER_PLATFORM_SECRET!;
     const { signature, timestamp, stringifiedPayload } = signOutgoingPayload(platformBPayload, secret);
 
-    // 6. Push the result to Platform B's callback URL
+    let callbackSuccessful = false;
+    let callbackErrorLog = null;
+
+    // 6. Push the result to Platform B
     try {
       const bResponse = await fetch(shadowTx.callback_url, {
         method: 'POST',
@@ -102,19 +113,35 @@ export async function POST(req: Request) {
         body: stringifiedPayload,
       });
 
-      if (!bResponse.ok) {
-        console.error(`Platform B B2C Webhook Delivery Failed with status: ${bResponse.status}`);
+      if (bResponse.ok) {
+        callbackSuccessful = true;
+      } else {
+        callbackErrorLog = `Platform B returned HTTP ${bResponse.status}`;
       }
     } catch (bError: any) {
       console.error(`Network error reaching Platform B for B2C sync: ${bError.message}`);
+      callbackErrorLog = bError.message;
     }
 
-    // 7. Acknowledge receipt to Safaricom
+    // 7. Commit Final State to Shadow Ledger
+    // Done LAST so we can accurately save the callback status.
+    await supabaseAdmin
+      .from('secondary_request_shadow')
+      .update({ 
+        status: finalStatus,
+        mpesa_receipt_number: TransactionID || null,
+        callback_synced: callbackSuccessful,
+        error_log: callbackErrorLog,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', shadowTx.id);
+
+    // 8. Acknowledge receipt to Safaricom
     return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted" });
 
   } catch (error: any) {
     console.error('B2C Result Webhook Fatal Error:', error);
-    // Tell Safaricom we got it to prevent queue clogging
-    return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted with internal errors" });
+    // Returning 500 forces Safaricom to retry. DO NOT return ResultCode 0 on fatal app errors.
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

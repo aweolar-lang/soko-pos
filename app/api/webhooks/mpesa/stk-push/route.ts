@@ -45,31 +45,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted but not found" });
     }
 
-    // 3. Process Ledger and Shadow Updates
+   // 3. Process Ledger Update (Must succeed before continuing)
     if (isSuccess && shadowTx.status !== 'completed') {
-      // For production safety, updating both tables should ideally be an RPC call for atomic transactions.
-      // Doing it sequentially here: Ledger first, then shadow status.
       const { error: ledgerError } = await supabaseAdmin.from('core_wallet_ledger').insert({
-        user_id: shadowTx.metadata?.user_id || 'PLATFORM_B_SYSTEM',
+        user_id: shadowTx.user_id || 'UNKNOWN_SYSTEM_ORPHAN', // Fixed column reference
         amount: shadowTx.amount,
-        tx_type: shadowTx.tx_type, // 'checkout' or 'subscription'
+        tx_type: shadowTx.tx_type, 
         shadow_request_id: shadowTx.id,
         description: `M-Pesa STK Push Settlement - Ref: ${shadowTx.metadata?.account_reference || 'N/A'}`
       });
 
       if (ledgerError) {
         console.error('CRITICAL: Failed to write to core_wallet_ledger:', ledgerError);
-        // We do not stop execution. We must still notify Platform B and update the shadow table.
+        // Throwing forces a 500 response. Daraja will keep the webhook in its retry queue.
+        throw new Error('Database transaction failed. Forcing Daraja retry.');
       }
     }
-
-    await supabaseAdmin
-      .from('secondary_request_shadow')
-      .update({ 
-        status: finalStatus,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', shadowTx.id);
 
     // 4. Notify Platform B
     const platformBPayload = {
@@ -83,8 +74,11 @@ export async function POST(req: Request) {
     const secret = process.env.INTER_PLATFORM_SECRET!;
     const { signature, timestamp, stringifiedPayload } = signOutgoingPayload(platformBPayload, secret);
 
+    let callbackSuccessful = false;
+    let callbackErrorLog = null;
+
     try {
-      await fetch(shadowTx.callback_url, {
+      const bResponse = await fetch(shadowTx.callback_url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -93,11 +87,30 @@ export async function POST(req: Request) {
         },
         body: stringifiedPayload,
       });
+      
+      if (bResponse.ok) {
+        callbackSuccessful = true;
+      } else {
+        callbackErrorLog = `Platform B returned HTTP ${bResponse.status}`;
+      }
     } catch (bError: any) {
       console.error(`Network error reaching Platform B: ${bError.message}`);
+      callbackErrorLog = bError.message;
     }
 
-    // 5. Acknowledge to Safaricom
+    // 5. Commit Final State to Shadow Ledger
+    await supabaseAdmin
+      .from('secondary_request_shadow')
+      .update({ 
+        status: finalStatus,
+        mpesa_receipt_number: receiptNumber,
+        callback_synced: callbackSuccessful,
+        error_log: callbackErrorLog,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', shadowTx.id);
+
+    // 6. Acknowledge to Safaricom
     return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted" });
 
   } catch (error: any) {
