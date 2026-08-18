@@ -10,7 +10,12 @@ const supabaseAdmin = createClient(
 export async function POST(req: Request) {
   try {
     const rawBody = await req.text();
-    const payload = JSON.parse(rawBody);
+    let payload: any;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ ResultCode: 1, ResultDesc: "Rejected: Invalid JSON payload" });
+    }
 
     // 1. Safaricom B2C Result Payload Structure
     const result = payload?.Result;
@@ -23,23 +28,27 @@ export async function POST(req: Request) {
       ResultCode, 
       ResultDesc, 
       ConversationID, 
-      TransactionID,
-      ReferenceData
+      TransactionID 
     } = result;
 
     // ResultCode 0 means the money successfully left your till and hit the user's phone.
     const isSuccess = ResultCode === 0;
     const finalStatus = isSuccess ? 'completed' : 'failed';
 
-    // 2. Log the raw webhook immediately for financial audit trails
-    await supabaseAdmin.from('mpesa_webhook_logs').insert({
-      tracking_id: ConversationID,
-      raw_payload: payload,
-      webhook_type: 'b2c_result'
-    });
+    // 2. Log the raw webhook matching mpesa_webhook_logs schema
+    const { data: logData } = await supabaseAdmin
+      .from('mpesa_webhook_logs')
+      .insert({
+        transaction_type: 'b2c_result',
+        mpesa_tracking_id: ConversationID,
+        mpesa_receipt_number: TransactionID || null,
+        raw_payload: payload,
+        processing_status: 'unprocessed'
+      })
+      .select('id')
+      .single();
 
     // 3. Find the original transaction in the shadow ledger
-    // We look it up using the ConversationID we saved during initiation
     const { data: shadowTx, error: fetchError } = await supabaseAdmin
       .from('secondary_request_shadow')
       .select('*')
@@ -47,42 +56,25 @@ export async function POST(req: Request) {
       .single();
 
     if (fetchError || !shadowTx) {
-      console.error(`B2C Transaction not found for ConversationID: ${ConversationID}`);
+      console.warn(`B2C Transaction not found for ConversationID: ${ConversationID}`);
       // Return success to Safaricom so they clear it from their retry queue
-      return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted but not found" });
+      return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted but shadow record not found" });
     }
 
-
-     if (isSuccess && shadowTx.status !== 'completed') {
-      // For production safety, updating both tables should ideally be an RPC call for atomic transactions.
-      // Doing it sequentially here: Ledger first, then shadow status.
-      const { error: ledgerError } = await supabaseAdmin.from('core_wallet_ledger').insert({
-        user_id: shadowTx.metadata?.user_id || 'PLATFORM_B_SYSTEM',
-        amount: shadowTx.amount,
-        tx_type: shadowTx.tx_type, // 'checkout' or 'subscription'
-        shadow_request_id: shadowTx.id,
-        description: `M-Pesa STK Push Settlement - Ref: ${shadowTx.metadata?.account_reference || 'N/A'}`
-      });
-
-      if (ledgerError) {
-        console.error('CRITICAL: Failed to write to core_wallet_ledger:', ledgerError);
-        // We do not stop execution. We must still notify Platform B and update the shadow table.
-      }
-    }
-    // 4. Process Ledger Update (Must succeed before continuing)
+    // 4. Process Ledger Update (Idempotent execution using shadowTx.user_id)
     if (isSuccess && shadowTx.status !== 'completed') {
       const { error: ledgerError } = await supabaseAdmin.from('core_wallet_ledger').insert({
-        user_id: shadowTx.user_id || 'UNKNOWN_SYSTEM_ORPHAN', // Fixed column reference
-        amount: shadowTx.amount, // Ensure your DB handles this as a deduction based on tx_type='withdrawal'
+        user_id: shadowTx.user_id, // Valid UUID guaranteed by secondary schema
+        amount: shadowTx.amount, // DB should handle this as a deduction based on tx_type='withdrawal'
         tx_type: shadowTx.tx_type, 
         shadow_request_id: shadowTx.id,
-        description: `M-Pesa B2C Withdrawal - Phone: ${shadowTx.metadata?.mpesa_number || 'N/A'}` // Fixed description
+        description: `M-Pesa B2C Withdrawal - Phone: ${shadowTx.metadata?.mpesa_number || 'N/A'}`
       });
 
       if (ledgerError) {
         console.error('CRITICAL: Failed to write B2C deduction to core_wallet_ledger:', ledgerError);
         // Throwing forces a 500 response. Daraja will keep the webhook in its retry queue.
-        throw new Error('Database transaction failed. Forcing Daraja retry.');
+        throw new Error(`Database transaction failed: ${ledgerError.message}`);
       }
     }
 
@@ -99,7 +91,7 @@ export async function POST(req: Request) {
     const { signature, timestamp, stringifiedPayload } = signOutgoingPayload(platformBPayload, secret);
 
     let callbackSuccessful = false;
-    let callbackErrorLog = null;
+    let callbackErrorLog: string | null = null;
 
     // 6. Push the result to Platform B
     try {
@@ -124,19 +116,26 @@ export async function POST(req: Request) {
     }
 
     // 7. Commit Final State to Shadow Ledger
-    // Done LAST so we can accurately save the callback status.
     await supabaseAdmin
       .from('secondary_request_shadow')
       .update({ 
         status: finalStatus,
-        mpesa_receipt_number: TransactionID || null,
+        mpesa_receipt: TransactionID || null,
         callback_synced: callbackSuccessful,
         error_log: callbackErrorLog,
         updated_at: new Date().toISOString()
       })
       .eq('id', shadowTx.id);
 
-    // 8. Acknowledge receipt to Safaricom
+    // 8. Update Webhook Log Processing Status
+    if (logData?.id) {
+      await supabaseAdmin
+        .from('mpesa_webhook_logs')
+        .update({ processing_status: 'processed' })
+        .eq('id', logData.id);
+    }
+
+    // 9. Acknowledge receipt to Safaricom
     return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted" });
 
   } catch (error: any) {

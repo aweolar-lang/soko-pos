@@ -24,7 +24,8 @@ export function verifyPlatformBRequest(
 
   // Prevent Replay Attacks: Enforce a strict 5-minute window
   const timeDifference = Date.now() - requestTime;
-  if (timeDifference > 5 * 60 * 1000 || timeDifference < 0) {
+  // Allow up to 60 seconds (60000ms) of clock drift for "future" timestamps
+if (timeDifference > 5 * 60 * 1000 || timeDifference < -60000) {
     return { isValid: false, error: 'Request expired or timestamp is in the future.' };
   }
 

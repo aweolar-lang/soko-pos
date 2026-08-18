@@ -25,8 +25,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: securityCheck.error }, { status: 403 });
     }
 
-    // 4. Parse Payload
-    const payload = JSON.parse(rawBody);
+    // 4. Safely Parse Payload
+    let payload: any;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON payload structure.' }, { status: 400 });
+    }
+
     const { 
       secondary_tx_id, 
       user_id, 
@@ -38,12 +44,17 @@ export async function POST(req: Request) {
     } = payload;
 
     // Validate required fields explicitly
-    if (!secondary_tx_id || !user_id || !tx_type || !amount || !mpesa_number || !callback_url) {
-      return NextResponse.json({ error: 'Missing required payload fields' }, { status: 400 });
+    if (!secondary_tx_id || !user_id || !tx_type || amount === undefined || amount === null || !mpesa_number || !callback_url) {
+      return NextResponse.json({ error: 'Missing required payload fields.' }, { status: 400 });
     }
 
     if (tx_type !== 'withdrawal') {
-      return NextResponse.json({ error: 'Invalid tx_type for this endpoint' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid tx_type for this endpoint. Expected "withdrawal".' }, { status: 400 });
+    }
+
+    const numericAmount = Number(amount);
+    if (isNaN(numericAmount) || numericAmount <= 0) {
+      return NextResponse.json({ error: 'Amount must be a positive number greater than 0.' }, { status: 400 });
     }
 
     // 5. Idempotent Shadow Ledger Insertion
@@ -53,7 +64,7 @@ export async function POST(req: Request) {
         secondary_tx_id,
         user_id,
         tx_type,
-        amount,
+        amount: numericAmount,
         payload_hash: signature,
         callback_url,
         // We inject the user_id into metadata so it is passed back to Platform B seamlessly
@@ -65,58 +76,78 @@ export async function POST(req: Request) {
 
     if (dbError) {
       if (dbError.code === '23505') { 
-        // Postgres unique violation: We already received this transaction ID.
+        // Postgres unique violation: Withdrawal already received
         return NextResponse.json({ 
           error: 'Withdrawal transaction already being processed',
           secondary_tx_id 
         }, { status: 409 });
       }
-      throw new Error(`Shadow Ledger Insert Failed: ${dbError.message}`);
+
+      if (dbError.code === '22P02') {
+        return NextResponse.json({
+          error: 'Invalid UUID format provided for user_id or secondary_tx_id.',
+          details: dbError.message
+        }, { status: 400 });
+      }
+
+      if (dbError.code === '23514') {
+        return NextResponse.json({
+          error: 'Database constraint violation.',
+          details: dbError.message
+        }, { status: 400 });
+      }
+
+      console.error('Shadow Ledger Insert Error:', dbError);
+      return NextResponse.json({ error: `Shadow Ledger Insert Failed: ${dbError.message}` }, { status: 500 });
+    }
+
+    if (!shadowData || !shadowData.id) {
+      return NextResponse.json({ error: 'Failed to initialize transaction record.' }, { status: 500 });
     }
 
     // 6. Trigger M-Pesa B2C API
     try {
-      // Pass the shadowData.id as the Occasion parameter so Safaricom returns it in the webhook
-      const mpesaResponse = await initiateB2C(amount, mpesa_number, shadowData.id);
+      // Pass shadowData.id as the Occasion parameter so Safaricom returns it in the webhook
+      const mpesaResponse = await initiateB2C(numericAmount, mpesa_number, shadowData.id);
       
-        // 7. Update Shadow Ledger with Safaricom's Tracking ID
-        // B2C uses ConversationID as the primary identifier
+      const trackingId = mpesaResponse.ConversationID || mpesaResponse.OriginatorConversationID;
+
+      // 7. Update Shadow Ledger with Safaricom's Tracking ID
       const { error: updateError } = await supabaseAdmin
         .from('secondary_request_shadow')
         .update({ 
-          mpesa_tracking_id: mpesaResponse.ConversationID 
+          mpesa_tracking_id: trackingId 
         })
         .eq('id', shadowData.id);
 
       if (updateError) {
-        // CRITICAL: M-Pesa queued the withdrawal, but DB update failed.
-        console.error(`🚨 CRITICAL B2C DESYNC: Failed to save ConversationID ${mpesaResponse.ConversationID} for Shadow ID ${shadowData.id}. Error: ${updateError.message}`);
+        console.error(`🚨 CRITICAL B2C DESYNC: Failed to save ConversationID ${trackingId} for Shadow ID ${shadowData.id}. Error: ${updateError.message}`);
       }
 
       // 8. Return success to Platform B
       return NextResponse.json({ 
         success: true, 
         message: 'Withdrawal queued successfully by M-Pesa',
-        mpesa_tracking_id: mpesaResponse.ConversationID 
+        mpesa_tracking_id: trackingId 
       });
 
     } catch (mpesaError: any) {
-      // 9. Handle Immediate M-Pesa Failure (e.g., Insufficient Till Balance)
       console.error('M-Pesa B2C Initiation Failed:', mpesaError.message);
 
-      await supabaseAdmin
-        .from('secondary_request_shadow')
-        .update({ 
-          status: 'failed',
-          error_log: mpesaError.message || 'B2C rejected by Safaricom'
-        })
-        .eq('id', shadowData.id);
+      if (shadowData?.id) {
+        await supabaseAdmin
+          .from('secondary_request_shadow')
+          .update({ 
+            status: 'failed',
+            error_log: mpesaError.message || 'B2C rejected by Safaricom'
+          })
+          .eq('id', shadowData.id);
+      }
 
       return NextResponse.json({ 
         error: 'Safaricom M-Pesa API rejected the B2C request', 
         details: mpesaError.message 
       }, { status: 502 });
-      
     }
 
   } catch (error: any) {

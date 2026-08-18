@@ -26,8 +26,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: securityCheck.error }, { status: 403 });
     }
 
-    // 4. Parse Payload
-    const payload = JSON.parse(rawBody);
+    // 4. Safely Parse Payload
+    let payload: any;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON payload structure.' }, { status: 400 });
+    }
+
     const { 
       secondary_tx_id, 
       phone_number, 
@@ -46,8 +52,14 @@ export async function POST(req: Request) {
     }
 
     // Validate required fields explicitly
-    if (!secondary_tx_id || !phone_number || !amount || !tx_type || !account_reference || !callback_url) {
-      return NextResponse.json({ error: 'Missing required payload fields' }, { status: 400 });
+    if (!secondary_tx_id || !phone_number || amount === undefined || amount === null || !tx_type || !account_reference || !callback_url) {
+      return NextResponse.json({ error: 'Missing required payload fields.' }, { status: 400 });
+    }
+
+    // Validate amount is positive and numeric (matches DB check constraint)
+    const numericAmount = Number(amount);
+    if (isNaN(numericAmount) || numericAmount <= 0) {
+      return NextResponse.json({ error: 'Amount must be a positive number greater than 0.' }, { status: 400 });
     }
 
     // 5. Idempotent Shadow Ledger Insertion
@@ -58,8 +70,8 @@ export async function POST(req: Request) {
         secondary_tx_id,
         user_id: actualUserId,
         tx_type,
-        amount,
-        payload_hash: signature, // Storing the signature acts as an extra audit trail
+        amount: numericAmount,
+        payload_hash: signature, // Storing signature as an audit trail
         callback_url,
         metadata,
         status: 'pending_mpesa'
@@ -68,30 +80,50 @@ export async function POST(req: Request) {
       .single();
 
     if (dbError) {
+      // Postgres error check 1: Duplicate secondary_tx_id (Unique constraint violation)
       if (dbError.code === '23505') { 
-        // Postgres unique violation: Platform B retried an already existing request
         return NextResponse.json({ 
           error: 'Transaction already being processed',
           secondary_tx_id 
         }, { status: 409 });
       }
-      throw new Error(`Shadow Ledger Insert Failed: ${dbError.message}`);
+
+      // Postgres error check 2: Malformed UUID string format
+      if (dbError.code === '22P02') {
+        return NextResponse.json({
+          error: 'Invalid UUID format provided for user_id or secondary_tx_id.',
+          details: dbError.message
+        }, { status: 400 });
+      }
+
+      // Postgres error check 3: Check constraint violation (e.g., amount <= 0)
+      if (dbError.code === '23514') {
+        return NextResponse.json({
+          error: 'Database constraint violation.',
+          details: dbError.message
+        }, { status: 400 });
+      }
+
+      console.error('Shadow Ledger Insert Error:', dbError);
+      return NextResponse.json({ error: `Shadow Ledger Insert Failed: ${dbError.message}` }, { status: 500 });
+    }
+
+    if (!shadowData || !shadowData.id) {
+      return NextResponse.json({ error: 'Failed to initialize transaction record.' }, { status: 500 });
     }
 
     // 6. Trigger M-Pesa STK Push
     try {
-      const mpesaResponse = await initiateStkPush(amount, phone_number, account_reference);
+      const mpesaResponse = await initiateStkPush(numericAmount, phone_number, account_reference);
 
-        // 7. Update Shadow Ledger with M-Pesa Tracking ID
+      // 7. Update Shadow Ledger with M-Pesa Tracking ID
       const { error: updateError } = await supabaseAdmin
         .from('secondary_request_shadow')
         .update({ mpesa_tracking_id: mpesaResponse.CheckoutRequestID })
         .eq('id', shadowData.id);
 
       if (updateError) {
-        // CRITICAL: The user received the STK push, but we failed to save the ID.
-        // If they pay, the webhook will orphan. Log this to a critical alerting system!
-        console.error(` CRITICAL: Failed to save CheckoutRequestID ${mpesaResponse.CheckoutRequestID} for Shadow ID ${shadowData.id}. Error: ${updateError.message}`);
+        console.error(`CRITICAL: Failed to save CheckoutRequestID ${mpesaResponse.CheckoutRequestID} for Shadow ID ${shadowData.id}. Error: ${updateError.message}`);
       }
 
       // 8. Return success to Platform B
@@ -104,20 +136,19 @@ export async function POST(req: Request) {
     } catch (mpesaError: any) {
       console.error('M-Pesa STK Push Failed:', mpesaError.message);
 
-      // Rollback the status so it doesn't stay 'pending' forever
+      // Rollback status so it doesn't stay 'pending_mpesa' forever
       await supabaseAdmin
         .from('secondary_request_shadow')
         .update({ 
           status: 'failed',
-          error_log: mpesaError.message || 'STK Push rejected'
-
-         })
+          error_log: mpesaError.message || 'STK Push rejected by Safaricom'
+        })
         .eq('id', shadowData.id);
 
       return NextResponse.json({ 
         error: 'Safaricom M-Pesa API rejected the request', 
         details: mpesaError.message 
-      }, { status: 502 }); // 502 Bad Gateway indicates the upstream (M-Pesa) failed
+      }, { status: 502 });
     }
 
   } catch (error: any) {

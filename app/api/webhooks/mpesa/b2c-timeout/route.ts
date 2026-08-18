@@ -10,16 +10,26 @@ const supabaseAdmin = createClient(
 export async function POST(req: Request) {
   try {
     const rawBody = await req.text();
-    const payload = JSON.parse(rawBody);
+    let payload: any;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ ResultCode: 1, ResultDesc: "Rejected: Invalid JSON payload" });
+    }
 
     const conversationId = payload?.Result?.ConversationID || payload?.ConversationID;
 
-    // 1. Log the timeout raw event
-    await supabaseAdmin.from('mpesa_webhook_logs').insert({
-      tracking_id: conversationId || 'TIMEOUT_UNKNOWN',
-      raw_payload: payload,
-      webhook_type: 'b2c_timeout'
-    });
+    // 1. Log the timeout raw event matching mpesa_webhook_logs schema
+    const { data: logData } = await supabaseAdmin
+      .from('mpesa_webhook_logs')
+      .insert({
+        transaction_type: 'b2c_timeout',
+        mpesa_tracking_id: conversationId || 'TIMEOUT_UNKNOWN',
+        raw_payload: payload,
+        processing_status: 'unprocessed'
+      })
+      .select('id')
+      .single();
 
     if (!conversationId) {
       return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted" });
@@ -33,12 +43,15 @@ export async function POST(req: Request) {
       .single();
 
     if (fetchError || !shadowTx) {
-      console.error(`Timeout tx not found for ConversationID: ${conversationId}`);
-      return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted but not found" });
+      console.warn(`Timeout tx not found for ConversationID: ${conversationId}`);
+      return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted but shadow record not found" });
     }
 
     // Protection against race conditions: Don't fail an already completed/failed tx
     if (shadowTx.status === 'completed' || shadowTx.status === 'failed') {
+      if (logData?.id) {
+        await supabaseAdmin.from('mpesa_webhook_logs').update({ processing_status: 'processed' }).eq('id', logData.id);
+      }
       return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted" });
     }
 
@@ -55,7 +68,7 @@ export async function POST(req: Request) {
     const { signature, timestamp, stringifiedPayload } = signOutgoingPayload(platformBPayload, secret);
 
     let callbackSuccessful = false;
-    let callbackErrorLog = null;
+    let callbackErrorLog: string | null = null;
 
     try {
       const bResponse = await fetch(shadowTx.callback_url, {
@@ -89,6 +102,14 @@ export async function POST(req: Request) {
         updated_at: new Date().toISOString() 
       })
       .eq('id', shadowTx.id);
+
+    // 5. Update Webhook Log Processing Status
+    if (logData?.id) {
+      await supabaseAdmin
+        .from('mpesa_webhook_logs')
+        .update({ processing_status: 'processed' })
+        .eq('id', logData.id);
+    }
 
     return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted" });
   } catch (error: any) {

@@ -10,7 +10,12 @@ const supabaseAdmin = createClient(
 export async function POST(req: Request) {
   try {
     const rawBody = await req.text();
-    const payload = JSON.parse(rawBody);
+    let payload: any;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ ResultCode: 1, ResultDesc: "Rejected: Invalid JSON payload" });
+    }
 
     const stkCallback = payload?.Body?.stkCallback;
     if (!stkCallback) {
@@ -21,20 +26,26 @@ export async function POST(req: Request) {
     const isSuccess = ResultCode === 0;
     const finalStatus = isSuccess ? 'completed' : 'failed';
 
-    let receiptNumber = null;
-    if (isSuccess && CallbackMetadata?.Item) {
+    let receiptNumber: string | null = null;
+    if (isSuccess && CallbackMetadata?.Item && Array.isArray(CallbackMetadata.Item)) {
       const receiptItem = CallbackMetadata.Item.find((item: any) => item.Name === 'MpesaReceiptNumber');
-      receiptNumber = receiptItem ? receiptItem.Value : null;
+      receiptNumber = receiptItem ? String(receiptItem.Value) : null;
     }
 
-    // 1. Log the webhook event
-    await supabaseAdmin.from('mpesa_webhook_logs').insert({
-      tracking_id: CheckoutRequestID,
-      raw_payload: payload,
-      webhook_type: 'stk_push'
-    });
+    // 1. Log incoming raw webhook payload matching mpesa_webhook_logs schema
+    const { data: logData } = await supabaseAdmin
+      .from('mpesa_webhook_logs')
+      .insert({
+        transaction_type: 'stk_push',
+        mpesa_tracking_id: CheckoutRequestID,
+        mpesa_receipt_number: receiptNumber,
+        raw_payload: payload,
+        processing_status: 'unprocessed'
+      })
+      .select('id')
+      .single();
 
-    // 2. Locate the shadow transaction
+    // 2. Locate the shadow transaction by mpesa_tracking_id
     const { data: shadowTx, error: fetchError } = await supabaseAdmin
       .from('secondary_request_shadow')
       .select('*')
@@ -42,13 +53,15 @@ export async function POST(req: Request) {
       .single();
 
     if (fetchError || !shadowTx) {
-      return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted but not found" });
+      console.warn(`Webhook received for unknown CheckoutRequestID: ${CheckoutRequestID}`);
+      // Return 0 to Safaricom so they stop retrying orphaned callbacks
+      return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted but shadow record not found" });
     }
 
-   // 3. Process Ledger Update (Must succeed before continuing)
+    // 3. Process Ledger Update (Idempotent: process only if not already completed)
     if (isSuccess && shadowTx.status !== 'completed') {
       const { error: ledgerError } = await supabaseAdmin.from('core_wallet_ledger').insert({
-        user_id: shadowTx.user_id || 'UNKNOWN_SYSTEM_ORPHAN', // Fixed column reference
+        user_id: shadowTx.user_id, // Valid UUID guaranteed by secondary_request_shadow
         amount: shadowTx.amount,
         tx_type: shadowTx.tx_type, 
         shadow_request_id: shadowTx.id,
@@ -57,8 +70,8 @@ export async function POST(req: Request) {
 
       if (ledgerError) {
         console.error('CRITICAL: Failed to write to core_wallet_ledger:', ledgerError);
-        // Throwing forces a 500 response. Daraja will keep the webhook in its retry queue.
-        throw new Error('Database transaction failed. Forcing Daraja retry.');
+        // Throwing forces a 500 response so Daraja retries the webhook
+        throw new Error(`Database ledger insertion failed: ${ledgerError.message}`);
       }
     }
 
@@ -75,7 +88,7 @@ export async function POST(req: Request) {
     const { signature, timestamp, stringifiedPayload } = signOutgoingPayload(platformBPayload, secret);
 
     let callbackSuccessful = false;
-    let callbackErrorLog = null;
+    let callbackErrorLog: string | null = null;
 
     try {
       const bResponse = await fetch(shadowTx.callback_url, {
@@ -110,7 +123,15 @@ export async function POST(req: Request) {
       })
       .eq('id', shadowTx.id);
 
-    // 6. Acknowledge to Safaricom
+    // 6. Update Webhook Log Processing Status
+    if (logData?.id) {
+      await supabaseAdmin
+        .from('mpesa_webhook_logs')
+        .update({ processing_status: 'processed' })
+        .eq('id', logData.id);
+    }
+
+    // 7. Acknowledge Receipt to Safaricom
     return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted" });
 
   } catch (error: any) {
