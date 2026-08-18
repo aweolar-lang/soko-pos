@@ -7,15 +7,21 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const interPlatformSecret = process.env.INTER_PLATFORM_SECRET;
 
 if (!supabaseUrl) {
-  throw new Error('Missing required environment variable: NEXT_PUBLIC_SUPABASE_URL');
+  throw new Error(
+    'Missing required environment variable: NEXT_PUBLIC_SUPABASE_URL'
+  );
 }
 
 if (!supabaseServiceRoleKey) {
-  throw new Error('Missing required environment variable: SUPABASE_SERVICE_ROLE_KEY');
+  throw new Error(
+    'Missing required environment variable: SUPABASE_SERVICE_ROLE_KEY'
+  );
 }
 
 if (!interPlatformSecret) {
-  throw new Error('Missing required environment variable: INTER_PLATFORM_SECRET');
+  throw new Error(
+    'Missing required environment variable: INTER_PLATFORM_SECRET'
+  );
 }
 
 const supabaseAdmin = createClient(
@@ -39,28 +45,18 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // 1. Security check:
-    // Platform B must provide:
-    // Authorization: Bearer <INTER_PLATFORM_SECRET>
+    // 1. Authenticate the requesting platform.
     const authHeader = req.headers.get('authorization');
-
-    if (!authHeader) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
     const expectedAuth = `Bearer ${interPlatformSecret}`;
 
-    if (!safeCompare(authHeader, expectedAuth)) {
+    if (!authHeader || !safeCompare(authHeader, expectedAuth)) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    // 2. Next.js 16 dynamic route params are asynchronous.
+    // 2. Resolve the dynamic route parameter.
     const { id: secondaryTxId } = await params;
 
     if (!secondaryTxId?.trim()) {
@@ -74,17 +70,7 @@ export async function GET(
     const { data: shadowTx, error: fetchError } = await supabaseAdmin
       .from('secondary_request_shadow')
       .select(
-        [
-          'secondary_tx_id',
-          'status',
-          'amount',
-          'tx_type',
-          'mpesa_receipt',
-          'error_log',
-          'metadata',
-          'created_at',
-          'updated_at',
-        ].join(', ')
+        'secondary_tx_id, status, amount, tx_type, mpesa_receipt, error_log, metadata, created_at, updated_at'
       )
       .eq('secondary_tx_id', secondaryTxId)
       .maybeSingle();
@@ -105,7 +91,7 @@ export async function GET(
       );
     }
 
-    // 4. Return the standardized state expected by Platform B.
+    // 4. Return the standardized transaction state.
     return NextResponse.json({
       secondary_tx_id: shadowTx.secondary_tx_id,
       status: shadowTx.status,
