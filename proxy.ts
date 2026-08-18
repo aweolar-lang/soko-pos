@@ -52,27 +52,32 @@ function isSafaricomSubnet(ip: string): boolean {
  * In production this commonly comes from the reverse proxy/CDN.
  */
 function getClientIp(request: NextRequest): string {
-  // 1. Next.js natively populates this on Vercel/Edge. Cannot be spoofed.
-  if (request.ip) return request.ip;
-
-  // 2. Strict infrastructure headers (Cloudflare, AWS, etc.)
+  // 1. Cloudflare
   const cfIp = request.headers.get('cf-connecting-ip');
   if (cfIp) return cfIp.trim();
 
+  // 2. Other trusted infrastructure headers
   const trueClientIp = request.headers.get('true-client-ip');
   if (trueClientIp) return trueClientIp.trim();
 
-  // 3. Fallback to X-Forwarded-For (Handle with extreme caution)
-  const forwardedFor = request.headers.get('x-forwarded-for');
-  if (forwardedFor) {
-    const ips = forwardedFor.split(',').map((ip) => ip.trim());
-    // The load balancer appends the real IP at the END of the chain. 
-    // The leftmost IP is easily spoofed. 
-    return ips[ips.length - 1]; 
-  }
-
+  // 3. X-Real-IP
   const realIp = request.headers.get('x-real-ip');
   if (realIp) return realIp.trim();
+
+  // 4. X-Forwarded-For
+  const forwardedFor = request.headers.get('x-forwarded-for');
+  if (forwardedFor) {
+    const ips = forwardedFor
+      .split(',')
+      .map((ip) => ip.trim())
+      .filter(Boolean);
+
+    if (ips.length > 0) {
+      // Your infrastructure is expected to append the actual
+      // client IP at the end of this chain.
+      return ips[ips.length - 1];
+    }
+  }
 
   return '';
 }
